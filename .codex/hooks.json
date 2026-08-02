@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.agents/skills/devweave/scripts/guard.py\"",
+            "commandWindows": "powershell -NoProfile -Command \"$repo = git rev-parse --show-toplevel; python (Join-Path $repo '.agents\\skills\\devweave\\scripts\\guard.py')\"",
+            "statusMessage": "Checking DevWeave gates"
+          }
+        ]
+      }
+    ]
+  }
+}

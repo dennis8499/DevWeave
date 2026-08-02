@@ -1,0 +1,7 @@
+{
+  "kind": "refactor",
+  "title": "重構核心接縫並維持行為",
+  "pre_evidence": ["baseline"],
+  "required_evidence": ["equivalence", "regression"],
+  "baseline_target": null
+}

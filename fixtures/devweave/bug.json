@@ -1,0 +1,7 @@
+{
+  "kind": "bug",
+  "title": "修正可重現的邊界錯誤",
+  "pre_evidence": ["reproduction"],
+  "required_evidence": ["regression"],
+  "baseline_target": null
+}

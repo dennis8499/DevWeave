@@ -1,0 +1,170 @@
+from __future__ import annotations
+
+import sys
+import subprocess
+import unittest
+
+from devweave_test_support import RepositoryHarness, SCRIPT_ROOT, core
+
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
+import guard
+
+
+def denied(result: dict | None) -> bool:
+    if not result:
+        return False
+    output = result.get("hookSpecificOutput", {})
+    return output.get("permissionDecision") == "deny"
+
+
+def patch_payload(repo, session: str, path: str, tool_name: str = "apply_patch") -> dict:
+    return {
+        "cwd": str(repo),
+        "session_id": session,
+        "tool_name": tool_name,
+        "tool_input": {
+            "command": f"*** Begin Patch\n*** Update File: {path}\n@@\n-old\n+new\n*** End Patch"
+        },
+    }
+
+
+def bash_payload(repo, session: str, command: str) -> dict:
+    return {
+        "cwd": str(repo),
+        "session_id": session,
+        "tool_name": "Bash",
+        "tool_input": {"command": command},
+    }
+
+
+class GuardTests(unittest.TestCase):
+    def test_uninitialized_repository_does_not_activate(self) -> None:
+        with RepositoryHarness() as harness:
+            payload = patch_payload(harness.repo, "s-unmanaged", "src/app.txt")
+            self.assertIsNone(guard.handle_hook(payload, harness.repo))
+
+    def test_managed_repository_blocks_unbound_writes(self) -> None:
+        with RepositoryHarness() as harness:
+            harness.init()
+            result = guard.handle_hook(
+                patch_payload(harness.repo, "s-unbound", "src/app.txt"), harness.repo
+            )
+            self.assertTrue(denied(result))
+
+    def test_devweave_name_inside_arbitrary_command_is_not_a_guard_bypass(self) -> None:
+        with RepositoryHarness() as harness:
+            harness.init()
+            payload = bash_payload(
+                harness.repo,
+                "s-bypass",
+                "python -c devweave.py",
+            )
+            self.assertTrue(denied(guard.handle_hook(payload, harness.repo)))
+
+    def test_bound_session_can_edit_artifacts_but_not_product_before_g2(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            session = "s-artifacts"
+            core.bind_session(harness.repo, session, state["id"])
+            artifact = harness.work_file(state["id"], "brief.md")
+            artifact_result = guard.handle_hook(
+                patch_payload(harness.repo, session, str(artifact)), harness.repo
+            )
+            product_result = guard.handle_hook(
+                patch_payload(harness.repo, session, "src/app.txt"), harness.repo
+            )
+            self.assertIsNone(artifact_result)
+            self.assertTrue(denied(product_result))
+
+    def test_g2_allows_product_write_and_stale_design_reblocks_it(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            session = "s-implementation"
+            core.bind_session(harness.repo, session, state["id"])
+            payload = patch_payload(harness.repo, session, "src/app.txt")
+            self.assertIsNone(guard.handle_hook(payload, harness.repo))
+            design = harness.work_file(state["id"], "design.md")
+            design.write_text(design.read_text(encoding="utf-8") + "\n變更設計。\n", encoding="utf-8")
+            self.assertTrue(denied(guard.handle_hook(payload, harness.repo)))
+
+    def test_g2_still_blocks_known_out_of_scope_patch(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            session = "s-scope"
+            core.bind_session(harness.repo, session, state["id"])
+            result = guard.handle_hook(
+                patch_payload(harness.repo, session, "README.md"), harness.repo
+            )
+            self.assertTrue(denied(result))
+            outside = guard.handle_hook(
+                patch_payload(harness.repo, session, "../outside.txt"), harness.repo
+            )
+            self.assertTrue(denied(outside))
+
+    def test_patch_move_destination_is_also_scope_checked(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            session = "s-move"
+            core.bind_session(harness.repo, session, state["id"])
+            payload = {
+                "cwd": str(harness.repo),
+                "session_id": session,
+                "tool_name": "apply_patch",
+                "tool_input": {
+                    "command": "*** Begin Patch\n*** Update File: src/app.txt\n*** Move to: README.md\n@@\n-old\n+new\n*** End Patch"
+                },
+            }
+            self.assertTrue(denied(guard.handle_hook(payload, harness.repo)))
+
+    def test_baseline_write_is_limited_to_verification(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            session = "s-baseline"
+            core.bind_session(harness.repo, session, state["id"])
+            payload = patch_payload(
+                harness.repo, session, ".devweave/baseline/architecture.md"
+            )
+            self.assertTrue(denied(guard.handle_hook(payload, harness.repo)))
+            harness.implement(state["id"], "done")
+            self.assertIsNone(guard.handle_hook(payload, harness.repo))
+
+    def test_read_only_is_unbound_but_configured_command_requires_binding(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            command = harness.configure_command(required_for=())
+            command_text = subprocess.list2cmdline(command["argv"])
+            self.assertIsNone(
+                guard.handle_hook(bash_payload(harness.repo, "", "git status"), harness.repo)
+            )
+            self.assertTrue(
+                denied(
+                    guard.handle_hook(
+                        bash_payload(harness.repo, "", command_text), harness.repo
+                    )
+                )
+            )
+            core.bind_session(harness.repo, "s-command", state["id"])
+            self.assertIsNone(
+                guard.handle_hook(
+                    bash_payload(harness.repo, "s-command", command_text), harness.repo
+                )
+            )
+
+    def test_cli_bind_command_binds_hook_session(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            command = (
+                "python .agents/skills/devweave/scripts/devweave.py --repo . "
+                f"bind --work {state['id']}"
+            )
+            result = guard.handle_hook(
+                bash_payload(harness.repo, "s-cli-bind", command), harness.repo
+            )
+            self.assertFalse(denied(result))
+            binding = core.load_session_binding(harness.repo, "s-cli-bind")
+            self.assertEqual(state["id"], binding["work"])
+
+
+if __name__ == "__main__":
+    unittest.main()

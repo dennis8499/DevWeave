@@ -1,0 +1,7 @@
+{
+  "kind": "feature",
+  "title": "新增可相容的查詢能力",
+  "pre_evidence": [],
+  "required_evidence": ["acceptance", "regression"],
+  "baseline_target": null
+}

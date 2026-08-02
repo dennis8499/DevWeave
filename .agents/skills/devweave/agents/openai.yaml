@@ -1,0 +1,6 @@
+interface:
+  display_name: "DevWeave"
+  short_description: "以三道品質關卡驅動需求探索、系統設計、程式實作與功能驗收"
+  default_prompt: "使用 $devweave 啟動一個完整、可追溯的軟體開發工作項。"
+policy:
+  allow_implicit_invocation: true

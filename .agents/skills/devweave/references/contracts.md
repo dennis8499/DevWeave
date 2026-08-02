@@ -1,0 +1,153 @@
+# DevWeave v1 Contracts
+
+Read this reference for CLI usage, artifact grammar, state recovery, or an ambiguous workflow. The Python engine is the executable source of truth.
+
+## Runtime and persistence
+
+- Runtime: Python 3.11 or newer, standard library only, inside a Git repository.
+- Schema version: integer `1` in both `project.json` and every `state.json`.
+- Encoding: UTF-8 for JSON, JSONL, Markdown, and hook output.
+- Writes: atomic temporary-file plus `os.replace` for JSON and generated text.
+- Concurrency: one atomic directory lock per work item and a separate project lock.
+- Events: append-only `events.jsonl`; never use it as mutable state.
+- Raw command output: `.devweave/cache/logs/<work-id>/<EVID-id>.log`, limited by project policy and excluded from Git.
+
+Machine state is authoritative. Update state, tasks, approvals, evidence, scope, risk, baseline decisions, commands, and waivers only through the CLI. Codex edits the five Markdown artifacts and product files.
+
+## Project model
+
+`.devweave/project.json` contains:
+
+- `schema_version`, `managed`, and `locale`.
+- `commands[]`, each with unique `id`, string-array `argv`, repo-relative `cwd`, positive `timeout_seconds`, and `required_for[]` risk levels.
+- `verification_profiles.low|standard|high`, containing required command IDs.
+- `protected_mutations[]` and evidence storage policy.
+
+Commands are executed with `shell=false`. Never convert `argv` to a shell string.
+
+## Work-item model
+
+`.devweave/work-items/<id>/state.json` contains:
+
+- identity: `id`, `kind`, `title`, `schema_version`, timestamps, and active/closed status;
+- lifecycle: `phase`, three gate records, and optional blocker;
+- scope: risk classification, risk rationale, downgrade rationale, paths, and scope rationale;
+- provenance: `base_source`, `base_baseline`, Git HEAD/branch/diff fingerprint, and `last_verification`;
+- ledgers: machine task state, evidence summaries, waivers, and baseline-update decisions.
+
+Valid phases are:
+
+```text
+requirements -> design -> implementation -> verification -> acceptance_review -> closed
+       ^            ^             ^
+       |            |             +-- G3 rejection or source/evidence change
+       |            +---------------- G2 rejection or design/plan change
+       +----------------------------- G1 rejection or brief/requirements/risk/scope change
+```
+
+`scope_review` and `build_review` are valid review aliases. Gate status is `pending`, `approved`, or `stale`. Every approval records the artifact fingerprint, Git identity, UTC timestamp, and an append-only event.
+
+## Fingerprints and invalidation
+
+- G1 fingerprint: exact `brief.md`, `requirements.md`, risk, scope, and G1 waivers.
+- G2 fingerprint: G1 material plus exact `design.md`, `plan.md`, and G2 waivers.
+- G3 fingerprint: G2 material plus exact `acceptance.md`, current Git source fingerprint, evidence ledger, the complete living-baseline tree fingerprint, and G3 waivers.
+- Source fingerprint: Git HEAD plus path/content/staged/unstaged diff material, excluding DevWeave machine state, its skill implementation, and Codex configuration.
+
+Invalidation is monotonic until reapproval:
+
+- G1 material change invalidates G1, G2, and G3 and returns to requirements.
+- G2 material change keeps G1 and invalidates G2 and G3 and returns to design.
+- Post-verification source change marks source-bound evidence stale, clears the verification snapshot, invalidates G3, and returns to verification while G2 remains current.
+- G3 artifact, evidence, baseline, or waiver change invalidates G3.
+- Closed work remains in place and cannot be reopened; start a new work item.
+
+## Artifact grammar and traceability
+
+Human-facing artifacts are `brief.md`, `requirements.md`, `design.md`, `plan.md`, and `acceptance.md`. Required prose is Traditional Chinese by default.
+
+- Use contiguous, unique second-level `REQ-###` and `NFR-###` headings.
+- Use contiguous, unique second-level `AC-###` headings. Every requirement links to an existing AC, and every AC links to an existing requirement.
+- Use contiguous, unique second-level `DEC-###` headings linked to existing requirements.
+- Use contiguous, unique second-level `TASK-###` headings linked to existing requirements, ACs, and decisions.
+- Keep approved task definitions immutable in `plan.md`; keep `pending`, `in_progress`, `blocked`, and `completed` status only in `state.json`.
+- Store versioned `EVID-###` JSON summaries. Current implementation evidence links to existing AC and TASK IDs and carries the source fingerprint and Git HEAD.
+- `acceptance.md` accounts for every current source-bound evidence ID and every AC.
+
+Discovery-only bug reproduction and refactor baseline evidence may predate an approved TASK ledger. They retain AC and source provenance but do not count as green, source-bound G3 evidence.
+
+## Profiles and risk
+
+- `new`: current acceptance evidence for the first end-to-end vertical slice and an accepted architecture baseline decision.
+- `feature`: current acceptance and regression evidence.
+- `refactor`: passing pre-change baseline before G1; current equivalence and regression evidence at G3.
+- `bug`: observed failing reproduction before G1 or an explicit narrow unreproducible waiver; current regression evidence at G3.
+- `high`: all profile evidence plus current independent review evidence and applicable migration, rollback, security, compatibility, or performance analysis.
+
+Risk changes are fingerprinted. Any downgrade, including high to standard, records a separate rationale.
+
+## Gate requirements
+
+- G1: complete brief/requirements grammar, risk, scope, and profile discovery evidence.
+- G2: current G1, complete design/plan grammar, trace graph, high-risk analysis, and explicit approval.
+- G3: current G2, completed task ledger exactly matching approved plan, current AC/TASK/source-bound evidence, all required command results or narrow waivers, in-scope diff, baseline decision, complete acceptance report, and explicit approval.
+- Every baseline path changed since work-item creation must be declared as a target; every declared target must contain an attributable addition, update, or deletion.
+- `close`: succeeds only when the exact current G3 fingerprint is approved.
+
+Waivers contain `id`, `gate`, `kind`, `target`, reason, approver, and timestamp. Adding or changing one invalidates the gate whose decision it affects.
+
+## CLI contract
+
+Run `scripts/devweave.py --repo <path> <command>`. Output is always one JSON document on stdout.
+
+Commands are `init`, `start`, `status`, `instructions`, `validate`, `bind`, `risk`, `scope`, `baseline`, `task start|complete|block`, `evidence add`, `verify`, `waiver add`, `approve`, `revise`, `close`, `doctor`, `project`, and `command set|list|remove`.
+
+`scope` is a replace operation, not an append operation. Supply the entire intended set in one command by repeating the option: `scope --path src --path tests --rationale "..."`.
+
+`bind` without `--session-id` deliberately returns `binding.status: awaiting_hook`. The invoking Codex session is considered bound only if the PreToolUse hook confirms the work ID through additional context. A trusted integration may supply its real session ID and receive `binding.status: bound`; agents must never invent one.
+
+Success envelope:
+
+```json
+{
+  "ok": true,
+  "work": {}
+}
+```
+
+Diagnostic envelope:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "validation_failed",
+    "message": "Human-readable diagnostic",
+    "details": {}
+  }
+}
+```
+
+`validate` and `verify` may return domain-specific payloads with `ok: false` rather than the generic error envelope. Stable process exit codes are:
+
+- `0`: command completed and its requested assertion passed.
+- `2`: validation, artifact, state, or gate failure.
+- `3`: no eligible item or ambiguous work-item selection.
+- `4`: command execution failure, failed verification, or unexpected internal failure.
+- `130`: interrupted by the operator.
+
+## Public chat verbs and selection
+
+- `new`, `feature`, `refactor`, `bug`: initialize if necessary, start one work item, bind it, then perform requirements work.
+- `next`: resolve and bind one work item, obtain instructions, and execute only the returned phase.
+- `status`: report state, gates, task progress, stale evidence, blocker, and next action in Traditional Chinese.
+- `revise`: record the earliest affected phase and reason before changing an approved artifact.
+- `approve`: validate and approve the current human gate; after G3, close.
+
+Resolve an explicitly named item first, then an item unambiguously established by the conversation, then the only eligible active item. If multiple candidates remain, show ID, title, kind, phase, and status and ask the user to choose.
+
+`status` is informational: an initialized repository with zero eligible items returns exit `0` and an empty `work_items` array. Commands that require a work item still use exit `3` when none can be resolved.
+
+## Language and ownership
+
+Keep skill instructions, Python, JSON keys, IDs, and internal contracts in English. Write chat summaries and human-facing Markdown in Traditional Chinese unless the user requests another language. Inspect Git state but leave branches, worktrees, commits, pushes, PRs, deployment, and remote trackers to an explicitly authorized workflow.

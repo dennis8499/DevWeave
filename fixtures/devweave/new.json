@@ -1,0 +1,7 @@
+{
+  "kind": "new",
+  "title": "建立第一個端到端切片",
+  "pre_evidence": [],
+  "required_evidence": ["acceptance"],
+  "baseline_target": ".devweave/baseline/architecture.md"
+}
