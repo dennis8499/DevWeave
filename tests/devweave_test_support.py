@@ -118,6 +118,12 @@ class RepositoryHarness:
 """,
             encoding="utf-8",
         )
+        core.set_knowledge_context(
+            self.repo,
+            work_id,
+            ["wiki/index.md", "wiki/overview.md"],
+            ["wiki/overview.md 尚為 placeholder；探索已回溯 fixture raw source。"],
+        )
 
     def fill_design(self, work_id: str, high_risk: bool = False) -> None:
         risk_analysis = (
@@ -189,6 +195,9 @@ AC-001、AC-002 對應 TASK-001，證據為 {evidence}，且綁定目前 source 
 ## 基線更新
 已更新指定 living baseline，或已記錄不需更新的理由。
 
+## Wiki 知識提升
+已完成必要的 affected-page promotion；沒有目標時 Wiki 維持不變。
+
 ## 殘餘風險
 無未處理的殘餘風險。
 
@@ -196,6 +205,64 @@ AC-001、AC-002 對應 TASK-001，證據為 {evidence}，且綁定目前 source 
 所有驗收條件、任務與必要證據均已完成，可提交 G3 核准。
 """,
             encoding="utf-8",
+        )
+
+    def promote_overview(self, work_id: str) -> None:
+        core.set_knowledge_plan(
+            self.repo,
+            work_id,
+            ["wiki/overview.md"],
+            [],
+            "new work 將 overview 提升為具來源的 active 知識。",
+        )
+        overview = self.repo / "wiki" / "overview.md"
+        frontmatter, _, errors = core.knowledge.parse_frontmatter_text(
+            overview.read_text(encoding="utf-8")
+        )
+        if errors:
+            raise AssertionError(errors)
+        frontmatter["sources"] = ["src/app.txt"]
+        frontmatter["status"] = "active"
+        body = """
+# Fixture Overview
+
+## Scope
+
+此 fixture 以 `src/app.txt` 提供可驗收的垂直切片。
+
+## Architecture
+
+單一 source file 代表最小產品邊界。
+
+## Key Modules
+
+- `src/app.txt`
+
+## Gaps
+
+- 無。
+"""
+        overview.write_text(
+            core.knowledge.render_frontmatter(frontmatter, body), encoding="utf-8"
+        )
+        index = self.repo / "wiki" / "index.md"
+        index.write_text(
+            index.read_text(encoding="utf-8").replace(
+                "專案概觀 placeholder", "Fixture 的 active、source-bound 專案概觀"
+            ),
+            encoding="utf-8",
+        )
+        log = self.repo / "wiki" / "log.md"
+        log.write_text(
+            log.read_text(encoding="utf-8")
+            + f"\n## [2099-01-01] promote | {work_id}\n\n"
+            + "- Promoted [[overview]] from current fixture source behavior.\n",
+            encoding="utf-8",
+        )
+        core.seal_knowledge(
+            self.repo,
+            work_id,
+            ["wiki/overview.md", "wiki/index.md", "wiki/log.md"],
         )
 
     def configure_command(

@@ -163,6 +163,84 @@ class CliContractTests(unittest.TestCase):
             self.assertEqual(2, result.returncode)
             self.assertEqual("validation_failed", payload["error"]["code"])
 
+    def test_knowledge_machine_cli_reports_and_replaces_g1_context(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            work_id = state["id"]
+            result, payload = invoke(
+                harness.repo, "knowledge", "status", "--work", work_id
+            )
+            self.assertEqual(0, result.returncode)
+            self.assertEqual("warning", payload["knowledge"]["health"])
+            self.assertIn("wiki/overview.md", payload["knowledge"]["placeholder_pages"])
+
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "context",
+                "--work",
+                work_id,
+                "--page",
+                "wiki/index.md",
+                "--page",
+                "wiki/overview.md",
+                "--gap",
+                "overview placeholder required raw-source fallback",
+            )
+            self.assertEqual(0, result.returncode, payload)
+            self.assertEqual(
+                ["wiki/index.md", "wiki/overview.md"],
+                payload["knowledge_context"]["pages"],
+            )
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "context",
+                "--work",
+                work_id,
+                "--page",
+                "wiki/index.md",
+            )
+            self.assertEqual(0, result.returncode, payload)
+            self.assertEqual(["wiki/index.md"], payload["knowledge_context"]["pages"])
+
+    def test_knowledge_plan_and_seal_cli_use_coupled_targets(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            work_id = state["id"]
+            harness.implement(work_id, "verification")
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "plan",
+                "--work",
+                work_id,
+                "--upsert",
+                "wiki/overview.md",
+                "--rationale",
+                "CLI promotion fixture",
+            )
+            self.assertEqual(0, result.returncode, payload)
+            self.assertEqual(
+                ["wiki/index.md", "wiki/log.md"],
+                payload["knowledge_updates"]["coupled"],
+            )
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "seal",
+                "--work",
+                work_id,
+                "--page",
+                "wiki/overview.md",
+                "--page",
+                "wiki/index.md",
+                "--page",
+                "wiki/log.md",
+            )
+            self.assertEqual(0, result.returncode, payload)
+            self.assertEqual(3, len(payload["pages"]))
+
 
 if __name__ == "__main__":
     unittest.main()

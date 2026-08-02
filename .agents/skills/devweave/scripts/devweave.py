@@ -33,12 +33,16 @@ from devweave_core import (
     resolve_work,
     revise_work,
     run_verification,
+    seal_knowledge,
     set_baseline_updates,
+    set_knowledge_context,
+    set_knowledge_plan,
     set_risk,
     set_scope,
     sync_state,
     update_task,
     validate_work,
+    work_knowledge_status,
 )
 
 
@@ -61,7 +65,9 @@ class JsonArgumentParser(argparse.ArgumentParser):
         raise SystemExit(2)
 
 
-def state_summary(state: dict[str, Any]) -> dict[str, Any]:
+def state_summary(
+    state: dict[str, Any], repo: Path | None = None
+) -> dict[str, Any]:
     tasks = state.get("tasks", {})
     evidence = state.get("evidence", {})
     stale_evidence = sorted(
@@ -69,7 +75,7 @@ def state_summary(state: dict[str, Any]) -> dict[str, Any]:
         for evidence_id, item in evidence.items()
         if item.get("stale")
     )
-    return {
+    summary = {
         "id": state["id"],
         "title": state["title"],
         "kind": state["kind"],
@@ -91,6 +97,9 @@ def state_summary(state: dict[str, Any]) -> dict[str, Any]:
         "blocker": state.get("blocker"),
         "updated_at": state["updated_at"],
     }
+    if repo is not None:
+        summary["knowledge"] = work_knowledge_status(repo, state)
+    return summary
 
 
 def command_init(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
@@ -105,7 +114,7 @@ def command_start(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
         risk=args.risk,
         risk_rationale=args.rationale,
     )
-    return {"ok": True, "work": state_summary(state)}
+    return {"ok": True, "work": state_summary(state, repo)}
 
 
 def command_status(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
@@ -122,7 +131,7 @@ def command_status(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
         return {
             "ok": True,
             "initialized": True,
-            "work_items": [state_summary(item) for item in items],
+            "work_items": [state_summary(item, repo) for item in items],
         }
     if not args.work and not list_work(repo, include_closed=args.include_closed):
         return {
@@ -134,7 +143,7 @@ def command_status(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
     state = resolve_work(repo, args.work, include_closed=args.include_closed)
     if state["status"] != "closed":
         state = sync_state(repo, state["id"])
-    return {"ok": True, "initialized": True, "work": state_summary(state)}
+    return {"ok": True, "initialized": True, "work": state_summary(state, repo)}
 
 
 def command_instructions(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
@@ -203,6 +212,47 @@ def command_baseline(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
         "work": state_summary(updated),
         "baseline_updates": updated["baseline_updates"],
     }
+
+
+def command_knowledge(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
+    if args.knowledge_action == "status":
+        state: dict[str, Any] | None = None
+        if args.work:
+            state = resolve_work(repo, args.work, include_closed=True)
+            if state.get("status") != "closed":
+                state = sync_state(repo, state["id"])
+        else:
+            candidates = list_work(repo)
+            if len(candidates) == 1:
+                state = sync_state(repo, candidates[0]["id"])
+            elif len(candidates) > 1:
+                state = resolve_work(repo, None)
+        return {
+            "ok": True,
+            "work": state["id"] if state else None,
+            "knowledge": work_knowledge_status(repo, state),
+        }
+    state = resolve_work(repo, args.work)
+    if args.knowledge_action == "context":
+        context = set_knowledge_context(
+            repo, state["id"], args.page, args.gap
+        )
+        return {"ok": True, "work": state["id"], "knowledge_context": context}
+    if args.knowledge_action == "plan":
+        updates = set_knowledge_plan(
+            repo,
+            state["id"],
+            args.upsert,
+            args.delete,
+            args.rationale,
+        )
+        return {"ok": True, "work": state["id"], "knowledge_updates": updates}
+    if args.knowledge_action == "seal":
+        result = seal_knowledge(repo, state["id"], args.page)
+        return {"ok": True, "work": state["id"], **result}
+    raise ValidationError(
+        "Unknown knowledge action.", {"action": args.knowledge_action}
+    )
 
 
 def command_task(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
@@ -416,6 +466,33 @@ def build_parser() -> argparse.ArgumentParser:
     baseline_parser.add_argument("--target", action="append", default=[])
     baseline_parser.add_argument("--rationale", required=True)
     baseline_parser.set_defaults(handler=command_baseline)
+
+    knowledge_parser = subparsers.add_parser("knowledge")
+    knowledge_subparsers = knowledge_parser.add_subparsers(
+        dest="knowledge_action", required=True
+    )
+    knowledge_status_parser = knowledge_subparsers.add_parser("status")
+    knowledge_status_parser.add_argument("--work")
+    knowledge_status_parser.set_defaults(handler=command_knowledge)
+    knowledge_context_parser = knowledge_subparsers.add_parser("context")
+    knowledge_context_parser.add_argument("--work")
+    knowledge_context_parser.add_argument(
+        "--page", action="append", default=[], required=True
+    )
+    knowledge_context_parser.add_argument("--gap", action="append", default=[])
+    knowledge_context_parser.set_defaults(handler=command_knowledge)
+    knowledge_plan_parser = knowledge_subparsers.add_parser("plan")
+    knowledge_plan_parser.add_argument("--work")
+    knowledge_plan_parser.add_argument("--upsert", action="append", default=[])
+    knowledge_plan_parser.add_argument("--delete", action="append", default=[])
+    knowledge_plan_parser.add_argument("--rationale", required=True)
+    knowledge_plan_parser.set_defaults(handler=command_knowledge)
+    knowledge_seal_parser = knowledge_subparsers.add_parser("seal")
+    knowledge_seal_parser.add_argument("--work")
+    knowledge_seal_parser.add_argument(
+        "--page", action="append", default=[], required=True
+    )
+    knowledge_seal_parser.set_defaults(handler=command_knowledge)
 
     task_parser = subparsers.add_parser("task")
     task_parser.add_argument("action", choices=("start", "complete", "block"))

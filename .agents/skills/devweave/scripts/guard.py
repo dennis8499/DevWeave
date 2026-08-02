@@ -166,10 +166,28 @@ def _allowed_artifact_path(work_id: str, path: str) -> bool:
     return relative in ARTIFACT_NAMES
 
 
-def _allow_patch_for_state(state: dict[str, Any], paths: list[str]) -> bool:
+def _knowledge_path(path: str, root: str) -> bool:
+    normalized_root = root.strip("/").replace("\\", "/").lower()
+    normalized = path.replace("\\", "/").lower()
+    return normalized == normalized_root or normalized.startswith(normalized_root + "/")
+
+
+def _mentions_knowledge_path(command: str, root: str) -> bool:
+    normalized = command.replace("\\", "/").lower()
+    target = root.strip("/").replace("\\", "/").lower()
+    return bool(re.search(rf"(?<![A-Za-z0-9_.-]){re.escape(target)}(?:/|\b)", normalized))
+
+
+def _allow_patch_for_state(
+    state: dict[str, Any], paths: list[str], knowledge_root: str = "wiki"
+) -> bool:
     if not paths:
         return False
     build_ready = state["gates"]["build"].get("status") == "approved"
+    updates = state.get("knowledge_updates", {})
+    allowed_knowledge = set(updates.get("upserts", [])) | set(
+        updates.get("deletes", [])
+    ) | set(updates.get("coupled", []))
     for path in paths:
         if path.startswith("../") or Path(path).is_absolute():
             return False
@@ -180,6 +198,15 @@ def _allow_patch_for_state(state: dict[str, Any], paths: list[str]) -> bool:
                 continue
             return False
         if path.startswith(".devweave/"):
+            return False
+        if _knowledge_path(path, knowledge_root):
+            if (
+                "base_knowledge" in state
+                and build_ready
+                and state.get("phase") in ("verification", "acceptance_review")
+                and path in allowed_knowledge
+            ):
+                continue
             return False
         if not build_ready:
             return False
@@ -249,6 +276,11 @@ def handle_hook(payload: dict[str, Any], repo: Path | None = None) -> dict[str, 
             )
         if _matches_configured_command(repo, command):
             return None
+        if _mentions_knowledge_path(command, project["knowledge"]["root"]):
+            return deny(
+                "Wiki 寫入必須在 verification/acceptance 階段透過已規劃的精確路徑；"
+                "shell 命令無法可靠驗證路徑，請使用 patch/edit/write 或 DevWeave knowledge CLI。"
+            )
         if state["gates"]["build"].get("status") != "approved":
             return deny(
                 f"工作項 {state['id']} 尚未通過 G2 設計與開發核准；"
@@ -262,11 +294,13 @@ def handle_hook(payload: dict[str, Any], repo: Path | None = None) -> dict[str, 
                 "此 repo 已由 DevWeave 管理。Codex 寫入前必須先綁定 active work item。"
             )
         paths = _patch_paths(command, repo)
-        if not _allow_patch_for_state(state, paths):
+        if not _allow_patch_for_state(
+            state, paths, project["knowledge"]["root"]
+        ):
             return deny(
                 f"工作項 {state['id']} 的目前 gate 不允許這次寫入。"
                 "G2 前僅能修改該工作項的 Markdown artifacts；"
-                "living baseline 只能在驗證階段更新。"
+                "living baseline 與已規劃 Wiki pages 只能在驗證階段更新。"
             )
         return None
 

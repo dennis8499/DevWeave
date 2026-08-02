@@ -1,0 +1,54 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "cwd": ".",
+      "id": "unit-tests",
+      "required_for": [
+        "high",
+        "low",
+        "standard"
+      ],
+      "timeout_seconds": 240
+    }
+  ],
+  "evidence": {
+    "raw_log_limit_bytes": 5000000,
+    "version_summaries": true
+  },
+  "knowledge": {
+    "enabled": true,
+    "root": "wiki"
+  },
+  "locale": "zh-TW",
+  "managed": true,
+  "protected_mutations": [
+    "product-code",
+    "tests",
+    "schema",
+    "dependencies",
+    "build",
+    "ci"
+  ],
+  "schema_version": 1,
+  "verification_profiles": {
+    "high": [
+      "unit-tests"
+    ],
+    "low": [
+      "unit-tests"
+    ],
+    "standard": [
+      "unit-tests"
+    ]
+  }
+}

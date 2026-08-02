@@ -1,0 +1,42 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013",
+    "AC-014",
+    "AC-015"
+  ],
+  "created_at": "2026-08-02T13:18:04+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "b8b69073d157d6d0f6472cf1fc946058cbff2f64",
+  "id": "EVID-004",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "2f1ad5eebab7465ddc28bb0fffdab7cf09095bd82c621db334df0b270a1a463b",
+  "stale": false,
+  "status": "passed",
+  "summary": "已在暫存 Git fixture 驗證 init→feature→G1/G2→source change→affected Wiki refresh/seal→G3→close；machine CLI、index/log coupling、legacy 與 no-overwrite 行為符合 AC-001～AC-015，skill quick validation 通過。",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005"
+  ]
+}

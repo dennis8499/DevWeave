@@ -1,0 +1,42 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013",
+    "AC-014",
+    "AC-015"
+  ],
+  "created_at": "2026-08-02T13:18:06+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "b8b69073d157d6d0f6472cf1fc946058cbff2f64",
+  "id": "EVID-005",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "2f1ad5eebab7465ddc28bb0fffdab7cf09095bd82c621db334df0b270a1a463b",
+  "stale": false,
+  "status": "passed",
+  "summary": "高風險 review 已檢查 migration/rollback、Windows/POSIX path、intermediate symlink escape、單次 Git catalog、atomic writes、schema v1 legacy、public compatibility、single-hook fail-closed 邊界與 G3 reconciliation；修正後 targeted 與 60 項 suite 均通過。",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005"
+  ]
+}

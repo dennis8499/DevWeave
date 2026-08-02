@@ -19,6 +19,8 @@ class EndToEndProfileTests(unittest.TestCase):
                     core.instructions(harness.repo, state)["reference"],
                 )
                 harness.implement(work_id, scenario["kind"])
+                if scenario["kind"] == "new":
+                    harness.promote_overview(work_id)
                 self.assertEqual(
                     "references/verification-phase.md",
                     core.instructions(
@@ -586,10 +588,15 @@ class ValidationAndPersistenceTests(unittest.TestCase):
             harness.init()
             project = core.read_json(core.project_path(harness.repo))
             project["commands"] = [{"id": "bad", "argv": "shell string"}]
+            project["knowledge"]["root"] = "docs/wiki"
             core.atomic_write_json(core.project_path(harness.repo), project)
             with self.assertRaises(core.ValidationError) as invalid_project:
                 core.load_project(harness.repo)
             self.assertTrue(invalid_project.exception.details["errors"])
+            self.assertIn(
+                "knowledge.root must be wiki",
+                invalid_project.exception.details["errors"],
+            )
 
     def test_multiple_items_require_selection_and_closed_item_cannot_reopen(self) -> None:
         with RepositoryHarness() as harness:

@@ -74,8 +74,12 @@ class GuardTests(unittest.TestCase):
             product_result = guard.handle_hook(
                 patch_payload(harness.repo, session, "src/app.txt"), harness.repo
             )
+            wiki_result = guard.handle_hook(
+                patch_payload(harness.repo, session, "wiki/overview.md"), harness.repo
+            )
             self.assertIsNone(artifact_result)
             self.assertTrue(denied(product_result))
+            self.assertTrue(denied(wiki_result))
 
     def test_g2_allows_product_write_and_stale_design_reblocks_it(self) -> None:
         with RepositoryHarness() as harness:
@@ -164,6 +168,57 @@ class GuardTests(unittest.TestCase):
             self.assertFalse(denied(result))
             binding = core.load_session_binding(harness.repo, "s-cli-bind")
             self.assertEqual(state["id"], binding["work"])
+
+    def test_wiki_write_requires_verification_and_exact_knowledge_plan(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            session = "s-wiki"
+            core.bind_session(harness.repo, session, state["id"])
+            planned = patch_payload(
+                harness.repo, session, "wiki/modules/runtime.md"
+            )
+            self.assertTrue(denied(guard.handle_hook(planned, harness.repo)))
+            self.assertTrue(
+                denied(
+                    guard.handle_hook(
+                        bash_payload(
+                            harness.repo,
+                            session,
+                            "Set-Content wiki/modules/runtime.md changed",
+                        ),
+                        harness.repo,
+                    )
+                )
+            )
+
+            harness.implement(state["id"], "verification")
+            self.assertTrue(denied(guard.handle_hook(planned, harness.repo)))
+            core.set_knowledge_plan(
+                harness.repo,
+                state["id"],
+                ["wiki/modules/runtime.md"],
+                [],
+                "Guard fixture promotion.",
+            )
+            self.assertIsNone(guard.handle_hook(planned, harness.repo))
+            self.assertIsNone(
+                guard.handle_hook(
+                    patch_payload(harness.repo, session, "wiki/index.md"), harness.repo
+                )
+            )
+            self.assertIsNone(
+                guard.handle_hook(
+                    patch_payload(harness.repo, session, "wiki/log.md"), harness.repo
+                )
+            )
+            self.assertTrue(
+                denied(
+                    guard.handle_hook(
+                        patch_payload(harness.repo, session, "wiki/modules/other.md"),
+                        harness.repo,
+                    )
+                )
+            )
 
 
 if __name__ == "__main__":

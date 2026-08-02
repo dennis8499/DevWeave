@@ -5,10 +5,11 @@ Read this reference only while the work item phase is design or build_review.
 ## Design
 
 1. Re-read the approved brief and requirements plus the relevant live code.
-2. Complete design.md in Traditional Chinese.
-3. Compare viable options. Record DEC headings that trace to REQ or NFR IDs.
-4. Specify interfaces, data flow, state changes, compatibility, failure modes, rollback, and observability.
-5. For high risk, explicitly decide the applicable migration, rollback, security, compatibility, and performance treatment.
+2. Treat Wiki as read-only input throughout G2. Keep new decisions in `design.md`; do not promote them into persistent Wiki pages yet.
+3. Complete design.md in Traditional Chinese.
+4. Compare viable options. Record DEC headings that trace to REQ or NFR IDs.
+5. Specify interfaces, data flow, state changes, compatibility, failure modes, rollback, and observability.
+6. For high risk, explicitly decide the applicable migration, rollback, security, compatibility, and performance treatment.
 
 ## Plan
 

@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+import knowledge_core as knowledge
+
 
 SCHEMA_VERSION = 1
 KINDS = ("new", "feature", "refactor", "bug")
@@ -141,9 +143,10 @@ def normalize_relpath(path: str | Path) -> str:
     return normalized
 
 
-def is_framework_path(path: str) -> bool:
+def is_framework_path(path: str, knowledge_root: str = "wiki") -> bool:
     normalized = normalize_relpath(path)
-    return any(normalized == prefix.rstrip("/") or normalized.startswith(prefix) for prefix in FRAMEWORK_PREFIXES)
+    prefixes = (*FRAMEWORK_PREFIXES, knowledge.normalize_root(knowledge_root) + "/")
+    return any(normalized == prefix.rstrip("/") or normalized.startswith(prefix) for prefix in prefixes)
 
 
 def path_matches_scope(path: str, patterns: Sequence[str]) -> bool:
@@ -396,6 +399,23 @@ def load_project(repo: Path) -> dict[str, Any]:
         or raw_limit <= 0
     ):
         errors.append("evidence.raw_log_limit_bytes must be a positive integer")
+    knowledge_policy = project.get("knowledge")
+    if knowledge_policy is None:
+        knowledge_policy = {"enabled": True, "root": "wiki"}
+        project["knowledge"] = knowledge_policy
+    if (
+        not isinstance(knowledge_policy, dict)
+        or knowledge_policy.get("enabled") is not True
+        or not isinstance(knowledge_policy.get("root"), str)
+    ):
+        errors.append("knowledge must enable one repo-relative root")
+    else:
+        try:
+            knowledge_policy["root"] = knowledge.normalize_root(knowledge_policy["root"])
+            if knowledge_policy["root"] != "wiki":
+                errors.append("knowledge.root must be wiki")
+        except knowledge.KnowledgeError as exc:
+            errors.append(exc.message)
     if errors:
         raise ValidationError(
             "Invalid DevWeave project model.",
@@ -427,7 +447,21 @@ def project_defaults() -> dict[str, Any]:
             "raw_log_limit_bytes": MAX_RAW_LOG_BYTES,
             "version_summaries": True,
         },
+        "knowledge": {
+            "enabled": True,
+            "root": "wiki",
+        },
     }
+
+
+def knowledge_root(repo: Path) -> str:
+    if not project_path(repo).exists():
+        return "wiki"
+    try:
+        raw = read_json(project_path(repo)).get("knowledge", {})
+        return knowledge.normalize_root(str(raw.get("root", "wiki")))
+    except (DevWeaveError, knowledge.KnowledgeError):
+        return "wiki"
 
 
 def _ensure_gitignore(repo: Path) -> None:
@@ -478,6 +512,11 @@ def init_project(repo: Path) -> dict[str, Any]:
         (root / "baseline" / "capabilities").mkdir(parents=True, exist_ok=True)
         if not project_path(repo).exists():
             atomic_write_json(project_path(repo), project_defaults())
+        else:
+            existing = read_json(project_path(repo))
+            if "knowledge" not in existing:
+                existing["knowledge"] = {"enabled": True, "root": "wiki"}
+                atomic_write_json(project_path(repo), existing)
         for target, asset in (
             ("product.md", "baseline-product.md.tmpl"),
             ("architecture.md", "baseline-architecture.md.tmpl"),
@@ -486,8 +525,43 @@ def init_project(repo: Path) -> dict[str, Any]:
             output = root / "baseline" / target
             if not output.exists():
                 atomic_write_text(output, _render_asset(asset, {}))
+        project = load_project(repo)
+        try:
+            knowledge.bootstrap_wiki(
+                repo,
+                assets_root(),
+                root=project["knowledge"]["root"],
+                locale=project["locale"],
+            )
+        except knowledge.KnowledgeError as exc:
+            raise ValidationError(exc.message, {"code": exc.code, "details": exc.details}) from exc
         _ensure_gitignore(repo)
     return load_project(repo)
+
+
+def _project_requires_bootstrap(repo: Path) -> bool:
+    if not project_path(repo).exists():
+        return True
+    raw = read_json(project_path(repo))
+    if "knowledge" not in raw:
+        return True
+    project = load_project(repo)
+    required = [
+        devweave_root(repo) / "cache" / "sessions",
+        devweave_root(repo) / "work-items",
+        devweave_root(repo) / "baseline" / "capabilities",
+        *(devweave_root(repo) / "baseline" / name for name in ("product.md", "architecture.md", "quality.md")),
+    ]
+    root = project["knowledge"]["root"]
+    wiki = repo / root
+    required.extend(wiki / name for name in knowledge.STARTER_FILES)
+    required.extend(wiki / name for name in knowledge.TYPE_DIRECTORIES.values())
+    if any(not path.exists() for path in required):
+        return True
+    try:
+        return not knowledge.inspect_wiki(repo, root=root)["compatible"]
+    except knowledge.KnowledgeError:
+        return True
 
 
 def _git(repo: Path, args: Sequence[str], *, check: bool = True) -> subprocess.CompletedProcess[bytes]:
@@ -531,7 +605,8 @@ def git_snapshot(repo: Path) -> dict[str, Any]:
         ["ls-files", "--others", "--exclude-standard", "-z"],
     ):
         paths.update(_zpaths(_git(repo, args).stdout))
-    filtered = sorted(path for path in paths if not is_framework_path(path))
+    wiki_root = knowledge_root(repo)
+    filtered = sorted(path for path in paths if not is_framework_path(path, wiki_root))
     files: dict[str, str] = {}
     for relative in filtered:
         relative_path = Path(relative)
@@ -603,7 +678,8 @@ def changed_paths_since(repo: Path, base_snapshot: dict[str, Any]) -> list[str]:
                 paths.update(_zpaths(result.stdout))
         else:
             paths.update(_zpaths(_git(repo, ["ls-files", "-z"]).stdout))
-    return sorted(path for path in paths if not is_framework_path(path))
+    wiki_root = knowledge_root(repo)
+    return sorted(path for path in paths if not is_framework_path(path, wiki_root))
 
 
 def _slugify(value: str) -> str:
@@ -639,8 +715,9 @@ def create_work(
         )
     if not title.strip():
         raise ValidationError("Work title must not be empty.")
-    if not project_path(repo).exists():
+    if _project_requires_bootstrap(repo):
         init_project(repo)
+    project = load_project(repo)
     with WorkLock(repo, "project"):
         work_id = _new_work_id(repo, kind, title)
         root = work_root(repo, work_id)
@@ -656,6 +733,9 @@ def create_work(
             atomic_write_text(root / name, _render_asset(f"{name}.tmpl", values))
         base = git_snapshot(repo)
         base_baseline = baseline_snapshot(repo)
+        base_knowledge = knowledge.knowledge_snapshot(
+            repo, root=project["knowledge"]["root"]
+        )
         state = {
             "schema_version": SCHEMA_VERSION,
             "id": work_id,
@@ -676,6 +756,20 @@ def create_work(
             },
             "base_source": base,
             "base_baseline": base_baseline,
+            "base_knowledge": base_knowledge,
+            "knowledge_context": {
+                "pages": [],
+                "gaps": [],
+                "recorded_at": None,
+            },
+            "knowledge_updates": {
+                "upserts": [],
+                "deletes": [],
+                "coupled": [],
+                "rationale": "",
+                "sealed": [],
+                "recorded_at": None,
+            },
             "gates": {
                 gate: {
                     "status": "pending",
@@ -728,6 +822,41 @@ def load_state(repo: Path, work_id: str) -> dict[str, Any]:
         or not isinstance(base_baseline.get("fingerprint"), str)
     ):
         errors.append("base_baseline is invalid")
+    if "base_knowledge" in state:
+        base_knowledge = state.get("base_knowledge")
+        if (
+            not isinstance(base_knowledge, dict)
+            or not isinstance(base_knowledge.get("files"), dict)
+            or not isinstance(base_knowledge.get("pages"), dict)
+            or not isinstance(base_knowledge.get("fingerprint"), str)
+        ):
+            errors.append("base_knowledge is invalid")
+        context = state.get("knowledge_context")
+        if (
+            not isinstance(context, dict)
+            or not isinstance(context.get("pages"), list)
+            or not all(isinstance(item, str) for item in context.get("pages", []))
+            or not isinstance(context.get("gaps"), list)
+            or not all(isinstance(item, str) for item in context.get("gaps", []))
+            or context.get("recorded_at") is not None
+            and not isinstance(context.get("recorded_at"), str)
+        ):
+            errors.append("knowledge_context is invalid")
+        updates = state.get("knowledge_updates")
+        if not isinstance(updates, dict):
+            errors.append("knowledge_updates is invalid")
+        else:
+            for key in ("upserts", "deletes", "coupled", "sealed"):
+                if not isinstance(updates.get(key), list) or not all(
+                    isinstance(item, str) for item in updates.get(key, [])
+                ):
+                    errors.append(f"knowledge_updates.{key} must be a string array")
+            if not isinstance(updates.get("rationale"), str):
+                errors.append("knowledge_updates.rationale must be a string")
+            if updates.get("recorded_at") is not None and not isinstance(
+                updates.get("recorded_at"), str
+            ):
+                errors.append("knowledge_updates.recorded_at must be a string or null")
     risk = state.get("risk")
     if (
         not isinstance(risk, dict)
@@ -836,14 +965,15 @@ def _artifact_bytes(repo: Path, work_id: str, names: Iterable[str]) -> bytes:
 
 def scope_fingerprint(repo: Path, state: dict[str, Any]) -> str:
     material = _artifact_bytes(repo, state["id"], ("brief.md", "requirements.md"))
-    material += canonical_json(
-        {
-            "risk": state["risk"],
-            "scope": state["scope"],
-            "waivers": _waivers_for_gate(state, "scope"),
-            "discovery_evidence": _discovery_evidence(state),
-        }
-    )
+    scope_material = {
+        "risk": state["risk"],
+        "scope": state["scope"],
+        "waivers": _waivers_for_gate(state, "scope"),
+        "discovery_evidence": _discovery_evidence(state),
+    }
+    if "base_knowledge" in state:
+        scope_material["knowledge_context"] = state.get("knowledge_context", {})
+    material += canonical_json(scope_material)
     return sha256_bytes(material)
 
 
@@ -919,14 +1049,22 @@ def acceptance_fingerprint(
     ]
     material = build_fingerprint(repo, state).encode("ascii")
     material += _artifact_bytes(repo, state["id"], ("acceptance.md",))
-    material += canonical_json(
-        {
-            "source": source["fingerprint"],
-            "evidence": evidence,
-            "baseline": _baseline_fingerprint(repo, state),
-            "waivers": _waivers_for_gate(state, "acceptance"),
+    acceptance_material: dict[str, Any] = {
+        "source": source["fingerprint"],
+        "evidence": evidence,
+        "baseline": _baseline_fingerprint(repo, state),
+        "waivers": _waivers_for_gate(state, "acceptance"),
+    }
+    if "base_knowledge" in state:
+        project = load_project(repo)
+        current_knowledge = knowledge.knowledge_snapshot(
+            repo, root=project["knowledge"]["root"]
+        )
+        acceptance_material["knowledge"] = {
+            "fingerprint": current_knowledge["fingerprint"],
+            "updates": state.get("knowledge_updates", {}),
         }
-    )
+    material += canonical_json(acceptance_material)
     return sha256_bytes(material)
 
 
@@ -1182,6 +1320,162 @@ def _current_gate_for_phase(phase: str) -> str | None:
     }.get(phase)
 
 
+def _validate_knowledge_context(
+    repo: Path,
+    state: dict[str, Any],
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    if "base_knowledge" not in state:
+        return
+    project = load_project(repo)
+    root = project["knowledge"]["root"]
+    context = state.get("knowledge_context", {})
+    pages = context.get("pages", [])
+    index = f"{root}/index.md"
+    if not context.get("recorded_at") or not pages:
+        errors.append("G1 requires a recorded Wiki-first knowledge context.")
+        return
+    if pages[0] != index or pages.count(index) != 1:
+        errors.append("Knowledge context must record wiki/index.md first and exactly once.")
+    if len(pages) > 6 or len(pages) != len(set(pages)):
+        errors.append("Knowledge context may include index plus at most five unique related pages.")
+    try:
+        current = knowledge.knowledge_snapshot(repo, root=root)
+    except knowledge.KnowledgeError as exc:
+        errors.append(f"Knowledge context cannot be checked: {exc.message}")
+        return
+    nonfresh: list[str] = []
+    for page in pages:
+        try:
+            normalized = knowledge.normalize_page(page, root)
+        except knowledge.KnowledgeError as exc:
+            errors.append(f"Knowledge context page is invalid: {exc.message}")
+            continue
+        record = current.get("pages", {}).get(normalized)
+        if (
+            not record
+            or record.get("status") != "active"
+            or record.get("parse_errors")
+            or record.get("source_error")
+            or record.get("source_fingerprint")
+            != record.get("computed_source_fingerprint")
+        ):
+            nonfresh.append(normalized)
+    if nonfresh and not context.get("gaps"):
+        errors.append(
+            "Knowledge context has missing, placeholder, stale, or invalid pages without a gap: "
+            + ", ".join(nonfresh)
+        )
+    if context.get("gaps"):
+        warnings.append(
+            f"Knowledge context records {len(context['gaps'])} gap(s) for raw-source follow-up."
+        )
+
+
+def _validate_knowledge_acceptance(
+    repo: Path,
+    state: dict[str, Any],
+    changed_source_paths: Sequence[str],
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    if "base_knowledge" not in state:
+        return
+    project = load_project(repo)
+    root = project["knowledge"]["root"]
+    base = state["base_knowledge"]
+    try:
+        current = knowledge.knowledge_snapshot(repo, root=root)
+        lint = knowledge.lint_wiki(
+            repo, root=root, base_snapshot=base, snapshot=current
+        )
+    except knowledge.KnowledgeError as exc:
+        errors.append(f"Knowledge validation failed: {exc.message}")
+        return
+    for finding in lint.get("findings", []):
+        page = f" [{finding['page']}]" if finding.get("page") else ""
+        message = f"Wiki {finding['code']}{page}: {finding['message']}"
+        if finding.get("severity") == "critical":
+            errors.append(message)
+        else:
+            warnings.append(message)
+
+    updates = state.get("knowledge_updates", {})
+    upserts = set(updates.get("upserts", []))
+    deletes = set(updates.get("deletes", []))
+    coupled = set(updates.get("coupled", []))
+    sealed = set(updates.get("sealed", []))
+    declared = upserts | deletes | coupled
+    actual = set(knowledge.changed_knowledge_paths(base, current))
+    undeclared = sorted(actual - declared)
+    unchanged = sorted(declared - actual)
+    if undeclared:
+        errors.append("Changed Wiki paths were not declared: " + ", ".join(undeclared))
+    if unchanged:
+        errors.append("Declared Wiki targets have no work-item change: " + ", ".join(unchanged))
+
+    content_targets = upserts | deletes
+    expected_coupled = {f"{root}/index.md", f"{root}/log.md"} if content_targets else set()
+    if coupled != expected_coupled:
+        errors.append("Wiki content updates must couple exactly wiki/index.md and wiki/log.md.")
+    for page in sorted(deletes):
+        if page not in base.get("pages", {}):
+            errors.append(f"Deleted Wiki target was not present at work start: {page}")
+        if page in current.get("pages", {}):
+            errors.append(f"Declared Wiki delete target still exists: {page}")
+
+    def active_current(page: str) -> bool:
+        record = current.get("pages", {}).get(page)
+        return bool(
+            record
+            and page in sealed
+            and record.get("status") == "active"
+            and not record.get("parse_errors")
+            and not record.get("source_error")
+            and record.get("verified_by") == state["id"]
+            and record.get("source_fingerprint")
+            == record.get("computed_source_fingerprint")
+        )
+
+    for page in sorted(upserts | coupled):
+        if page not in current.get("pages", {}):
+            errors.append(f"Declared Wiki upsert target does not exist: {page}")
+        elif not active_current(page):
+            errors.append(
+                f"Wiki target is not active and sealed against current sources by this work item: {page}"
+            )
+
+    affected = knowledge.affected_pages(base, changed_source_paths)
+    for page in affected:
+        if page in deletes and page not in current.get("pages", {}):
+            continue
+        if page not in upserts or not active_current(page):
+            errors.append(
+                f"Affected Wiki page must be refreshed and sealed or deleted: {page}"
+            )
+
+    if state.get("kind") == "new":
+        overview = f"{root}/overview.md"
+        record = current.get("pages", {}).get(overview)
+        if (
+            overview not in upserts
+            or not active_current(overview)
+            or not record
+            or not record.get("sources")
+            or record.get("source_fingerprint") == "none"
+        ):
+            errors.append(
+                "New-project work must promote wiki/overview.md to an active, sourced, sealed page."
+            )
+
+    if content_targets:
+        for message in knowledge.validate_promote_log(
+            repo, state["id"], root=root, base=base
+        ):
+            errors.append(f"Wiki log: {message}")
+
+
 def validate_work(
     repo: Path,
     state: dict[str, Any],
@@ -1353,6 +1647,7 @@ def validate_work(
             errors.append("Low-risk classification requires a downgrade rationale.")
         if not state["scope"].get("paths"):
             errors.append("At least one approved scope path is required before G1.")
+        _validate_knowledge_context(repo, state, errors, warnings)
         if state["kind"] == "bug":
             reproduction = [
                 item
@@ -1524,6 +1819,7 @@ def validate_work(
             )
 
         changed = changed_paths_since(repo, state.get("base_source", {}))
+        _validate_knowledge_acceptance(repo, state, changed, errors, warnings)
         out_of_scope = [
             path
             for path in changed
@@ -1716,6 +2012,270 @@ def set_baseline_updates(
             repo, work_id, "baseline_updates_set", state["baseline_updates"]
         )
         return state
+
+
+def _raise_knowledge(exc: knowledge.KnowledgeError) -> None:
+    raise ValidationError(
+        exc.message,
+        {"knowledge_code": exc.code, "details": exc.details},
+    ) from exc
+
+
+def work_knowledge_status(repo: Path, state: dict[str, Any] | None = None) -> dict[str, Any]:
+    project = load_project(repo)
+    root = project["knowledge"]["root"]
+    try:
+        current = knowledge.knowledge_snapshot(repo, root=root)
+        result = knowledge.knowledge_status(repo, root=root, snapshot=current)
+    except knowledge.KnowledgeError as exc:
+        _raise_knowledge(exc)
+    result["legacy_work"] = state is not None and "base_knowledge" not in state
+    if state is None or "base_knowledge" not in state:
+        bootstrap_pending = any(
+            item.get("code") == "missing_wiki" for item in result.get("critical", [])
+        )
+        if state is not None and bootstrap_pending:
+            result["health"] = "bootstrap_pending"
+            result["critical"] = []
+        result.update(
+            {
+                "affected_pages": [],
+                "pending_refresh": [],
+                "changed_paths": [],
+                "planned": None,
+                "bootstrap_pending": bootstrap_pending,
+            }
+        )
+        return result
+    changed_source = (
+        changed_paths_since(repo, state.get("base_source", {}))
+        if state.get("phase") in ("verification", "acceptance_review", "closed")
+        else []
+    )
+    affected = knowledge.affected_pages(state["base_knowledge"], changed_source)
+    updates = state.get("knowledge_updates", {})
+    upserts = set(updates.get("upserts", []))
+    deletes = set(updates.get("deletes", []))
+    sealed = set(updates.get("sealed", []))
+    pending: list[str] = []
+    for page in affected:
+        record = current.get("pages", {}).get(page)
+        deleted = page in deletes and record is None
+        refreshed = bool(
+            page in upserts
+            and page in sealed
+            and record
+            and record.get("status") == "active"
+            and record.get("verified_by") == state["id"]
+            and record.get("source_fingerprint") == record.get("computed_source_fingerprint")
+        )
+        if not deleted and not refreshed:
+            pending.append(page)
+    result.update(
+        {
+            "affected_pages": affected[:50],
+            "pending_refresh": sorted(pending)[:50],
+            "changed_paths": knowledge.changed_knowledge_paths(
+                state["base_knowledge"], current
+            )[:50],
+            "planned": updates,
+        }
+    )
+    return result
+
+
+def set_knowledge_context(
+    repo: Path,
+    work_id: str,
+    pages: Sequence[str],
+    gaps: Sequence[str] = (),
+) -> dict[str, Any]:
+    with WorkLock(repo, work_id):
+        state = load_state(repo, work_id)
+        sync_state_unlocked(repo, state)
+        if "base_knowledge" not in state:
+            raise ValidationError(
+                "This legacy work item does not require a retrospective knowledge context."
+            )
+        if state["phase"] not in ("requirements", "scope_review"):
+            raise ValidationError(
+                "Knowledge context is read-only after G1.", {"phase": state["phase"]}
+            )
+        project = load_project(repo)
+        root = project["knowledge"]["root"]
+        normalized: list[str] = []
+        try:
+            for page in pages:
+                value = knowledge.normalize_page(page, root)
+                if value not in normalized:
+                    normalized.append(value)
+        except knowledge.KnowledgeError as exc:
+            _raise_knowledge(exc)
+        if not normalized or len(normalized) > 6:
+            raise ValidationError(
+                "Knowledge context must contain wiki/index.md and at most five related pages.",
+                {"pages": normalized},
+            )
+        expected_index = f"{root}/index.md"
+        if normalized[0] != expected_index:
+            raise ValidationError(
+                "Knowledge context must record wiki/index.md first.",
+                {"expected": expected_index, "pages": normalized},
+            )
+        cleaned_gaps = [item.strip() for item in gaps if item.strip()]
+        if len(cleaned_gaps) != len(gaps) or len(cleaned_gaps) > 20 or any(
+            len(item) > 500 for item in cleaned_gaps
+        ):
+            raise ValidationError("Knowledge gaps must be non-empty and at most 500 characters each.")
+        try:
+            snapshot = knowledge.knowledge_snapshot(repo, root=root)
+        except knowledge.KnowledgeError as exc:
+            _raise_knowledge(exc)
+        nonfresh = []
+        for page in normalized:
+            record = snapshot.get("pages", {}).get(page)
+            if (
+                not record
+                or record.get("status") != "active"
+                or record.get("parse_errors")
+                or record.get("source_error")
+                or record.get("source_fingerprint")
+                != record.get("computed_source_fingerprint")
+            ):
+                nonfresh.append(page)
+        if nonfresh and not cleaned_gaps:
+            raise ValidationError(
+                "Missing, placeholder, stale, or invalid Wiki pages require a recorded gap.",
+                {"pages": nonfresh},
+            )
+        state["knowledge_context"] = {
+            "pages": normalized,
+            "gaps": cleaned_gaps,
+            "recorded_at": utc_now(),
+        }
+        save_state_unlocked(repo, state)
+        append_event_unlocked(
+            repo, work_id, "knowledge_context_set", state["knowledge_context"]
+        )
+        return state["knowledge_context"]
+
+
+def set_knowledge_plan(
+    repo: Path,
+    work_id: str,
+    upserts: Sequence[str],
+    deletes: Sequence[str],
+    rationale: str,
+) -> dict[str, Any]:
+    if not rationale.strip():
+        raise ValidationError("Knowledge plan rationale must not be empty.")
+    with WorkLock(repo, work_id):
+        state = load_state(repo, work_id)
+        sync_state_unlocked(repo, state)
+        if "base_knowledge" not in state:
+            raise ValidationError(
+                "This legacy work item does not require a retrospective knowledge plan."
+            )
+        if state["gates"]["build"].get("status") != "approved" or state["phase"] not in (
+            "verification",
+            "acceptance_review",
+        ):
+            raise ValidationError(
+                "Knowledge promotion may be planned only during verification or acceptance.",
+                {"phase": state["phase"]},
+            )
+        project = load_project(repo)
+        root = project["knowledge"]["root"]
+        try:
+            normalized_upserts = sorted(
+                {knowledge.normalize_page(page, root) for page in upserts}
+            )
+            normalized_deletes = sorted(
+                {knowledge.normalize_page(page, root) for page in deletes}
+            )
+        except knowledge.KnowledgeError as exc:
+            _raise_knowledge(exc)
+        special = {f"{root}/index.md", f"{root}/log.md"}
+        if special.intersection(normalized_upserts) or special.intersection(
+            normalized_deletes
+        ):
+            raise ValidationError(
+                "wiki/index.md and wiki/log.md are coupled automatically; do not list them as content targets."
+            )
+        overlap = sorted(set(normalized_upserts) & set(normalized_deletes))
+        if overlap:
+            raise ValidationError(
+                "A Wiki page cannot be both upserted and deleted.", {"pages": overlap}
+            )
+        unknown_deletes = sorted(
+            set(normalized_deletes) - set(state["base_knowledge"].get("pages", {}))
+        )
+        if unknown_deletes:
+            raise ValidationError(
+                "Knowledge delete targets must exist in the work-item base snapshot.",
+                {"pages": unknown_deletes},
+            )
+        coupled = sorted(special) if normalized_upserts or normalized_deletes else []
+        state["knowledge_updates"] = {
+            "upserts": normalized_upserts,
+            "deletes": normalized_deletes,
+            "coupled": coupled,
+            "rationale": rationale.strip(),
+            "sealed": [],
+            "recorded_at": utc_now(),
+        }
+        save_state_unlocked(repo, state)
+        append_event_unlocked(
+            repo, work_id, "knowledge_plan_set", state["knowledge_updates"]
+        )
+        return state["knowledge_updates"]
+
+
+def seal_knowledge(
+    repo: Path,
+    work_id: str,
+    pages: Sequence[str],
+) -> dict[str, Any]:
+    with WorkLock(repo, work_id):
+        state = load_state(repo, work_id)
+        sync_state_unlocked(repo, state)
+        if "base_knowledge" not in state:
+            raise ValidationError("Legacy work items do not have a knowledge seal ledger.")
+        if state["phase"] not in ("verification", "acceptance_review"):
+            raise ValidationError(
+                "Knowledge pages may be sealed only during verification or acceptance.",
+                {"phase": state["phase"]},
+            )
+        project = load_project(repo)
+        root = project["knowledge"]["root"]
+        try:
+            normalized = sorted({knowledge.normalize_page(page, root) for page in pages})
+        except knowledge.KnowledgeError as exc:
+            _raise_knowledge(exc)
+        updates = state.get("knowledge_updates", {})
+        allowed = set(updates.get("upserts", [])) | set(updates.get("coupled", []))
+        unauthorized = sorted(set(normalized) - allowed)
+        if not normalized or unauthorized:
+            raise ValidationError(
+                "Knowledge seal pages must be planned upserts or coupled index/log pages.",
+                {"unauthorized": unauthorized},
+            )
+        try:
+            sealed_records = knowledge.seal_pages(
+                repo, normalized, work_id, root=root
+            )
+        except knowledge.KnowledgeError as exc:
+            _raise_knowledge(exc)
+        updates["sealed"] = sorted(set(updates.get("sealed", [])) | set(normalized))
+        state["knowledge_updates"] = updates
+        save_state_unlocked(repo, state)
+        append_event_unlocked(
+            repo,
+            work_id,
+            "knowledge_pages_sealed",
+            {"pages": normalized, "records": sealed_records},
+        )
+        return {"pages": sealed_records, "knowledge_updates": updates}
 
 
 def add_waiver(
@@ -2138,7 +2698,7 @@ def instructions(repo: Path, state: dict[str, Any]) -> dict[str, Any]:
         "acceptance_review": "close" if gate_is_approved else "request_g3",
         "closed": "none",
     }.get(phase, "inspect_state")
-    return {
+    payload = {
         "work": state["id"],
         "kind": state["kind"],
         "risk": state["risk"]["level"],
@@ -2151,6 +2711,18 @@ def instructions(repo: Path, state: dict[str, Any]) -> dict[str, Any]:
         "blocker": state.get("blocker"),
         "gates": state["gates"],
     }
+    payload["knowledge"] = work_knowledge_status(repo, state)
+    if phase in ("requirements", "scope_review"):
+        payload["knowledge"]["read_order"] = [
+            f"{knowledge_root(repo)}/index.md",
+            "at_most_five_related_pages",
+            "raw_sources_only_for_recorded_gaps",
+        ]
+    elif phase in ("design", "build_review"):
+        payload["knowledge"]["write_policy"] = "read_only"
+    elif phase in ("verification", "acceptance_review"):
+        payload["knowledge"]["write_policy"] = "planned_pages_and_coupled_index_log_only"
+    return payload
 
 
 def bind_session(repo: Path, session_id: str, work_id: str) -> dict[str, Any]:
@@ -2208,6 +2780,24 @@ def doctor(repo: Path) -> dict[str, Any]:
                 len(command_ids) == len(set(command_ids)),
                 f"{len(command_ids)} configured command(s)",
             )
+            root = project["knowledge"]["root"]
+            try:
+                inspection = knowledge.inspect_wiki(repo, root=root)
+                compatible = inspection["status"] == "compatible"
+                if compatible:
+                    detail = f"{root}/ is compatible"
+                elif inspection["status"] in ("missing", "empty"):
+                    detail = f"{root}/ is {inspection['status']}; run init or start to bootstrap it"
+                else:
+                    reasons = "; ".join(
+                        f"{item['path']}: {item['reason']}"
+                        for item in inspection["conflicts"]
+                    )
+                    detail = f"knowledge_conflict: {reasons}"
+            except knowledge.KnowledgeError as exc:
+                compatible = False
+                detail = f"knowledge_conflict: {exc.message}"
+            add("knowledge", compatible, detail)
         except DevWeaveError as exc:
             add("commands", False, exc.message)
     return {"ok": all(item["ok"] for item in checks), "checks": checks}

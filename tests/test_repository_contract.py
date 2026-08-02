@@ -29,7 +29,10 @@ class RepositoryContractTests(unittest.TestCase):
                     imported.update(alias.name.split(".", 1)[0] for alias in node.names)
                 elif isinstance(node, ast.ImportFrom) and node.module:
                     imported.add(node.module.split(".", 1)[0])
-            non_standard = imported - set(sys.stdlib_module_names) - {"devweave_core"}
+            non_standard = imported - set(sys.stdlib_module_names) - {
+                "devweave_core",
+                "knowledge_core",
+            }
             self.assertEqual(set(), non_standard, f"{path.name}: {sorted(non_standard)}")
 
     def test_hook_contract_is_json_and_resolves_from_git_root(self) -> None:

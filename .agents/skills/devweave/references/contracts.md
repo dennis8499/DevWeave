@@ -22,6 +22,7 @@ Machine state is authoritative. Update state, tasks, approvals, evidence, scope,
 - `commands[]`, each with unique `id`, string-array `argv`, repo-relative `cwd`, positive `timeout_seconds`, and `required_for[]` risk levels.
 - `verification_profiles.low|standard|high`, containing required command IDs.
 - `protected_mutations[]` and evidence storage policy.
+- `knowledge.enabled: true` and the normalized fixed `knowledge.root: wiki`. Missing knowledge settings are supplied in memory and persisted by the next explicit `init` or `start`.
 
 Commands are executed with `shell=false`. Never convert `argv` to a shell string.
 
@@ -32,8 +33,9 @@ Commands are executed with `shell=false`. Never convert `argv` to a shell string
 - identity: `id`, `kind`, `title`, `schema_version`, timestamps, and active/closed status;
 - lifecycle: `phase`, three gate records, and optional blocker;
 - scope: risk classification, risk rationale, downgrade rationale, paths, and scope rationale;
-- provenance: `base_source`, `base_baseline`, Git HEAD/branch/diff fingerprint, and `last_verification`;
+- provenance: `base_source`, `base_baseline`, optional `base_knowledge`, Git HEAD/branch/diff fingerprint, and `last_verification`;
 - ledgers: machine task state, evidence summaries, waivers, and baseline-update decisions.
+- knowledge-aware work adds `knowledge_context` (`pages`, `gaps`, `recorded_at`) and `knowledge_updates` (`upserts`, `deletes`, `coupled`, `rationale`, `sealed`, `recorded_at`). Missing fields identify a legacy active item and never add retrospective G1/G3 blockers.
 
 Valid phases are:
 
@@ -49,10 +51,11 @@ requirements -> design -> implementation -> verification -> acceptance_review ->
 
 ## Fingerprints and invalidation
 
-- G1 fingerprint: exact `brief.md`, `requirements.md`, risk, scope, and G1 waivers.
+- G1 fingerprint: exact `brief.md`, `requirements.md`, risk, scope, G1 waivers, and—when knowledge-aware—the recorded index-first knowledge context.
 - G2 fingerprint: G1 material plus exact `design.md`, `plan.md`, and G2 waivers.
-- G3 fingerprint: G2 material plus exact `acceptance.md`, current Git source fingerprint, evidence ledger, the complete living-baseline tree fingerprint, and G3 waivers.
-- Source fingerprint: Git HEAD plus path/content/staged/unstaged diff material, excluding DevWeave machine state, its skill implementation, and Codex configuration.
+- G3 fingerprint: G2 material plus exact `acceptance.md`, current product-source fingerprint, evidence ledger, the complete living-baseline tree fingerprint, knowledge-tree fingerprint and promotion ledger, and G3 waivers.
+- Product-source fingerprint: Git HEAD plus path/content/staged/unstaged diff material, excluding DevWeave machine state, its skill implementation, Codex configuration, and the configured Wiki root.
+- Knowledge fingerprint: sorted path/content hashes of every file under the Wiki root. A Wiki-only change therefore invalidates G3 without staling product verification evidence.
 
 Invalidation is monotonic until reapproval:
 
@@ -61,6 +64,23 @@ Invalidation is monotonic until reapproval:
 - Post-verification source change marks source-bound evidence stale, clears the verification snapshot, invalidates G3, and returns to verification while G2 remains current.
 - G3 artifact, evidence, baseline, or waiver change invalidates G3.
 - Closed work remains in place and cannot be reopened; start a new work item.
+
+## Wiki knowledge model
+
+`init` and `start` non-destructively ensure root `wiki/` contains `index.md`, `overview.md`, `log.md`, and typed directories for architecture, modules, entities, patterns, decisions, dependencies, guides, and synthesis. A compatible existing Wiki is adopted without overwriting Markdown. A non-empty Wiki without a recognized `type: index`, or an incompatible same-name starter file, returns `knowledge_conflict`; `doctor` reports the same condition.
+
+Supported page types are `overview`, `architecture`, `module`, `entity`, `pattern`, `decision`, `dependency`, `guide`, `synthesis`, `index`, and `log`. Every page retains `title`, `type`, `sources`, `last_updated`, `tags`, and `status`, plus:
+
+- `source_fingerprint`: `sha256:<hex>` for sourced pages and `none` for an empty source list;
+- `verified_by`: the work ID that most recently promoted the page.
+
+Sources are normalized, unique, repo-relative paths and may not enter Wiki, `.devweave`, or `.git`. A page lists at most five. Files hash current bytes; symlinks hash their target text. Directories expand sorted Git-tracked and non-ignored untracked files, including tracked missing entries, then hash canonical path/content material. Source deletion, dirty content, rename, or directory membership changes therefore stales the page.
+
+G1 records `wiki/index.md` first and at most five related pages through `knowledge context`; missing, placeholder, stale, invalid, or contradictory knowledge requires a gap before raw-source fallback. G2 and implementation keep Wiki read-only. Source behavior and approved artifacts outrank conflicting Wiki claims.
+
+At verification, affected pages are computed only from this work's changed product paths against each page's sources captured in `base_knowledge`. Affected pages must be an active/current sealed upsert or a declared deletion. Other stale pages are warnings. Any content target automatically authorizes `wiki/index.md` and `wiki/log.md`; both must actually change and be sealed. The log body must preserve its base prefix and append exactly one `promote` heading containing the work ID. `new` also requires an active, sourced, sealed overview.
+
+Wiki lint treats malformed frontmatter, invalid/missing sources, invalid source fingerprints, ambiguous or broken wikilinks, missing/duplicate index entries, and rewritten log history as critical. Placeholder, unsealed, orphan, stale, coverage-review, and semantic-review findings are warnings unless the page is affected or a declared promotion target.
 
 ## Artifact grammar and traceability
 
@@ -88,9 +108,9 @@ Risk changes are fingerprinted. Any downgrade, including high to standard, recor
 
 ## Gate requirements
 
-- G1: complete brief/requirements grammar, risk, scope, and profile discovery evidence.
+- G1: complete brief/requirements grammar, risk, scope, Wiki-first context, and profile discovery evidence.
 - G2: current G1, complete design/plan grammar, trace graph, high-risk analysis, and explicit approval.
-- G3: current G2, completed task ledger exactly matching approved plan, current AC/TASK/source-bound evidence, all required command results or narrow waivers, in-scope diff, baseline decision, complete acceptance report, and explicit approval.
+- G3: current G2, completed task ledger exactly matching approved plan, current AC/TASK/source-bound evidence, all required command results or narrow waivers, in-scope product diff, valid declared Wiki promotion when applicable, baseline decision, complete acceptance report, and explicit approval.
 - Every baseline path changed since work-item creation must be declared as a target; every declared target must contain an attributable addition, update, or deletion.
 - `close`: succeeds only when the exact current G3 fingerprint is approved.
 
@@ -100,7 +120,18 @@ Waivers contain `id`, `gate`, `kind`, `target`, reason, approver, and timestamp.
 
 Run `scripts/devweave.py --repo <path> <command>`. Output is always one JSON document on stdout.
 
-Commands are `init`, `start`, `status`, `instructions`, `validate`, `bind`, `risk`, `scope`, `baseline`, `task start|complete|block`, `evidence add`, `verify`, `waiver add`, `approve`, `revise`, `close`, `doctor`, `project`, and `command set|list|remove`.
+Commands are `init`, `start`, `status`, `instructions`, `validate`, `bind`, `risk`, `scope`, `baseline`, `task start|complete|block`, `evidence add`, `verify`, `waiver add`, `approve`, `revise`, `close`, `doctor`, `project`, `command set|list|remove`, and the router-only `knowledge` namespace.
+
+Knowledge machine commands are:
+
+```text
+knowledge status [--work <id>]
+knowledge context --work <id> --page wiki/index.md [--page ...] [--gap ...]
+knowledge plan --work <id> [--upsert ...] [--delete ...] --rationale <text>
+knowledge seal --work <id> --page ...
+```
+
+`context` and `plan` replace their complete ledgers. `context` is valid only before G1. `plan` is valid only in verification/acceptance with a current G2 and couples index/log automatically. `seal` accepts only planned upserts and coupled pages and preserves the page body and unknown frontmatter fields while writing date, current source fingerprint, and work provenance.
 
 `scope` is a replace operation, not an append operation. Supply the entire intended set in one command by repeating the option: `scope --path src --path tests --rationale "..."`.
 

@@ -10,7 +10,7 @@ Use DevWeave as the repository's SDLC router. Keep machine state in the Python e
 ## Activation boundary
 
 1. Check for `.devweave/project.json` at the Git repository root.
-2. If it does not exist, activate only for an explicit `$devweave` request. For an explicit request, run `init`, inspect the repository for likely build/test/lint/typecheck commands, propose those commands, and start the requested work item.
+2. If it does not exist, activate only for an explicit `$devweave` request. For an explicit request, run `init`, inspect the repository for likely build/test/lint/typecheck commands, propose those commands, and start the requested work item. Initialization also installs a non-destructive root `wiki/` skeleton.
 3. If it exists and `managed` is true, activate implicitly for requests that would modify product code, tests, schemas, dependencies, build configuration, or CI configuration.
 4. Do not create a work item for read-only exploration, explanation, status reporting, or review. Do not take over Git operations such as branching, committing, worktrees, or pushing.
 
@@ -50,6 +50,14 @@ For every active turn:
 
 Consider a session bound only when the PreToolUse hook returns additional context confirming the work ID, or when an integration supplies a real `--session-id` and the CLI returns `status: bound`. A plain CLI response with `status: awaiting_hook` means the request was issued but the guard binding was not observable. Report that the hook may be untrusted or disabled; never claim the guardrail is active without confirmation.
 
+## Wiki-first knowledge discipline
+
+- In G1, read `wiki/index.md` first and then at most five related pages. Record the complete read set with `knowledge context`; record a gap before using raw sources for missing, placeholder, stale, or contradictory knowledge. Current source behavior and approved DevWeave artifacts win conflicts.
+- Treat `.devweave/baseline/` as accepted governance truth and `wiki/` as detailed module, entity, dependency, pattern, decision, guide, and synthesis knowledge.
+- Keep Wiki read-only throughout G2 and implementation. New design decisions remain in `design.md` until verification.
+- In verification, use `knowledge status` to identify affected pages. If promotion is needed, declare content targets with `knowledge plan`, update only those targets plus coupled `wiki/index.md` and `wiki/log.md`, append one `promote` log entry containing the work ID, and run `knowledge seal` on every upsert and coupled page.
+- Do not manufacture a no-update rationale when no page is affected and no Wiki change is made. Critical lint, undeclared Wiki changes, unrefreshed affected pages, rewritten log history, or an unpromoted `new` overview block G3; unrelated warnings are reported without blocking.
+
 When starting work, use `start --kind new|feature|refactor|bug --title <title>`. Set risk with `risk`, scope with `scope`, verification commands with `command set`, tasks with `task`, evidence with `evidence add` or `verify`, baseline decisions with `baseline`, and rejection/rework with `revise`. `scope` replaces the complete scope set: pass every path in one call by repeating `--path`, for example `scope --path src --path tests`. Close only after G3 is current and approved.
 
 ## Gate discipline
@@ -58,6 +66,7 @@ When starting work, use `start --kind new|feature|refactor|bug --title <title>`.
 - G2 approves `design.md`, the immutable task definitions in `plan.md`, and high-risk analyses.
 - Implementation may start only when G2 remains current. Record task progress in `state.json` through engine commands; never check off tasks in `plan.md`.
 - G3 approves `acceptance.md`, current source-bound evidence, required command results, scope compliance, and living baseline updates.
+- G1 fingerprints the recorded knowledge context. Product verification excludes `wiki/`; G3 separately fingerprints the knowledge tree and promotion ledger.
 - Any stale fingerprint means the previous approval or evidence is no longer valid. Return to the earliest phase reported by `instructions` and do not bypass it with manual state edits.
 - Waivers must be explicit, narrow, justified, attributable, and accepted by the relevant gate. A waiver is not a generic substitute for missing validation.
 
