@@ -61,7 +61,6 @@ When the request names a store, or the change is omitted or ambiguous, read the 
 5. **Report state and next action**
 
    List revised and rejected artifacts plus deferred missing artifacts or files. Recommend:
-
    - Missing artifacts: `$openspec-continue-change`.
    - Revised planning after implementation began: `$openspec-apply-change`.
    - Complete, implemented change: `$openspec-archive-change`.

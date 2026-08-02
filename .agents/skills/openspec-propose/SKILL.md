@@ -47,7 +47,6 @@ When the request names a store, read the shared [planning-target contract](../_s
 3. **Build the required set**
 
    Track the required set in a todo list. Repeatedly choose a missing artifact whose non-skipped dependencies are satisfied, then:
-
    1. Run `openspec instructions <artifact-id> --change "<name>" --json`.
    2. Read the shared [instruction-input contract](../_shared/openspec-contracts.md#instruction-inputs).
    3. Re-read every returned dependency file from disk.

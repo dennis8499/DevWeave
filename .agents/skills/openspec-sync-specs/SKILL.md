@@ -35,7 +35,6 @@ When the request names a store, or the change is omitted or ambiguous, read the 
    Use `artifactPaths.specs.existingOutputPaths` as the only delta source. When the entry is missing or empty, report that there is nothing to sync and stop before requesting instructions or writing.
 
    Default to every listed path. If the caller supplies an explicit subset, preserve exactly that subset through the merge:
-
    - An empty subset means there is nothing to sync; stop.
    - A named path absent from `existingOutputPaths` is an error; report it and stop.
    - Paths outside the subset remain untouched.
@@ -57,7 +56,6 @@ When the request names a store, or the change is omitted or ambiguous, read the 
 4. **Merge every selected delta**
 
    Before merging, read the complete [spec merge and format reference](FORMATS.md). For each selected path:
-
    - Read the delta spec.
    - Read `<planningHome.root>/openspec/specs/<capability>/spec.md` when it exists.
    - Apply ADDED, MODIFIED, REMOVED, and RENAMED intent using the snapshot's rules.

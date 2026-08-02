@@ -43,13 +43,13 @@ When the user requests implementation, explain that this stance keeps applicatio
 
 Offer capture after a decision crystallizes; the user chooses whether to write it.
 
-| Insight | Existing artifact to revise |
-|---|---|
-| Scope or motivation | `proposal.md` |
+| Insight                 | Existing artifact to revise  |
+| ----------------------- | ---------------------------- |
+| Scope or motivation     | `proposal.md`                |
 | Requirement or scenario | `specs/<capability>/spec.md` |
-| Technical decision | `design.md` |
-| Implementation work | `tasks.md` |
-| Invalidated assumption | The artifact that owns it |
+| Technical decision      | `design.md`                  |
+| Implementation work     | `tasks.md`                   |
+| Invalidated assumption  | The artifact that owns it    |
 
 Use schema-reported artifact ids and paths for custom workflows rather than assuming this spec-driven mapping. Exploration may create or update an OpenSpec artifact after explicit user approval; before writing, obtain its schema instructions and apply the configured template and rules.
 

@@ -51,7 +51,6 @@ When the request names a store, or the change is omitted or ambiguous, read the 
    When deltas exist, compare every delta with `<planningHome.root>/openspec/specs/<capability>/spec.md`, determine pending additions, modifications, removals, and renames, then show one combined summary.
 
    Offer exactly:
-
    - Pending changes: `Sync now (recommended)` or `Archive without syncing`.
    - Already synchronized: `Archive now`, `Sync anyway`, or `Cancel`.
 

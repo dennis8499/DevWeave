@@ -34,7 +34,6 @@ When the request names a store, or the change is omitted or ambiguous, read the 
    Preserve the selected store flag. Use status to identify the schema and planning scope; use apply instructions for `state`, progress, tasks, `contextFiles`, the dynamic `instruction`, and optional prompt inputs. Read the shared [status and path](../_shared/openspec-contracts.md#status-and-paths) and [instruction-input](../_shared/openspec-contracts.md#instruction-inputs) contracts while interpreting them.
 
    Route on `state`:
-
    - `blocked`: report the missing artifacts and stop. Suggest `openspec-continue-change`; when that skill is unavailable, point to `openspec status --change "<name>" --json` and `openspec instructions <artifact-id> --change "<name>" --json`.
    - `all_done`: report completion, suggest `$openspec-archive-change`, and stop.
    - Any ready state: continue.
@@ -50,7 +49,6 @@ When the request names a store, or the change is omitted or ambiguous, read the 
 4. **Implement the task loop**
 
    For each pending task in order:
-
    - Announce the task.
    - Make the smallest focused code change that satisfies its artifacts and instruction.
    - Run the relevant project verification.
