@@ -49,6 +49,59 @@ $devweave approve [work-id]
 
 Codex 會把這些對話命令路由到 `.agents/skills/devweave/scripts/devweave.py`。初始化後，產品程式、測試、schema、dependency、build 或 CI 相關修改必須先綁定 active work item，且實作前必須具備仍有效的 G2 核准。
 
+## Companion engineering Skills
+
+DevWeave 是唯一 SDLC router；repository 另以 project-local copies 提供五個階段內方法：
+
+- `grill-me` 與 `grilling`：逐題釐清需求與決策。
+- `codebase-design`：以 module、interface、seam 與 adapter 設計可測試邊界。
+- `diagnosing-bugs`：建立可重現、可最小化的除錯 feedback loop。
+- `tdd`：在已核准 task 上執行 red → minimal green 的垂直切片。
+
+它們不擁有 work item、artifact、gate、Wiki、evidence 或 Git 操作。若 companion Skill 與 `AGENTS.md` 或目前的 DevWeave phase 衝突，一律以 DevWeave 為準。
+
+### 安裝與確認
+
+從 repository root 安裝精確 allowlist；不要使用 `--all`，也不要執行 `setup-matt-pocock-skills`：
+
+```powershell
+npx skills@latest add mattpocock/skills --agent codex --skill grill-me --skill grilling --skill codebase-design --skill diagnosing-bugs --skill tdd --copy --yes
+npx skills@latest list -a codex
+```
+
+安裝結果與 upstream hashes 記錄在 `skills-lock.json`。安裝後請開啟新的 Codex session，讓 project skills 重新被掃描。
+
+### 階段對應
+
+| DevWeave 階段 | Companion Skill | 寫入與產出邊界 |
+| --- | --- | --- |
+| G1 requirements | `$grill-me` / `grilling` | Wiki-first 探索後逐題釐清；結論只寫入 `brief.md` 與 `requirements.md`。 |
+| Bug discovery | `diagnosing-bugs` | G2 前使用既有 command 或 cache/temp harness；tracked regression test 留到 G2 後。 |
+| G2 design | `codebase-design` | interface 與 test seam 決策寫入 `design.md`，immutable tasks 寫入 `plan.md`。 |
+| Implementation | `tdd` | 僅在 current G2 後，對單一 TASK 進行 red/green slice 並記錄 AC/TASK evidence。 |
+| Verification | DevWeave | 執行完整驗證、清理 instrumentation、更新 baseline／Wiki、產生 acceptance，最後等待 G3。 |
+
+範例：
+
+```text
+$devweave feature 新增 CSV 匯出；G1 使用 $grill-me 釐清需求
+$devweave next <work-id>；G2 使用 $codebase-design 定義 interface 與 test seams
+$devweave next <work-id>；對目前 TASK 使用 $tdd
+$devweave bug 偶發重複扣款；使用 $diagnosing-bugs 建立可重現 feedback loop
+```
+
+Companion Skill 若發現 approved requirement、design、scope 或 task 必須改變，應執行 `$devweave revise` 回到最早受影響階段；不得直接偏離核准內容。它也不得自行建立 issue、branch、worktree、commit、push、PR、部署、`CONTEXT.md`、ADR 或第二份 spec。
+
+### 更新與回復
+
+禁止自動更新。上游版本變更必須建立新的 DevWeave feature work item，再執行 project-scope update、檢閱 instruction 與 lock diff、重跑 G3 驗證：
+
+```powershell
+npx skills@latest update codebase-design diagnosing-bugs grill-me grilling tdd --project
+```
+
+需要回復時，由明確授權的 Git workflow 回復 companion directories、`skills-lock.json`、policy、文件與 tests；DevWeave 不會自行 commit 或 reset。
+
 ## Wiki-first 知識生命週期
 
 `init` 或下一次 `start` 會在目標 repo 根目錄非破壞性建立 `wiki/` 骨架。既有相容 Wiki 會被採用，任何同名內容都不會被覆寫；不相容內容由 `doctor` 回報 `knowledge_conflict`。DevWeave framework repository 本身不必為了提供此能力建立 root Wiki。
@@ -93,6 +146,7 @@ python .agents/skills/devweave/scripts/devweave.py --repo . command set `
 
 ```text
 .agents/skills/devweave/       standalone router、references、templates、engine
+.agents/skills/<companion>/    五個 project-local、非 router 的工程方法
 .codex/hooks.json              Codex PreToolUse guard
 AGENTS.md                      repo activation 與治理規則
 .devweave/project.json         專案設定與語言中立驗證命令
@@ -102,7 +156,7 @@ AGENTS.md                      repo activation 與治理規則
 wiki/                           source-bound 詳細知識、索引與 append-only promotion log
 ```
 
-Router-only knowledge CLI 提供 `status`、G1 的 `context`，以及 verification 的 `plan`／`seal`。`context` 與 `plan` 都是完整取代；`plan` 會自動授權 index/log coupling。公開 chat verbs 維持 `new/feature/refactor/bug/next/status/revise/approve`，沒有第二套 skill、agent、installer、RAG 或資料庫。
+Router-only knowledge CLI 提供 `status`、G1 的 `context`，以及 verification 的 `plan`／`seal`。`context` 與 `plan` 都是完整取代；`plan` 會自動授權 index/log coupling。公開 chat verbs 維持 `new/feature/refactor/bug/next/status/revise/approve`，沒有第二套 router、orchestrator、agent、runtime installer、RAG 或資料庫；companion Skills 不擁有 lifecycle 或 machine state。
 
 DevWeave 只觀察 branch、HEAD 與 diff，不會自行建立 branch、worktree、commit、push、PR 或部署。Hook 是 Codex guardrail，不是作業系統 sandbox；停用 hook 或使用外部編輯器時，它無法阻止修改。
 
