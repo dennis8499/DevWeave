@@ -1,0 +1,34 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008"
+  ],
+  "created_at": "2026-08-03T00:03:16+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "2986615a480f805706853f1d4bdad66eda9c129c",
+  "id": "EVID-002",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "6bd2e70ffb563a416c7ef2da677877b49d9f7a331ce3e0ab01c2688944377a6a",
+  "stale": false,
+  "status": "passed",
+  "summary": "README.md 與 docs/使用手冊.md 已完成繁體中文文件交付；內容、流程、CLI、連結、scope、Wiki-first、驗證與維護說明均已人工檢視並通過文件 smoke checks。",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004"
+  ]
+}

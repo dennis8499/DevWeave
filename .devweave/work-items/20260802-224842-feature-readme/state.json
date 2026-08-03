@@ -1,0 +1,271 @@
+{
+  "base_baseline": {
+    "files": {
+      ".devweave/baseline/architecture.md": "ea9f8d04a78ec73a439341a3bc3a6774b97db481269dcdba630ff2e56de0157d",
+      ".devweave/baseline/product.md": "3d53183df37dd47a9a6f05603e73c54aec25c9c4fceb00795ece7e09fa225c61",
+      ".devweave/baseline/quality.md": "04f690742f52a2bb3f2d65d8e18f1b5981a688b37a7e8843732e2351d08f4fd2"
+    },
+    "fingerprint": "f02ec0e97789d807529396c802877b3ee72373c3f049e5d820818f37e48d5004"
+  },
+  "base_knowledge": {
+    "files": {
+      "wiki/architecture/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/decisions/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/dependencies/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/entities/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/guides/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/index.md": "0ecb4eb30e0da0e0a141b64ef608435cf13f8a37f0bff13579807386b091a76b",
+      "wiki/log.md": "1d30b879c00271145fd3d01c41b5bcdda6e16193a4e3ad7c0022c2d75ec97efb",
+      "wiki/modules/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/overview.md": "50a2c029a619be1f8c92f0d82e5c158c67b6cef4d12f894a46da7f2995856855",
+      "wiki/patterns/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/synthesis/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fingerprint": "0d878b08c4bba63fe61ff09c0f4b9979eeb6f74a596a996049dbb7edb9816605",
+    "log": {
+      "body_hash": "797a36ea7c0e4fad357272f2465c66b14d0f34c07ee2feeb2c1429f307cd49d6",
+      "body_length": 209
+    },
+    "pages": {
+      "wiki/index.md": {
+        "body_hash": "9a7ce83519e5543e878d3a452f020baf3f872dc68de5e24eb59aa63e34468db8",
+        "body_length": 490,
+        "computed_source_fingerprint": "none",
+        "file_hash": "0ecb4eb30e0da0e0a141b64ef608435cf13f8a37f0bff13579807386b091a76b",
+        "last_updated": "2026-08-02",
+        "parse_errors": [],
+        "path": "wiki/index.md",
+        "relative": "index.md",
+        "source_error": null,
+        "source_fingerprint": "none",
+        "sources": [],
+        "status": "active",
+        "title": "Wiki Index",
+        "type": "index",
+        "verified_by": "bootstrap"
+      },
+      "wiki/log.md": {
+        "body_hash": "797a36ea7c0e4fad357272f2465c66b14d0f34c07ee2feeb2c1429f307cd49d6",
+        "body_length": 209,
+        "computed_source_fingerprint": "none",
+        "file_hash": "1d30b879c00271145fd3d01c41b5bcdda6e16193a4e3ad7c0022c2d75ec97efb",
+        "last_updated": "2026-08-02",
+        "parse_errors": [],
+        "path": "wiki/log.md",
+        "relative": "log.md",
+        "source_error": null,
+        "source_fingerprint": "none",
+        "sources": [],
+        "status": "active",
+        "title": "Wiki Activity Log",
+        "type": "log",
+        "verified_by": "bootstrap"
+      },
+      "wiki/overview.md": {
+        "body_hash": "9e10cd0ab62ad6c2473aef93fda40c50100f9d0faf6e8c5946cc81bb524b6609",
+        "body_length": 347,
+        "computed_source_fingerprint": "none",
+        "file_hash": "50a2c029a619be1f8c92f0d82e5c158c67b6cef4d12f894a46da7f2995856855",
+        "last_updated": "2026-08-02",
+        "parse_errors": [],
+        "path": "wiki/overview.md",
+        "relative": "overview.md",
+        "source_error": null,
+        "source_fingerprint": "none",
+        "sources": [],
+        "status": "placeholder",
+        "title": "Codebase Overview",
+        "type": "overview",
+        "verified_by": "bootstrap"
+      }
+    },
+    "root": "wiki"
+  },
+  "base_source": {
+    "branch": "master",
+    "dirty_paths": [],
+    "files": {},
+    "fingerprint": "d735254d214f668902fdd22938c8f02c93e71faec858bbc71f0f246756ab4e23",
+    "head": "2986615a480f805706853f1d4bdad66eda9c129c"
+  },
+  "baseline_updates": {
+    "rationale": "本 work item 僅更新 README.md 與 docs/使用手冊.md；未改變 accepted product、architecture 或 quality truth，因此不更新 .devweave/baseline。",
+    "recorded_at": "2026-08-03T00:03:02+00:00",
+    "targets": []
+  },
+  "blocker": null,
+  "closed_at": "2026-08-03T00:17:21+00:00",
+  "created_at": "2026-08-02T14:48:42+00:00",
+  "evidence": {
+    "EVID-001": {
+      "argv": [
+        "python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "binds_current_source": true,
+      "command_id": "unit-tests",
+      "covers": [
+        "AC-004",
+        "AC-007",
+        "AC-008"
+      ],
+      "created_at": "2026-08-03T00:01:54+00:00",
+      "cwd": ".",
+      "execution_error": null,
+      "exit_code": 0,
+      "expectation": "zero",
+      "git_head": "2986615a480f805706853f1d4bdad66eda9c129c",
+      "id": "EVID-001",
+      "kind": "regression",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": ".devweave/cache/logs/20260802-224842-feature-readme/EVID-001.log",
+      "schema_version": 1,
+      "source_fingerprint": "6bd2e70ffb563a416c7ef2da677877b49d9f7a331ce3e0ab01c2688944377a6a",
+      "stale": false,
+      "started_at": "2026-08-03T00:00:04+00:00",
+      "status": "passed",
+      "summary": "st_cli_bind_command_binds_hook_session (test_guard.GuardTests.test_cli_bind_command_binds_hook_session) ... ok\r\ntest_devweave_name_inside_arbitrary_command_is_not_a_guard_bypass (test_guard.GuardTests.test_devweave_name_inside_arbitrary_command_is_not_a_guard_bypass) ... ok\r\ntest_g2_allows_product_write_and_stale_design_reblocks_it (test_guard.GuardTests.test_g2_allows_product_write_and_stale_design_reblocks_it) ... ok\r\ntest_g2_still_blocks_known_out_of_scope_patch (test_guard.GuardTests.test_g2_still_blocks_known_out_of_scope_patch) ... ok\r\ntest_managed_repository_blocks_unbound_writes (test_guard.GuardTests.test_managed_repository_blocks_unbound_writes) ... ok\r\ntest_patch_move_destination_is_also_scope_checked (test_guard.GuardTests.test_patch_move_destination_is_also_scope_checked) ... ok\r\ntest_read_only_is_unbound_but_configured_command_requires_binding (test_guard.GuardTests.test_read_only_is_unbound_but_configured_command_requires_binding) ... ok\r\ntest_uninitialized_repository_does_not_activate (test_guard.GuardTests.test_uninitialized_repository_does_not_activate) ... ok\r\ntest_wiki_write_requires_verification_and_exact_knowledge_plan (test_guard.GuardTests.test_wiki_write_requires_verification_and_exact_knowledge_plan) ... ok\r\ntest_bootstrap_conflict_is_reported_without_touching_user_content (test_knowledge.KnowledgeCoreTests.test_bootstrap_conflict_is_reported_without_touching_user_content) ... ok\r\ntest_bootstrap_is_idempotent_and_adopts_without_overwrite (test_knowledge.KnowledgeCoreTests.test_bootstrap_is_idempotent_and_adopts_without_overwrite) ... ok\r\ntest_frontmatter_parser_and_lint_cover_links_uniqueness_and_index (test_knowledge.KnowledgeCoreTests.test_frontmatter_parser_and_lint_cover_links_uniqueness_and_index) ... ok\r\ntest_project_upgrade_is_read_only_until_init_and_legacy_state_loads (test_knowledge.KnowledgeCoreTests.test_project_upgrade_is_read_only_until_init_and_legacy_state_loads) ... ok\r\ntest_source_fingerprint_tracks_dirty_directory_rename_delete_and_ignores_ignored (test_knowledge.KnowledgeCoreTests.test_source_fingerprint_tracks_dirty_directory_rename_delete_and_ignores_ignored) ... ok\r\ntest_declared_delete_and_append_only_log_rules (test_knowledge.KnowledgeLifecycleTests.test_declared_delete_and_append_only_log_rules) ... ok\r\ntest_only_affected_page_blocks_and_unrelated_stale_page_warns (test_knowledge.KnowledgeLifecycleTests.test_only_affected_page_blocks_and_unrelated_stale_page_warns) ... ok\r\ntest_plan_requires_real_changes_and_seal_rejects_unplanned_pages (test_knowledge.KnowledgeLifecycleTests.test_plan_requires_real_changes_and_seal_rejects_unplanned_pages) ... ok\r\ntest_refresh_promotion_passes_g3_and_wiki_only_change_stales_only_g3 (test_knowledge.KnowledgeLifecycleTests.test_refresh_promotion_passes_g3_and_wiki_only_change_stales_only_g3) ... ok\r\ntest_companion_skill_precedence_policy_covers_side_effect_boundaries (test_repository_contract.RepositoryContractTests.test_companion_skill_precedence_policy_covers_side_effect_boundaries) ... ok\r\ntest_companion_skill_provenance_and_relative_links_are_complete (test_repository_contract.RepositoryContractTests.test_companion_skill_provenance_and_relative_links_are_complete) ... ok\r\ntest_devweave_is_the_only_router_with_expected_companions (test_repository_contract.RepositoryContractTests.test_devweave_is_the_only_router_with_expected_companions) ... ok\r\ntest_doctor_passes_for_an_initialized_fixture_with_hook (test_repository_contract.RepositoryContractTests.test_doctor_passes_for_an_initialized_fixture_with_hook) ... ok\r\ntest_hook_contract_is_json_and_resolves_from_git_root (test_repository_contract.RepositoryContractTests.test_hook_contract_is_json_and_resolves_from_git_root) ... ok\r\ntest_runtime_has_no_openspec_or_third_party_imports (test_repository_contract.RepositoryContractTests.test_runtime_has_no_openspec_or_third_party_imports) ... ok\r\n\r\n----------------------------------------------------------------------\r\nRan 62 tests in 109.610s\r\n\r\nOK",
+      "tasks": [
+        "TASK-004"
+      ],
+      "timed_out": false
+    },
+    "EVID-002": {
+      "binds_current_source": true,
+      "command_id": null,
+      "covers": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006",
+        "AC-007",
+        "AC-008"
+      ],
+      "created_at": "2026-08-03T00:03:16+00:00",
+      "exit_code": null,
+      "expectation": null,
+      "git_head": "2986615a480f805706853f1d4bdad66eda9c129c",
+      "id": "EVID-002",
+      "kind": "acceptance",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": null,
+      "schema_version": 1,
+      "source_fingerprint": "6bd2e70ffb563a416c7ef2da677877b49d9f7a331ce3e0ab01c2688944377a6a",
+      "stale": false,
+      "status": "passed",
+      "summary": "README.md 與 docs/使用手冊.md 已完成繁體中文文件交付；內容、流程、CLI、連結、scope、Wiki-first、驗證與維護說明均已人工檢視並通過文件 smoke checks。",
+      "tasks": [
+        "TASK-001",
+        "TASK-002",
+        "TASK-003",
+        "TASK-004"
+      ]
+    }
+  },
+  "gates": {
+    "acceptance": {
+      "approved_at": "2026-08-03T00:17:17+00:00",
+      "approved_by": "小豬的電腦 <dennis8499@gmail.com>",
+      "fingerprint": "d947942c71559bcbf9fb5f44b0613dc18153720ed73b8e8c9253e87d9de1e314",
+      "status": "approved"
+    },
+    "build": {
+      "approved_at": "2026-08-02T15:02:24+00:00",
+      "approved_by": "Codex user",
+      "fingerprint": "7a8f8f67b301e3f0b48395f0db47f9f00626ab242f8b9778507ac08caa28695b",
+      "status": "approved"
+    },
+    "scope": {
+      "approved_at": "2026-08-02T14:57:23+00:00",
+      "approved_by": "Codex user",
+      "fingerprint": "d0d9823bd623f1d92ca0452d482ecb4492ca42406a6e562586a4f7a07a928054",
+      "status": "approved"
+    }
+  },
+  "id": "20260802-224842-feature-readme",
+  "kind": "feature",
+  "knowledge_context": {
+    "gaps": [
+      "wiki/overview.md 仍是 bootstrap placeholder，缺少可直接引用的模組、runtime、dependency 與 operational knowledge；需回溯 raw source。"
+    ],
+    "pages": [
+      "wiki/index.md",
+      "wiki/overview.md",
+      "wiki/log.md"
+    ],
+    "recorded_at": "2026-08-02T14:49:43+00:00"
+  },
+  "knowledge_updates": {
+    "coupled": [],
+    "deletes": [],
+    "rationale": "",
+    "recorded_at": null,
+    "sealed": [],
+    "upserts": []
+  },
+  "last_verification": {
+    "at": "2026-08-03T00:03:16+00:00",
+    "evidence_id": "EVID-002",
+    "source_fingerprint": "6bd2e70ffb563a416c7ef2da677877b49d9f7a331ce3e0ab01c2688944377a6a"
+  },
+  "phase": "closed",
+  "risk": {
+    "downgrade_rationale": null,
+    "level": "standard",
+    "rationale": "文件範圍隔離、可逆且不改變 runtime、CLI、schema 或產品行為。"
+  },
+  "schema_version": 1,
+  "scope": {
+    "paths": [
+      "README.md",
+      "docs/使用手冊.md"
+    ],
+    "rationale": "本 work item 只更新專案入口 README 與新增繁體中文使用手冊；不納入 source、tests、Wiki、依賴、build、CI 或 machine ledger。"
+  },
+  "status": "closed",
+  "tasks": {
+    "TASK-001": {
+      "completed_at": "2026-08-02T15:05:08+00:00",
+      "evidence": [],
+      "note": "README 已重整為 zh-TW 專案入口；已檢查 headings、快速開始命令、machine terminology、手冊連結與 README diff whitespace。手冊連結將於 TASK-002 完成後進行整體驗證。",
+      "started_at": "2026-08-02T15:02:40+00:00",
+      "status": "completed"
+    },
+    "TASK-002": {
+      "completed_at": "2026-08-02T23:57:17+00:00",
+      "evidence": [],
+      "note": "已建立 docs/使用手冊.md，涵蓋一般使用者與維護者的安裝、初始化、Codex hook、doctor、公開命令、完整 Python CLI、work item/artifact/task/evidence/gate/fingerprint、Wiki-first、knowledge promotion、companion skills、驗證、exit code 與故障排除；文件連結與空白檢查已通過。",
+      "started_at": "2026-08-02T15:05:36+00:00",
+      "status": "completed"
+    },
+    "TASK-003": {
+      "completed_at": "2026-08-02T23:59:51+00:00",
+      "evidence": [],
+      "note": "已完成 README 與使用手冊的相對連結、路徑、命令名稱、scope 說明與 Traditional Chinese 文案一致性檢查；doctor、project、status --all 成功，並通過 33 組有效 CLI --help smoke check。task list 與 evidence list 未列入，因實際 parser 僅提供 task start/complete/block 與 evidence add。",
+      "started_at": "2026-08-02T23:57:22+00:00",
+      "status": "completed"
+    },
+    "TASK-004": {
+      "completed_at": "2026-08-03T00:02:39+00:00",
+      "evidence": [
+        "EVID-001"
+      ],
+      "note": "完整 unit-tests 由 DevWeave verify 執行成功：62 tests、exit code 0、EVID-001 current regression evidence。README 與 docs/使用手冊.md 的連結、trailing whitespace、git diff --check 及 worktree scope 檢查均通過；僅包含預期文件與 DevWeave work-item artifacts/evidence。",
+      "started_at": "2026-08-02T23:59:58+00:00",
+      "status": "completed"
+    }
+  },
+  "title": "補充 README 與繁體中文使用手冊",
+  "updated_at": "2026-08-03T00:17:21+00:00",
+  "waivers": []
+}
