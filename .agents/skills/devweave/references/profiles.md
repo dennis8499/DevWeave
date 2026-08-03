@@ -21,6 +21,12 @@ Use one state machine for every profile. Change the required discovery and evide
 - Map affected interfaces, data, users, compatibility, and explicit non-goals.
 - Require current acceptance and regression evidence before G3.
 
+### knowledge bootstrap modifier
+
+- Keep `kind: feature` and add `knowledge_profile: bootstrap`; do not create another lifecycle or work kind.
+- Explore the whole repository and prohibit product-source changes.
+- In G2 select three to five core/high-value content pages; in G3 require promote, complete overview plus architecture plus module, and reject no-update or deletion.
+
 ### refactor
 
 - Freeze observable behavior and relevant performance or quality baselines before G1.

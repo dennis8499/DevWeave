@@ -204,11 +204,181 @@ class CliContractTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, payload)
             self.assertEqual(["wiki/index.md"], payload["knowledge_context"]["pages"])
 
+    def test_knowledge_bootstrap_cli_creates_then_resumes_one_work_item(self) -> None:
+        with RepositoryHarness() as harness:
+            result, payload = invoke(harness.repo, "knowledge", "bootstrap")
+            self.assertEqual(0, result.returncode, payload)
+            self.assertEqual("created", payload["action"])
+            self.assertEqual("bootstrap", payload["work"]["knowledge_profile"])
+            work_id = payload["work"]["id"]
+
+            result, payload = invoke(harness.repo, "knowledge", "bootstrap")
+            self.assertEqual(0, result.returncode, payload)
+            self.assertEqual("resume", payload["action"])
+            self.assertEqual(work_id, payload["work"]["id"])
+
+            result, payload = invoke(
+                harness.repo, "knowledge", "bootstrap", "--scope", "src"
+            )
+            self.assertEqual(2, result.returncode)
+            self.assertEqual("usage_error", payload["error"]["code"])
+
+    def test_knowledge_review_and_scaffold_cli_are_phase_and_plan_bound(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            work_id = state["id"]
+            harness.implement(work_id, "durable module behavior", review=False)
+
+            result, payload = invoke(
+                harness.repo, "instructions", "--work", work_id
+            )
+            self.assertEqual(0, result.returncode, payload)
+            self.assertEqual(
+                "record_knowledge_review", payload["instructions"]["next_action"]
+            )
+
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "review",
+                "--work",
+                work_id,
+                "--disposition",
+                "promote",
+                "--rationale",
+                "此變更形成可跨工作項重用的 module knowledge。",
+            )
+            self.assertEqual(0, result.returncode, payload)
+            self.assertEqual("promote", payload["knowledge_review"]["disposition"])
+            result, payload = invoke(
+                harness.repo, "instructions", "--work", work_id
+            )
+            self.assertEqual("plan_knowledge_updates", payload["instructions"]["next_action"])
+
+            page = "wiki/modules/runtime.md"
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "scaffold",
+                "--work",
+                work_id,
+                "--page",
+                page,
+                "--type",
+                "module",
+                "--title",
+                "Runtime Module",
+                "--source",
+                "src/app.txt",
+            )
+            self.assertEqual(2, result.returncode)
+            self.assertEqual("validation_failed", payload["error"]["code"])
+
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "plan",
+                "--work",
+                work_id,
+                "--upsert",
+                page,
+                "--rationale",
+                "建立新的 runtime module 頁。",
+            )
+            self.assertEqual(0, result.returncode, payload)
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "scaffold",
+                "--work",
+                work_id,
+                "--page",
+                page,
+                "--type",
+                "module",
+                "--title",
+                "Runtime Module",
+                "--source",
+                "src/app.txt",
+            )
+            self.assertEqual(0, result.returncode, payload)
+            self.assertEqual("placeholder", payload["scaffold"]["status"])
+            self.assertTrue((harness.repo / page).is_file())
+            result, payload = invoke(
+                harness.repo, "instructions", "--work", work_id
+            )
+            self.assertEqual(
+                "promote_and_seal_knowledge", payload["instructions"]["next_action"]
+            )
+
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "scaffold",
+                "--work",
+                work_id,
+                "--page",
+                page,
+                "--type",
+                "module",
+                "--title",
+                "Runtime Module",
+                "--source",
+                "src/app.txt",
+            )
+            self.assertEqual(2, result.returncode)
+            self.assertEqual("validation_failed", payload["error"]["code"])
+
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "seal",
+                "--work",
+                work_id,
+                "--page",
+                page,
+            )
+            self.assertEqual(2, result.returncode)
+            self.assertIn("active", payload["error"]["message"].lower())
+
+    def test_knowledge_no_update_review_cli_records_rationale_without_plan(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            work_id = state["id"]
+            harness.implement(work_id, "local-only behavior", review=False)
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "review",
+                "--work",
+                work_id,
+                "--disposition",
+                "no-update",
+                "--rationale",
+                "沒有可跨工作項重用的 durable knowledge。",
+            )
+            self.assertEqual(0, result.returncode, payload)
+            self.assertEqual("no-update", payload["knowledge_review"]["disposition"])
+            self.assertEqual([], payload["knowledge"]["planned"]["upserts"])
+            self.assertTrue(payload["knowledge"]["review"]["current"])
+
     def test_knowledge_plan_and_seal_cli_use_coupled_targets(self) -> None:
         with RepositoryHarness() as harness:
             state = harness.prepare_g2()
             work_id = state["id"]
-            harness.implement(work_id, "verification")
+            harness.implement(work_id, "verification", review=False)
+            result, payload = invoke(
+                harness.repo,
+                "knowledge",
+                "review",
+                "--work",
+                work_id,
+                "--disposition",
+                "promote",
+                "--rationale",
+                "CLI fixture 將 overview 提升為 durable knowledge。",
+            )
+            self.assertEqual(0, result.returncode, payload)
             result, payload = invoke(
                 harness.repo,
                 "knowledge",
@@ -224,6 +394,20 @@ class CliContractTests(unittest.TestCase):
             self.assertEqual(
                 ["wiki/index.md", "wiki/log.md"],
                 payload["knowledge_updates"]["coupled"],
+            )
+            overview = harness.repo / "wiki/overview.md"
+            frontmatter, _, errors = core.knowledge.parse_frontmatter_text(
+                overview.read_text(encoding="utf-8")
+            )
+            self.assertEqual([], errors)
+            frontmatter["sources"] = ["src/app.txt"]
+            frontmatter["status"] = "active"
+            overview.write_text(
+                core.knowledge.render_frontmatter(
+                    frontmatter,
+                    "\n# Fixture Overview\n\nCurrent source-backed behavior.\n",
+                ),
+                encoding="utf-8",
             )
             result, payload = invoke(
                 harness.repo,

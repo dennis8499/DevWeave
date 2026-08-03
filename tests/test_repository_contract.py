@@ -130,6 +130,57 @@ class RepositoryContractTests(unittest.TestCase):
             report = core.doctor(harness.repo)
             self.assertTrue(report["ok"], report["checks"])
 
+    def test_codebase_wiki_closed_loop_is_documented_on_the_single_router(self) -> None:
+        documents = {
+            ".agents/skills/devweave/SKILL.md": (
+                "$devweave wiki bootstrap",
+                "knowledge review",
+                "knowledge scaffold",
+                "at most five related pages",
+            ),
+            ".agents/skills/devweave/references/requirements-phase.md": (
+                "bootstrap",
+                "source fallback",
+                "content hash",
+            ),
+            ".agents/skills/devweave/references/verification-phase.md": (
+                "promote|no-update",
+                "one to five content",
+                "placeholder",
+            ),
+            ".agents/skills/devweave/references/contracts.md": (
+                "knowledge_profile",
+                "knowledge_review_required",
+                "knowledge bootstrap",
+                "knowledge scaffold",
+            ),
+            "AGENTS.md": (
+                "$devweave wiki bootstrap",
+                "Knowledge Review",
+                "no-update",
+            ),
+            "README.md": (
+                "$devweave wiki bootstrap",
+                "Codebase LLM Wiki",
+                "Knowledge Review",
+            ),
+            "docs/使用手冊.md": (
+                "knowledge bootstrap",
+                "knowledge review",
+                "knowledge scaffold",
+            ),
+            "vscode-extension/README.md": (
+                "DevWeave: Bootstrap Codebase Wiki",
+                "$devweave wiki bootstrap",
+                "九個公開",
+            ),
+        }
+        for relative, fragments in documents.items():
+            source = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+            for fragment in fragments:
+                self.assertIn(fragment, source, f"{relative}: {fragment}")
+            self.assertNotIn("八個公開", source, relative)
+
 
 if __name__ == "__main__":
     unittest.main()

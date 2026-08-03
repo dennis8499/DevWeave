@@ -11,13 +11,16 @@ For managed changes:
 1. Resolve or create a work item through the DevWeave Python CLI.
 2. Bind the current Codex session through `devweave bind`.
 3. Follow `devweave instructions` and load only its current phase reference.
-4. During G1, read `wiki/index.md` before at most five related pages and record the full knowledge context. Use raw sources only to resolve a recorded missing, placeholder, stale, or contradictory Wiki gap.
+4. During G1, read `wiki/index.md` before at most five related pages and record the full knowledge context, including page content hashes and source fingerprints. Use raw sources only after recording a missing, placeholder, stale, contradictory, or insufficient Wiki gap, and inspect the smallest necessary source range.
 5. Do not implement until G2 is approved and current. Keep Wiki read-only through G2 and implementation.
-6. During verification, refresh or delete only affected/planned Wiki pages, synchronize index, append a work-attributed promote log entry, and seal the promoted pages before G3.
-7. Do not close until G1, G2, and G3 are approved and current.
-8. Never edit DevWeave JSON state, event, or evidence ledgers directly.
+6. During verification, every new-format work item must complete a current Knowledge Review. Use `promote` for durable reusable knowledge; use `no-update` only for non-bootstrap work with a rationale, no affected page, no Wiki diff, and no knowledge plan.
+7. A promote plan may upsert/delete at most five content pages. Refresh or delete every affected page, cover durable uncovered changes with one or more pages, synchronize index, append one work-attributed promote log entry, and seal active pages before G3. Scaffolded placeholders and template tokens cannot be sealed.
+8. Do not close until G1, G2, and G3 are approved and current.
+9. Never edit DevWeave JSON state, event, or evidence ledgers directly.
 
 `.devweave/baseline/` is accepted governance truth; root `wiki/` is detailed, source-bound codebase knowledge. Wiki-first controls read order, not factual priority: current source behavior and approved DevWeave artifacts win conflicts, which must be recorded as gaps.
+
+`$devweave wiki bootstrap` is the only public Codebase Wiki bootstrap entry. It routes through `knowledge bootstrap`, explores the whole repository, and uses a normal feature work item with `knowledge_profile: bootstrap` plus the existing G1/G2/G3 lifecycle. An already complete core Wiki creates no work item; a missing bootstrap is advisory and does not block ordinary work. Bootstrap may write three to five planned Wiki content pages in G3 but must not modify product source.
 
 Machine keys and protocols are English. User-facing discovery, approval summaries, artifacts, and acceptance reports are Traditional Chinese unless the user asks otherwise. DevWeave observes Git state but never implicitly creates branches, worktrees, commits, or pushes.
 

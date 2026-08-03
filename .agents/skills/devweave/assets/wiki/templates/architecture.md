@@ -2,11 +2,11 @@
 title: <TITLE>
 type: architecture
 sources: [<SOURCE_PATH>]
-last_updated: 1970-01-01
+last_updated: <DATE>
 tags: [architecture]
-status: active
+status: placeholder
 source_fingerprint: none
-verified_by: bootstrap
+verified_by: <WORK_ID>
 ---
 
 # <TITLE>
@@ -18,4 +18,3 @@ verified_by: bootstrap
 ## Boundaries
 
 ## Evidence and Gaps
-

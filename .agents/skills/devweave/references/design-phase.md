@@ -17,6 +17,7 @@ Read this reference only while the work item phase is design or build_review.
 2. Trace every task to REQ/NFR, AC, and DEC IDs.
 3. Give every task a focused output, dependencies, and targeted verification.
 4. Plan living-baseline updates and the full verification set.
+5. For a `knowledge_profile: bootstrap` work item, select three to five evidence-backed content pages in the immutable plan: `wiki/overview.md`, at least one architecture page, at least one module page, and at most two additional high-value topics. Plan no product-source modification; Wiki remains read-only until verification.
 
 Run validate with gate build. Reconcile design or requirements when implementation uncertainty exposes a planning defect.
 

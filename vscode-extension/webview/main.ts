@@ -48,6 +48,10 @@ document.addEventListener("click", (event) => {
     api.postMessage({ type: "refresh" });
   } else if (action === "initialize") {
     api.postMessage({ type: "initialize" });
+  } else if (action === "wiki-bootstrap") {
+    const intent: PublicCommandIntent = { type: "wikiBootstrap" };
+    pendingIntent = intent;
+    api.postMessage({ type: "previewAction", intent });
   } else if (action === "confirm-copy") {
     if (pendingIntent) {
       api.postMessage({ type: "copyAction", intent: pendingIntent });
@@ -167,10 +171,10 @@ function renderWorkSelector(): string {
 
 function renderPublicCommandForm(work: any): string {
   const command = selectedCommand;
-  const mutationDisabled = Boolean(snapshot?.mutationBlocked && ["new", "feature", "refactor", "bug", "revise", "approve"].includes(command));
+  const mutationDisabled = Boolean(snapshot?.mutationBlocked && ["new", "feature", "refactor", "bug", "revise", "approve", "wikiBootstrap"].includes(command));
   const requiresWork = command === "revise" || command === "approve";
   const disabled = mutationDisabled || (requiresWork && !work);
-  return `<section class="section-card composer" aria-labelledby="public-command-title"><div class="section-heading"><div><p class="eyebrow">PUBLIC COMMANDS</p><h2 id="public-command-title">產生 Codex 對話命令</h2><p class="muted">只處理初始化與使用手冊列出的八個公開命令；先預覽，再複製到 Codex Chat。</p></div><span class="pill info">$devweave</span></div><form id="public-command-form"><label for="command-select">命令</label><select id="command-select" name="command" aria-label="選擇公開 DevWeave 命令">${publicCommandOptions(command)}</select>${renderCommandFields(command, work)}${mutationDisabled ? `<div class="notice warning"><span class="status-icon">!</span><div><strong>目前為 read-only diagnostic state</strong><p>請先使用 status 公開命令確認狀態；mutation 命令暫停產生。</p></div></div>` : ""}<div class="action-row"><button class="primary" type="submit" ${disabled ? "disabled" : ""}>Preview public command</button>${requiresWork && !work ? `<span class="muted">請先選擇目前 work item。</span>` : ""}</div></form></section>`;
+  return `<section class="section-card composer" aria-labelledby="public-command-title"><div class="section-heading"><div><p class="eyebrow">PUBLIC COMMANDS</p><h2 id="public-command-title">產生 Codex 對話命令</h2><p class="muted">只處理初始化與使用手冊列出的九個公開命令；先預覽，再複製到 Codex Chat。</p></div><span class="pill info">$devweave</span></div><form id="public-command-form"><label for="command-select">命令</label><select id="command-select" name="command" aria-label="選擇公開 DevWeave 命令">${publicCommandOptions(command)}</select>${renderCommandFields(command, work)}${mutationDisabled ? `<div class="notice warning"><span class="status-icon">!</span><div><strong>目前為 read-only diagnostic state</strong><p>請先使用 status 公開命令確認狀態；mutation 命令暫停產生。</p></div></div>` : ""}<div class="action-row"><button class="primary" type="submit" ${disabled ? "disabled" : ""}>Preview public command</button>${requiresWork && !work ? `<span class="muted">請先選擇目前 work item。</span>` : ""}</div></form></section>`;
 }
 
 function publicCommandOptions(selected: PublicCommandName): string {
@@ -181,6 +185,7 @@ function publicCommandOptions(selected: PublicCommandName): string {
     ["bug", "bug — 問題症狀"],
     ["next", "next — 下一步"],
     ["status", "status — 目前狀態"],
+    ["wikiBootstrap", "wiki bootstrap — 建立 Codebase Wiki"],
     ["revise", "revise — 修改決策"],
     ["approve", "approve — 人工核准"]
   ];
@@ -202,6 +207,8 @@ function renderCommandFields(command: PublicCommandName, work: any): string {
       return work
         ? `<label class="checkbox-field" for="include-work"><input id="include-work" name="include-work" type="checkbox" checked />帶入目前 work：<code>${escapeHtml(work.id)}</code><small>取消勾選即可產生不帶 work ID 的 ${command}。</small></label>`
         : `<p class="field-hint">目前沒有 work item；${command} 會產生不帶 work ID 的公開命令。</p>`;
+    case "wikiBootstrap":
+      return `<p class="field-hint">探索整個 repository，建立或續接一般 DevWeave bootstrap Work Item；Extension 只產生 prompt。</p>`;
     case "revise":
       return work
         ? `<div class="selected-work"><span>目前 work</span><code>${escapeHtml(work.id)}</code></div><label for="command-change">Decision change</label><textarea id="command-change" name="change" rows="3" placeholder="說明需要修改的決策或方向" spellcheck="true"></textarea>`
@@ -233,6 +240,9 @@ function formIntent(form: HTMLFormElement, work: any): PublicCommandIntent | nul
       candidate = form.elements.namedItem("include-work") && !((form.elements.namedItem("include-work") as HTMLInputElement).checked)
         ? { type: command }
         : { type: command, ...(work ? { workId: work.id } : {}) };
+      break;
+    case "wikiBootstrap":
+      candidate = { type: command };
       break;
     case "revise":
       candidate = work ? { type: command, workId: work.id, change: formValue(form, "change") } : null;
@@ -334,7 +344,15 @@ function renderKnowledge(work: any): string {
   const pages = knowledge?.pages ?? [];
   const categoryCounts = pages.reduce((counts: Record<string, number>, page: any) => { counts[page.type] = (counts[page.type] ?? 0) + 1; return counts; }, {});
   const categories = Object.entries(categoryCounts).map(([type, count]) => `<span class="pill">${escapeHtml(type)} ${escapeHtml(count)}</span>`).join("");
-  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">WIKI-FIRST KNOWLEDGE</p><h2>Knowledge health</h2></div><span class="pill ${knowledge?.health === "healthy" ? "success" : "warning"}">${escapeHtml(knowledge?.health ?? "unknown")}</span></div><div class="notice info"><span class="status-icon">i</span><div><strong>G1 fixed read order</strong><p><code>wiki/index.md</code> first, followed by at most five related pages. Raw sources are only for recorded gaps.</p></div></div><div class="pill-row">${categories || `<span class="muted">No Wiki categories detected.</span>`}</div><div class="metric-grid"><div class="metric"><span>Pages</span><strong>${pages.length}</strong></div><div class="metric"><span>Placeholder</span><strong>${(knowledge?.placeholderPages ?? []).length}</strong></div><div class="metric"><span>Stale</span><strong>${(knowledge?.stalePages ?? []).length}</strong></div><div class="metric"><span>Pending refresh</span><strong>${(knowledge?.pendingRefresh ?? []).length}</strong></div></div><div class="page-list">${pages.slice(0, 12).map((page: any) => `<button class="page-row" data-action="open" data-path="${escapeAttr(page.path)}"><span>${icon(page.status)}</span><span><strong>${escapeHtml(page.title)}</strong><small>${escapeHtml(page.path)} · ${escapeHtml(page.status)}${page.parseErrors?.length ? " · parse warning" : ""}</small></span></button>`).join("")}</div></section>`;
+  const bootstrap = knowledge?.bootstrap;
+  const review = knowledge?.review;
+  const bootstrapNotice = bootstrap?.recommended
+    ? `<div class="notice warning"><span class="status-icon">•</span><div><strong>Codebase Wiki bootstrap recommended</strong><p>${escapeHtml((bootstrap.reasons ?? []).join(", ") || "核心頁尚未完整")}</p><button class="primary" data-action="wiki-bootstrap" ${snapshot?.mutationBlocked ? "disabled" : ""}>Bootstrap Codebase Wiki</button></div></div>`
+    : `<div class="notice info"><span class="status-icon">✓</span><div><strong>Core Wiki bootstrap detected</strong><p>Filesystem projection 已找到 active、sourced 的 overview、architecture 與 module；engine 仍是 currentness 的權威來源。</p></div></div>`;
+  const reviewState = review?.required
+    ? `${review.disposition ?? "missing"} · ${review.current ? "current" : "missing/stale"}`
+    : "legacy / not required";
+  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">WIKI-FIRST KNOWLEDGE</p><h2>Knowledge health</h2></div><span class="pill ${knowledge?.health === "healthy" ? "success" : "warning"}">${escapeHtml(knowledge?.health ?? "unknown")}</span></div>${bootstrapNotice}<div class="notice info"><span class="status-icon">i</span><div><strong>G1 fixed read order</strong><p><code>wiki/index.md</code> first, followed by at most five related pages. Raw sources are only for recorded gaps.</p></div></div><div class="pill-row">${categories || `<span class="muted">No Wiki categories detected.</span>`}</div><div class="metric-grid"><div class="metric"><span>Pages</span><strong>${pages.length}</strong></div><div class="metric"><span>Placeholder</span><strong>${(knowledge?.placeholderPages ?? []).length}</strong></div><div class="metric"><span>Stale</span><strong>${(knowledge?.stalePages ?? []).length}</strong></div><div class="metric"><span>Pending refresh</span><strong>${(knowledge?.pendingRefresh ?? []).length}</strong></div><div class="metric"><span>Covered changes</span><strong>${(knowledge?.coveredChangedPaths ?? []).length}</strong></div><div class="metric"><span>Uncovered changes</span><strong>${(knowledge?.uncoveredChangedPaths ?? []).length}</strong></div><div class="metric"><span>Knowledge review</span><strong>${escapeHtml(reviewState)}</strong></div></div><div class="page-list">${pages.slice(0, 12).map((page: any) => `<button class="page-row" data-action="open" data-path="${escapeAttr(page.path)}"><span>${icon(page.status)}</span><span><strong>${escapeHtml(page.title)}</strong><small>${escapeHtml(page.path)} · ${escapeHtml(page.status)}${page.verifiedBy ? ` · verified ${escapeHtml(page.verifiedBy)}` : ""}${page.parseErrors?.length ? " · parse warning" : ""}</small></span></button>`).join("")}</div></section>`;
 }
 
 function renderTasksEvidence(work: any): string {
@@ -367,10 +385,11 @@ function traceIds(text: string): string[] {
 }
 
 function renderEmptyWork(): string {
+  const knowledge = renderKnowledge({ knowledge: snapshot?.knowledge });
   if (snapshot?.workItems?.length && snapshot.workItems.length > 1) {
-    return `<section class="empty-card"><span class="empty-icon">⌁</span><h2>Select a work item</h2><p class="muted">目前有多個 work items；請先在上方選擇 work ID。next/status 可以不帶 work，revise/approve 必須先選擇。</p></section>`;
+    return `<section class="empty-card"><span class="empty-icon">⌁</span><h2>Select a work item</h2><p class="muted">目前有多個 work items；請先在上方選擇 work ID。next/status 可以不帶 work，revise/approve 必須先選擇。</p></section>${knowledge}`;
   }
-  return `<section class="empty-card"><span class="empty-icon">＋</span><h2>No work item selected</h2><p class="muted">沒有既有 work item 時，仍可使用 new、feature、refactor、bug、next 與 status 公開命令；revise/approve 需要目前 work。</p></section>`;
+  return `<section class="empty-card"><span class="empty-icon">＋</span><h2>No work item selected</h2><p class="muted">沒有既有 work item 時，仍可使用 new、feature、refactor、bug、next、status 與 wiki bootstrap 公開命令；revise/approve 需要目前 work。</p></section>${knowledge}`;
 }
 
 function renderActionPreview(bundle: any): void {
@@ -423,7 +442,7 @@ function clearPendingPreview(): void {
 }
 
 function parsePublicCommandName(value: string): value is PublicCommandName {
-  return ["new", "feature", "refactor", "bug", "next", "status", "revise", "approve"].includes(value);
+  return ["new", "feature", "refactor", "bug", "next", "status", "revise", "approve", "wikiBootstrap"].includes(value);
 }
 
 function isPublicCommandName(value: unknown): value is PublicCommandName {

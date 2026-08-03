@@ -71,6 +71,7 @@ WIKILINK_PATTERN = re.compile(r"\[\[([^\]]+)\]\]")
 FINGERPRINT_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
 DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
 WORK_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+TEMPLATE_TOKEN_PATTERN = re.compile(r"<[A-Z][A-Z0-9_]*>")
 MAX_SOURCES = 5
 
 
@@ -234,7 +235,12 @@ def parse_frontmatter_text(text: str) -> tuple[dict[str, Any], str, list[str]]:
 
 def _yaml_scalar(value: Any) -> str:
     text = str(value)
-    if not text or text != text.strip() or any(char in text for char in "#:{}[],&*!|>'\"%@`"):
+    if (
+        not text
+        or text != text.strip()
+        or any(ord(char) < 0x20 for char in text)
+        or any(char in text for char in "#:{}[],&*!|>'\"%@`")
+    ):
         return json.dumps(text, ensure_ascii=False)
     return text
 
@@ -267,6 +273,29 @@ def _atomic_write(path: Path, text: str) -> None:
     finally:
         if temporary.exists():
             temporary.unlink()
+
+
+def _exclusive_write(path: Path, text: str) -> None:
+    """Create one complete file without ever replacing an existing target."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    created = False
+    try:
+        with path.open("x", encoding="utf-8", newline="\n") as handle:
+            created = True
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except FileExistsError as exc:
+        raise KnowledgeError(
+            "page_exists",
+            "Wiki scaffold target already exists and was not modified.",
+            {"page": path.as_posix()},
+        ) from exc
+    except Exception:
+        if created and path.exists():
+            path.unlink()
+        raise
 
 
 def _inside_repo(repo: Path, relative: str) -> Path:
@@ -373,6 +402,132 @@ def bootstrap_wiki(
         "root": knowledge_root,
         "status": "created" if created else "adopted",
         "created": sorted(created),
+    }
+
+
+def scaffold_page(
+    repo: Path,
+    assets: Path,
+    *,
+    page: str,
+    page_type: str,
+    title: str,
+    sources: Sequence[str],
+    work_id: str,
+    package_name: str | None = None,
+    version: str | None = None,
+    decision_date: str | None = None,
+    decision_status: str | None = None,
+    root: str = "wiki",
+    today: str | None = None,
+) -> dict[str, Any]:
+    """Render one canonical content-page template through a no-overwrite seam."""
+
+    content_types = PAGE_TYPES - {"index", "log"}
+    if page_type not in content_types:
+        raise KnowledgeError(
+            "invalid_page_type",
+            "Scaffold supports only canonical Wiki content page types.",
+            {"type": page_type, "allowed": sorted(content_types)},
+        )
+    if not isinstance(title, str) or not title.strip():
+        raise KnowledgeError("invalid_title", "Wiki scaffold title must not be empty.")
+    if not WORK_PATTERN.fullmatch(work_id):
+        raise KnowledgeError("invalid_work", "verified_by must be a valid work ID.")
+    normalized_page = normalize_page(page, root)
+    knowledge_root = normalize_root(root)
+    relative = normalized_page[len(knowledge_root) + 1 :]
+    location_error = _page_expected_location(relative, page_type)
+    if location_error:
+        raise KnowledgeError(
+            "page_location", location_error, {"page": normalized_page}
+        )
+    normalized_sources = normalize_sources(sources, knowledge_root)
+    if not normalized_sources:
+        raise KnowledgeError(
+            "missing_source", "Scaffolded Wiki pages require at least one source."
+        )
+    source_fingerprint(repo, normalized_sources, root=knowledge_root)
+    rendered_date = today or datetime.now(timezone.utc).date().isoformat()
+    if not _valid_date(rendered_date):
+        raise KnowledgeError(
+            "invalid_date", "Scaffold date must use YYYY-MM-DD.", {"date": rendered_date}
+        )
+
+    extras: dict[str, str] = {}
+    if page_type == "dependency":
+        if not (package_name or "").strip() or not (version or "").strip():
+            raise KnowledgeError(
+                "missing_dependency_fields",
+                "Dependency scaffold requires package_name and version.",
+            )
+        extras = {
+            "package_name": str(package_name).strip(),
+            "version": str(version).strip(),
+        }
+    elif package_name is not None or version is not None:
+        raise KnowledgeError(
+            "unexpected_type_fields",
+            "package_name and version are valid only for dependency pages.",
+        )
+    if page_type == "decision":
+        if not _valid_date(decision_date) or decision_status not in {
+            "proposed",
+            "accepted",
+            "deprecated",
+            "superseded",
+        }:
+            raise KnowledgeError(
+                "invalid_decision_fields",
+                "Decision scaffold requires a valid decision_date and decision_status.",
+            )
+        extras.update(
+            {
+                "decision_date": str(decision_date),
+                "decision_status": str(decision_status),
+            }
+        )
+    elif decision_date is not None or decision_status is not None:
+        raise KnowledgeError(
+            "unexpected_type_fields",
+            "decision_date and decision_status are valid only for decision pages.",
+        )
+
+    asset = assets / "wiki" / "templates" / f"{page_type}.md"
+    try:
+        template = asset.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise KnowledgeError(
+            "missing_asset",
+            "Bundled Wiki template is missing.",
+            {"asset": f"wiki/templates/{page_type}.md"},
+        ) from exc
+    template_frontmatter, body, parse_errors = parse_frontmatter_text(template)
+    if parse_errors or template_frontmatter.get("type") != page_type:
+        raise KnowledgeError(
+            "invalid_asset",
+            "Bundled Wiki template is incompatible.",
+            {"asset": f"wiki/templates/{page_type}.md", "errors": parse_errors},
+        )
+    values: dict[str, Any] = {
+        "title": title.strip(),
+        "type": page_type,
+        "sources": normalized_sources,
+        "last_updated": rendered_date,
+        "tags": template_frontmatter.get("tags", [page_type]),
+        "status": "placeholder",
+        "source_fingerprint": "none",
+        "verified_by": work_id,
+        **extras,
+    }
+    rendered = render_frontmatter(values, body.replace("<TITLE>", title.strip()))
+    target = _inside_repo(repo, normalized_page)
+    _exclusive_write(target, rendered)
+    return {
+        "page": normalized_page,
+        "type": page_type,
+        "status": "placeholder",
+        "sources": normalized_sources,
     }
 
 
@@ -759,6 +914,59 @@ def knowledge_status(
     }
 
 
+def bootstrap_assessment(
+    repo: Path, *, root: str = "wiki", snapshot: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Return the deterministic readiness of the repository's core Wiki pages."""
+
+    knowledge_root = normalize_root(root)
+    snapshot = snapshot or knowledge_snapshot(repo, root=knowledge_root)
+    lint = lint_wiki(repo, root=knowledge_root, snapshot=snapshot)
+    pages = snapshot.get("pages", {})
+
+    def ready(record: Any) -> bool:
+        return bool(
+            isinstance(record, dict)
+            and record.get("status") == "active"
+            and record.get("sources")
+            and not record.get("parse_errors")
+            and not record.get("source_error")
+            and record.get("verified_by")
+            and record.get("source_fingerprint") not in (None, "none")
+            and record.get("source_fingerprint")
+            == record.get("computed_source_fingerprint")
+        )
+
+    overview = f"{knowledge_root}/overview.md"
+    architecture_pages = sorted(
+        path
+        for path, record in pages.items()
+        if record.get("type") == "architecture" and ready(record)
+    )
+    module_pages = sorted(
+        path
+        for path, record in pages.items()
+        if record.get("type") == "module" and ready(record)
+    )
+    reasons: list[str] = []
+    if not ready(pages.get(overview)):
+        reasons.append("overview_not_ready")
+    if not architecture_pages:
+        reasons.append("architecture_missing")
+    if not module_pages:
+        reasons.append("module_missing")
+    if lint["summary"]["critical"]:
+        reasons.append("critical_lint")
+    return {
+        "complete": not reasons,
+        "recommended": bool(reasons),
+        "reasons": reasons,
+        "overview": overview if ready(pages.get(overview)) else None,
+        "architecture_pages": architecture_pages[:50],
+        "module_pages": module_pages[:50],
+    }
+
+
 def seal_pages(
     repo: Path,
     pages: Iterable[str],
@@ -783,6 +991,19 @@ def seal_pages(
         frontmatter, body, errors = parse_frontmatter_text(text)
         if errors:
             raise KnowledgeError("invalid_frontmatter", "Wiki page frontmatter cannot be sealed.", {"page": page, "errors": errors})
+        if frontmatter.get("status") != "active":
+            raise KnowledgeError(
+                "page_not_ready",
+                "Only active Wiki pages may be sealed.",
+                {"page": page, "status": frontmatter.get("status")},
+            )
+        tokens = sorted(set(TEMPLATE_TOKEN_PATTERN.findall(text)))
+        if tokens:
+            raise KnowledgeError(
+                "template_token",
+                "Wiki page still contains canonical template tokens.",
+                {"page": page, "tokens": tokens},
+            )
         sources = normalize_sources(frontmatter.get("sources", []), root)
         fingerprint = source_fingerprint(repo, sources, root=root, catalog=catalog)
         frontmatter["sources"] = sources
@@ -794,6 +1015,19 @@ def seal_pages(
         rendered = render_frontmatter(frontmatter, body)
         prepared.append((path, rendered, frontmatter))
         results.append({"page": page, "source_fingerprint": fingerprint, "last_updated": frontmatter["last_updated"], "verified_by": work_id})
+    snapshot = knowledge_snapshot(repo, root=root)
+    lint = lint_wiki(repo, root=root, snapshot=snapshot)
+    critical = [
+        finding
+        for finding in lint.get("findings", [])
+        if finding.get("severity") == "critical"
+    ]
+    if critical:
+        raise KnowledgeError(
+            "critical_lint",
+            "Wiki contains critical lint findings and cannot be sealed.",
+            {"findings": critical[:50]},
+        )
     for path, rendered, _ in prepared:
         _atomic_write(path, rendered)
     return results
@@ -818,6 +1052,66 @@ def affected_pages(base: dict[str, Any], changed_paths: Sequence[str]) -> list[s
         if any(source_overlaps_path(source, changed) for source in sources for changed in changed_paths):
             affected.append(page)
     return sorted(affected)
+
+
+def context_records(
+    snapshot: dict[str, Any], pages: Sequence[str]
+) -> list[dict[str, Any]]:
+    """Project an ordered, serializable observation for each context page."""
+
+    records: list[dict[str, Any]] = []
+    snapshot_pages = snapshot.get("pages", {}) if isinstance(snapshot, dict) else {}
+    for path in pages:
+        record = snapshot_pages.get(path)
+        records.append(
+            {
+                "path": path,
+                "present": isinstance(record, dict),
+                "status": record.get("status") if isinstance(record, dict) else None,
+                "content_hash": record.get("file_hash") if isinstance(record, dict) else None,
+                "source_fingerprint": record.get("source_fingerprint")
+                if isinstance(record, dict)
+                else None,
+                "computed_source_fingerprint": record.get(
+                    "computed_source_fingerprint"
+                )
+                if isinstance(record, dict)
+                else None,
+            }
+        )
+    return records
+
+
+def coverage_paths(
+    snapshot: dict[str, Any], changed_paths: Sequence[str]
+) -> dict[str, list[str]]:
+    """Split changed paths by whether an active Wiki page declares overlap."""
+
+    sources: list[str] = []
+    for record in (
+        snapshot.get("pages", {}).values() if isinstance(snapshot, dict) else []
+    ):
+        if not isinstance(record, dict):
+            continue
+        if (
+            record.get("status") != "active"
+            or record.get("parse_errors")
+            or record.get("source_error")
+        ):
+            continue
+        sources.extend(record.get("sources", []))
+    normalized = sorted(
+        {PurePosixPath(path).as_posix() for path in changed_paths if path}
+    )
+    covered = [
+        path
+        for path in normalized
+        if any(source_overlaps_path(source, path) for source in sources)
+    ]
+    return {
+        "covered": covered,
+        "uncovered": [path for path in normalized if path not in covered],
+    }
 
 
 def validate_promote_log(repo: Path, work_id: str, *, root: str = "wiki", base: dict[str, Any] | None = None) -> list[str]:

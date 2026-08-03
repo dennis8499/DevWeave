@@ -100,8 +100,563 @@ class EndToEndProfileTests(unittest.TestCase):
                     )
                     self.assertNotEqual(work_id, replacement["id"])
 
+    def test_bootstrap_profile_reaches_g3_through_scaffold_and_seal(self) -> None:
+        with RepositoryHarness() as harness:
+            harness.init()
+            created = core.bootstrap_knowledge_work(harness.repo)
+            work_id = created["work"]["id"]
+            harness.fill_requirements(work_id)
+            core.set_scope(
+                harness.repo,
+                work_id,
+                ["wiki/**"],
+                "Bootstrap 僅提升 Wiki，不修改產品 source。",
+            )
+            core.approve_gate(harness.repo, work_id, "scope", "Test Approver")
+            harness.fill_design(work_id)
+            core.approve_gate(harness.repo, work_id, "build", "Test Approver")
+            core.update_task(harness.repo, work_id, "TASK-001", "start")
+            core.update_task(
+                harness.repo,
+                work_id,
+                "TASK-001",
+                "complete",
+                note="已選定 overview、architecture 與 module 三個核心頁。",
+            )
+            with self.assertRaises(core.ValidationError) as no_update:
+                core.set_knowledge_review(
+                    harness.repo,
+                    work_id,
+                    "no-update",
+                    "Bootstrap 不允許略過核心知識提升。",
+                )
+            self.assertIn("not allowed", no_update.exception.message.lower())
+            core.set_knowledge_review(
+                harness.repo,
+                work_id,
+                "promote",
+                "Bootstrap 建立可重用的 repository 核心知識。",
+            )
+            pages = [
+                "wiki/overview.md",
+                "wiki/architecture/system.md",
+                "wiki/modules/runtime.md",
+            ]
+            core.set_knowledge_plan(
+                harness.repo,
+                work_id,
+                pages,
+                [],
+                "建立三個 source-bound 核心頁。",
+            )
+            core.scaffold_knowledge(
+                harness.repo,
+                work_id,
+                page="wiki/architecture/system.md",
+                page_type="architecture",
+                title="System Architecture",
+                sources=["src/app.txt"],
+            )
+            core.scaffold_knowledge(
+                harness.repo,
+                work_id,
+                page="wiki/modules/runtime.md",
+                page_type="module",
+                title="Runtime Module",
+                sources=["src/app.txt"],
+            )
+
+            for page in pages:
+                target = harness.repo / page
+                frontmatter, _, errors = core.knowledge.parse_frontmatter_text(
+                    target.read_text(encoding="utf-8")
+                )
+                self.assertEqual([], errors)
+                frontmatter["sources"] = ["src/app.txt"]
+                frontmatter["status"] = "active"
+                target.write_text(
+                    core.knowledge.render_frontmatter(
+                        frontmatter,
+                        f"\n# {frontmatter['title']}\n\n"
+                        "此頁由目前 fixture source 驗證，描述可重用的核心邊界。\n",
+                    ),
+                    encoding="utf-8",
+                )
+
+            index = harness.repo / "wiki/index.md"
+            index_text = index.read_text(encoding="utf-8")
+            index_text = index_text.replace(
+                "_尚無頁面。_",
+                "- [[system]] | Source-bound system architecture",
+                1,
+            ).replace(
+                "_尚無頁面。_",
+                "- [[runtime]] | Source-bound runtime module",
+                1,
+            )
+            index.write_text(index_text, encoding="utf-8")
+            log = harness.repo / "wiki/log.md"
+            log.write_text(
+                log.read_text(encoding="utf-8")
+                + f"\n## [2099-01-01] promote | {work_id}\n\n"
+                + "- Promoted overview, architecture, and module from fixture sources.\n",
+                encoding="utf-8",
+            )
+            core.seal_knowledge(
+                harness.repo,
+                work_id,
+                [*pages, "wiki/index.md", "wiki/log.md"],
+            )
+
+            harness.configure_command()
+            regression = core.run_verification(
+                harness.repo,
+                work_id,
+                command_id="fixture-tests",
+                kind="regression",
+                covers=["AC-001", "AC-002"],
+                tasks=["TASK-001"],
+            )
+            acceptance = core.add_evidence(
+                harness.repo,
+                work_id,
+                kind="acceptance",
+                status="passed",
+                summary="Bootstrap 核心 Wiki 可由 index 定位並通過 source-bound 驗收。",
+                covers=["AC-001", "AC-002"],
+                tasks=["TASK-001"],
+                observed_result="success",
+            )
+            core.set_baseline_updates(
+                harness.repo,
+                work_id,
+                [],
+                "Bootstrap 不改變 accepted product 或 architecture baseline。",
+            )
+            harness.fill_acceptance(work_id, [regression["id"], acceptance["id"]])
+
+            state = core.load_state(harness.repo, work_id)
+            report = core.validate_work(harness.repo, state, "acceptance")
+            self.assertTrue(report.ok, report.errors)
+            approved = core.approve_gate(
+                harness.repo, work_id, "acceptance", "Test Approver"
+            )
+            self.assertEqual("approved", approved["gates"]["acceptance"]["status"])
+            self.assertEqual("closed", core.close_work(harness.repo, work_id)["status"])
+            self.assertEqual(
+                "already_complete",
+                core.bootstrap_knowledge_work(harness.repo)["action"],
+            )
+
 
 class StateAndFingerprintTests(unittest.TestCase):
+    def test_bootstrap_work_is_created_resumed_or_skipped_when_complete(self) -> None:
+        with RepositoryHarness() as harness:
+            harness.init()
+            created = core.bootstrap_knowledge_work(harness.repo)
+            self.assertEqual("created", created["action"])
+            self.assertEqual("feature", created["work"]["kind"])
+            self.assertEqual("bootstrap", created["work"]["knowledge_profile"])
+            self.assertTrue(created["work"]["knowledge_review_required"])
+
+            resumed = core.bootstrap_knowledge_work(harness.repo)
+            self.assertEqual("resume", resumed["action"])
+            self.assertEqual(created["work"]["id"], resumed["work"]["id"])
+            self.assertEqual(1, len(core.list_work(harness.repo)))
+
+        with RepositoryHarness() as harness:
+            harness.init()
+
+            def write_core_page(relative: str, page_type: str) -> None:
+                sources = ["src/app.txt"]
+                values = {
+                    "title": page_type.title(),
+                    "type": page_type,
+                    "sources": sources,
+                    "last_updated": "2099-01-01",
+                    "tags": [page_type],
+                    "status": "active",
+                    "source_fingerprint": core.knowledge.source_fingerprint(
+                        harness.repo, sources
+                    ),
+                    "verified_by": "prior-work",
+                }
+                target = harness.repo / "wiki" / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(
+                    core.knowledge.render_frontmatter(
+                        values, f"\n# {page_type.title()}\n\nSource-bound.\n"
+                    ),
+                    encoding="utf-8",
+                )
+
+            write_core_page("overview.md", "overview")
+            write_core_page("architecture/system.md", "architecture")
+            write_core_page("modules/runtime.md", "module")
+            index = harness.repo / "wiki/index.md"
+            text = index.read_text(encoding="utf-8")
+            text = text.replace(
+                "## Architecture\n\n", "## Architecture\n\n- [[system]] | System\n"
+            )
+            text = text.replace(
+                "## Modules\n\n", "## Modules\n\n- [[runtime]] | Runtime\n"
+            )
+            index.write_text(text, encoding="utf-8")
+
+            complete = core.bootstrap_knowledge_work(harness.repo)
+            self.assertEqual("already_complete", complete["action"])
+            self.assertIsNone(complete["work"])
+            self.assertTrue(complete["bootstrap"]["complete"])
+            self.assertEqual([], core.list_work(harness.repo))
+
+    def test_bootstrap_acceptance_requires_core_plan_and_zero_product_diff(self) -> None:
+        with RepositoryHarness() as harness:
+            harness.init()
+            created = core.bootstrap_knowledge_work(harness.repo)
+            work_id = created["work"]["id"]
+            harness.fill_requirements(work_id)
+            core.set_scope(
+                harness.repo,
+                work_id,
+                ["src/**"],
+                "Bootstrap 不修改產品程式碼；scope 僅供偵測違規 diff。",
+            )
+            core.approve_gate(harness.repo, work_id, "scope", "Test Approver")
+            harness.fill_design(work_id)
+            core.approve_gate(harness.repo, work_id, "build", "Test Approver")
+            core.update_task(harness.repo, work_id, "TASK-001", "start")
+            core.update_task(
+                harness.repo,
+                work_id,
+                "TASK-001",
+                "complete",
+                note="Bootstrap knowledge design complete.",
+            )
+            core.set_knowledge_review(
+                harness.repo,
+                work_id,
+                "promote",
+                "建立可長期重用的 repository 核心知識。",
+            )
+            core.set_knowledge_plan(
+                harness.repo,
+                work_id,
+                ["wiki/overview.md"],
+                [],
+                "不完整的 bootstrap plan 應在 G3 被拒絕。",
+            )
+
+            state = core.load_state(harness.repo, work_id)
+            errors: list[str] = []
+            core._validate_knowledge_acceptance(
+                harness.repo,
+                state,
+                core.changed_paths_since(harness.repo, state["base_source"]),
+                errors,
+                [],
+            )
+            self.assertTrue(any("three to five" in item.lower() for item in errors))
+            self.assertTrue(any("architecture" in item.lower() for item in errors))
+            self.assertTrue(any("module" in item.lower() for item in errors))
+
+            (harness.repo / "src/app.txt").write_text(
+                "baseline\nbootstrap must reject this product diff\n",
+                encoding="utf-8",
+            )
+            core.set_knowledge_review(
+                harness.repo,
+                work_id,
+                "promote",
+                "重新檢視變更後仍須 promote，但產品 diff 必須阻擋 G3。",
+            )
+            core.set_knowledge_plan(
+                harness.repo,
+                work_id,
+                [
+                    "wiki/overview.md",
+                    "wiki/architecture/system.md",
+                    "wiki/modules/runtime.md",
+                ],
+                [],
+                "宣告三個核心頁以隔離產品 diff 規則。",
+            )
+            state = core.load_state(harness.repo, work_id)
+            errors = []
+            core._validate_knowledge_acceptance(
+                harness.repo,
+                state,
+                core.changed_paths_since(harness.repo, state["base_source"]),
+                errors,
+                [],
+            )
+            self.assertTrue(any("product source" in item.lower() for item in errors))
+
+    def test_new_work_declares_additive_knowledge_review_contract(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            self.assertTrue(state["knowledge_review_required"])
+            self.assertNotIn("knowledge_profile", state)
+            self.assertEqual([], state["knowledge_context"]["records"])
+            self.assertEqual(
+                {
+                    "disposition": None,
+                    "rationale": "",
+                    "affected_pages": [],
+                    "covered_changed_paths": [],
+                    "uncovered_changed_paths": [],
+                    "change_fingerprint": None,
+                    "recorded_at": None,
+                    "invalidated_at": None,
+                },
+                state["knowledge_review"],
+            )
+            self.assertIsNone(state["knowledge_updates"]["change_fingerprint"])
+
+            for key in ("knowledge_review_required", "knowledge_review"):
+                state.pop(key)
+            state["knowledge_context"].pop("records")
+            state["knowledge_updates"].pop("change_fingerprint")
+            core.atomic_write_json(core.state_path(harness.repo, state["id"]), state)
+            legacy = core.load_state(harness.repo, state["id"])
+            self.assertNotIn("knowledge_review_required", legacy)
+            self.assertNotIn("knowledge_review", legacy)
+            self.assertTrue(
+                core.work_knowledge_status(harness.repo, legacy)["legacy_work"]
+            )
+
+    def test_new_work_rejects_malformed_knowledge_context_record(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            valid_record = {
+                "path": "wiki/index.md",
+                "present": True,
+                "status": "active",
+                "content_hash": "abc",
+                "source_fingerprint": None,
+                "computed_source_fingerprint": None,
+            }
+            malformed_records = [
+                {**valid_record, "content_hash": ["not", "a", "hash"]},
+                {
+                    key: value
+                    for key, value in valid_record.items()
+                    if key != "source_fingerprint"
+                },
+            ]
+            for record in malformed_records:
+                with self.subTest(record=record):
+                    state["knowledge_context"]["records"] = [record]
+                    core.atomic_write_json(
+                        core.state_path(harness.repo, state["id"]), state
+                    )
+
+                    with self.assertRaises(core.ValidationError) as raised:
+                        core.load_state(harness.repo, state["id"])
+
+                    self.assertIn(
+                        "knowledge_context.records is invalid",
+                        raised.exception.details["errors"],
+                    )
+
+    def test_new_work_rejects_semantically_incomplete_knowledge_review(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            state["knowledge_review"].update(
+                {
+                    "disposition": "promote",
+                    "rationale": "",
+                    "change_fingerprint": "source-fingerprint",
+                    "recorded_at": "2026-08-03T01:00:00Z",
+                }
+            )
+            core.atomic_write_json(core.state_path(harness.repo, state["id"]), state)
+
+            with self.assertRaises(core.ValidationError) as raised:
+                core.load_state(harness.repo, state["id"])
+
+            self.assertTrue(
+                any(
+                    "disposition requires rationale" in error
+                    for error in raised.exception.details["errors"]
+                )
+            )
+
+            state = harness.start(title="Missing knowledge base")
+            state.pop("base_knowledge")
+            core.atomic_write_json(core.state_path(harness.repo, state["id"]), state)
+            with self.assertRaises(core.ValidationError) as missing_base:
+                core.load_state(harness.repo, state["id"])
+            self.assertIn(
+                "knowledge_review_required needs a base_knowledge snapshot",
+                missing_base.exception.details["errors"],
+            )
+
+    def test_context_records_capture_page_state_and_design_drift_invalidates_g1(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            work_id = state["id"]
+            harness.fill_requirements(work_id)
+            captured = core.load_state(harness.repo, work_id)["knowledge_context"]
+            self.assertEqual(
+                ["wiki/index.md", "wiki/overview.md"], captured["pages"]
+            )
+            self.assertEqual(captured["pages"], [item["path"] for item in captured["records"]])
+            self.assertTrue(captured["records"][0]["present"])
+            self.assertEqual("placeholder", captured["records"][1]["status"])
+            self.assertTrue(captured["records"][1]["content_hash"])
+
+            core.set_scope(harness.repo, work_id, ["src/**"], "限制產品來源範圍。")
+            core.approve_gate(harness.repo, work_id, "scope", "Test Approver")
+            overview = harness.repo / "wiki/overview.md"
+            overview.write_text(
+                overview.read_text(encoding="utf-8") + "\nExternal knowledge drift.\n",
+                encoding="utf-8",
+            )
+            stale = core.sync_state(harness.repo, work_id)
+            self.assertEqual("requirements", stale["phase"])
+            self.assertEqual("stale", stale["gates"]["scope"]["status"])
+
+    def test_no_update_review_projects_coverage_and_invalidates_on_source_change(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            work_id = state["id"]
+            harness.implement(work_id, "knowledge review change", review=False)
+
+            before = core.work_knowledge_status(
+                harness.repo, core.load_state(harness.repo, work_id)
+            )
+            self.assertEqual([], before["covered_changed_paths"])
+            self.assertEqual(["src/app.txt"], before["uncovered_changed_paths"])
+            self.assertTrue(before["bootstrap"]["recommended"])
+            self.assertFalse(before["review"]["current"])
+
+            review = core.set_knowledge_review(
+                harness.repo,
+                work_id,
+                "no-update",
+                "此 fixture 只改變測試 marker，沒有可跨 Work Item 重用的知識。",
+            )
+            self.assertEqual("no-update", review["disposition"])
+            self.assertEqual(["src/app.txt"], review["uncovered_changed_paths"])
+            current = core.work_knowledge_status(
+                harness.repo, core.load_state(harness.repo, work_id)
+            )
+            self.assertTrue(current["review"]["current"])
+
+            (harness.repo / "src/app.txt").write_text(
+                "changed after knowledge review\n", encoding="utf-8"
+            )
+            invalidated = core.sync_state(harness.repo, work_id)
+            self.assertIsNotNone(invalidated["knowledge_review"]["invalidated_at"])
+            self.assertIsNone(
+                invalidated["knowledge_updates"]["change_fingerprint"]
+            )
+            status = core.work_knowledge_status(harness.repo, invalidated)
+            self.assertFalse(status["review"]["current"])
+
+    def test_promote_review_is_required_for_a_current_five_page_plan(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            work_id = state["id"]
+            harness.implement(work_id, "promotion candidate", review=False)
+            with self.assertRaises(core.ValidationError):
+                core.set_knowledge_plan(
+                    harness.repo,
+                    work_id,
+                    ["wiki/modules/one.md"],
+                    [],
+                    "Plan before review must fail.",
+                )
+
+            review = core.set_knowledge_review(
+                harness.repo,
+                work_id,
+                "promote",
+                "變更形成可重用的 module knowledge。",
+            )
+            five = [f"wiki/modules/page-{number}.md" for number in range(1, 6)]
+            updates = core.set_knowledge_plan(
+                harness.repo,
+                work_id,
+                five,
+                [],
+                "建立最多五個 source-bound module pages。",
+            )
+            self.assertEqual(five, updates["upserts"])
+            self.assertEqual(
+                review["change_fingerprint"], updates["change_fingerprint"]
+            )
+            with self.assertRaises(core.ValidationError) as too_many:
+                core.set_knowledge_plan(
+                    harness.repo,
+                    work_id,
+                    five + ["wiki/modules/page-6.md"],
+                    [],
+                    "第六頁應被拒絕。",
+                )
+            self.assertIn("five", too_many.exception.message.lower())
+
+    def test_acceptance_requires_current_review_and_no_update_has_no_wiki_diff(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            work_id = state["id"]
+            harness.implement(work_id, "no durable knowledge", review=False)
+            current = core.load_state(harness.repo, work_id)
+            changed = core.changed_paths_since(harness.repo, current["base_source"])
+            errors: list[str] = []
+            core._validate_knowledge_acceptance(
+                harness.repo, current, changed, errors, []
+            )
+            self.assertTrue(any("knowledge review" in item.lower() for item in errors))
+
+            with self.assertRaises(core.ValidationError):
+                core.set_knowledge_review(
+                    harness.repo,
+                    work_id,
+                    "no-update",
+                    "",
+                )
+            index = harness.repo / "wiki/index.md"
+            original_index = index.read_bytes()
+            index.write_bytes(original_index + b"\nUndeclared Wiki diff.\n")
+            with self.assertRaises(core.ValidationError) as wiki_diff:
+                core.set_knowledge_review(
+                    harness.repo,
+                    work_id,
+                    "no-update",
+                    "Wiki 已有變更時不得宣告 no-update。",
+                )
+            self.assertIn("not allowed", wiki_diff.exception.message.lower())
+            index.write_bytes(original_index)
+
+            core.set_knowledge_review(
+                harness.repo,
+                work_id,
+                "no-update",
+                "沒有跨工作項可重用的知識。",
+            )
+            current = core.load_state(harness.repo, work_id)
+            errors = []
+            core._validate_knowledge_acceptance(
+                harness.repo, current, changed, errors, []
+            )
+            self.assertEqual([], errors)
+
+            overview = harness.repo / "wiki/overview.md"
+            overview.write_text(
+                overview.read_text(encoding="utf-8") + "\nUnexpected Wiki diff.\n",
+                encoding="utf-8",
+            )
+            errors = []
+            core._validate_knowledge_acceptance(
+                harness.repo,
+                core.load_state(harness.repo, work_id),
+                changed,
+                errors,
+                [],
+            )
+            self.assertTrue(any("no-update" in item.lower() for item in errors))
+
     def test_requirements_change_invalidates_all_gates(self) -> None:
         with RepositoryHarness() as harness:
             state = harness.prepare_g2()

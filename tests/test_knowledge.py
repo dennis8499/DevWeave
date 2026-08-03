@@ -139,6 +139,388 @@ def knowledge_acceptance(harness: RepositoryHarness, state: dict) -> tuple[list[
 
 
 class KnowledgeCoreTests(unittest.TestCase):
+    def test_frontmatter_renderer_quotes_control_characters(self) -> None:
+        rendered = knowledge.render_frontmatter(
+            {
+                "title": "Runtime\nModule",
+                "type": "module",
+                "sources": ["src/app.txt"],
+                "last_updated": "2026-08-03",
+                "tags": ["module"],
+                "status": "placeholder",
+            },
+            "# Runtime Module\n",
+        )
+
+        frontmatter, body, errors = knowledge.parse_frontmatter_text(rendered)
+
+        self.assertEqual([], errors)
+        self.assertEqual("Runtime\nModule", frontmatter["title"])
+        self.assertEqual("# Runtime Module\n", body)
+
+    def test_bootstrap_assessment_requires_sourced_overview_architecture_and_module(self) -> None:
+        with RepositoryHarness() as harness:
+            harness.init()
+            pending = knowledge.bootstrap_assessment(harness.repo)
+            self.assertFalse(pending["complete"])
+            self.assertTrue(pending["recommended"])
+            self.assertEqual(
+                ["overview_not_ready", "architecture_missing", "module_missing"],
+                pending["reasons"],
+            )
+
+            write_page(harness.repo, "overview.md", "overview", ["README.md"])
+            write_page(
+                harness.repo,
+                "architecture/system.md",
+                "architecture",
+                ["src/app.txt"],
+            )
+            add_to_index(harness.repo, "system", "Architecture", "System architecture")
+            write_page(
+                harness.repo,
+                "modules/runtime.md",
+                "module",
+                ["src/app.txt"],
+            )
+            add_to_index(harness.repo, "runtime", "Modules", "Runtime module")
+
+            complete = knowledge.bootstrap_assessment(harness.repo)
+            self.assertTrue(complete["complete"])
+            self.assertFalse(complete["recommended"])
+            self.assertEqual([], complete["reasons"])
+            self.assertEqual("wiki/overview.md", complete["overview"])
+            self.assertEqual(["wiki/architecture/system.md"], complete["architecture_pages"])
+            self.assertEqual(["wiki/modules/runtime.md"], complete["module_pages"])
+
+            extras = [
+                ("modules/api.md", "module", "api", "Modules"),
+                ("entities/work-item.md", "entity", "work-item", "Entities"),
+                ("patterns/gates.md", "pattern", "gates", "Patterns"),
+            ]
+            for relative, page_type, stem, section in extras:
+                write_page(harness.repo, relative, page_type, ["src/app.txt"])
+                add_to_index(harness.repo, stem, section, f"{page_type} fixture")
+            over_five = knowledge.bootstrap_assessment(harness.repo)
+            self.assertTrue(over_five["complete"])
+            self.assertEqual([], over_five["reasons"])
+            self.assertGreater(
+                len(knowledge.knowledge_snapshot(harness.repo)["pages"]) - 2,
+                5,
+            )
+
+    def test_context_records_and_coverage_are_deterministic_and_source_bound(self) -> None:
+        with RepositoryHarness() as harness:
+            harness.init()
+            write_page(
+                harness.repo,
+                "modules/runtime.md",
+                "module",
+                ["src/app.txt"],
+            )
+            add_to_index(harness.repo, "runtime", "Modules", "Runtime module")
+            snapshot = knowledge.knowledge_snapshot(harness.repo)
+
+            records = knowledge.context_records(
+                snapshot,
+                [
+                    "wiki/index.md",
+                    "wiki/modules/runtime.md",
+                    "wiki/modules/missing.md",
+                ],
+            )
+            self.assertEqual(
+                [
+                    "wiki/index.md",
+                    "wiki/modules/runtime.md",
+                    "wiki/modules/missing.md",
+                ],
+                [record["path"] for record in records],
+            )
+            self.assertTrue(records[0]["present"])
+            self.assertEqual("active", records[1]["status"])
+            self.assertEqual(
+                snapshot["pages"]["wiki/modules/runtime.md"]["file_hash"],
+                records[1]["content_hash"],
+            )
+            self.assertEqual(
+                snapshot["pages"]["wiki/modules/runtime.md"]["source_fingerprint"],
+                records[1]["source_fingerprint"],
+            )
+            self.assertEqual(
+                {
+                    "path": "wiki/modules/missing.md",
+                    "present": False,
+                    "status": None,
+                    "content_hash": None,
+                    "source_fingerprint": None,
+                    "computed_source_fingerprint": None,
+                },
+                records[2],
+            )
+
+            coverage = knowledge.coverage_paths(
+                snapshot, ["README.md", "src/app.txt", "src/app.txt"]
+            )
+            self.assertEqual(["src/app.txt"], coverage["covered"])
+            self.assertEqual(["README.md"], coverage["uncovered"])
+
+            (harness.repo / "src/app.txt").write_text(
+                "source currentness changed\n", encoding="utf-8"
+            )
+            changed_records = knowledge.context_records(
+                knowledge.knowledge_snapshot(harness.repo),
+                ["wiki/modules/runtime.md"],
+            )
+            self.assertEqual(records[1]["content_hash"], changed_records[0]["content_hash"])
+            self.assertEqual(
+                records[1]["source_fingerprint"],
+                changed_records[0]["source_fingerprint"],
+            )
+            self.assertNotEqual(
+                records[1]["computed_source_fingerprint"],
+                changed_records[0]["computed_source_fingerprint"],
+            )
+
+    def test_scaffold_uses_canonical_template_and_never_overwrites(self) -> None:
+        with RepositoryHarness() as harness:
+            harness.init()
+            result = knowledge.scaffold_page(
+                harness.repo,
+                core.skill_root() / "assets",
+                page="wiki/modules/runtime.md",
+                page_type="module",
+                title="Runtime Module",
+                sources=["src/app.txt"],
+                work_id="fixture-work",
+                today="2099-01-02",
+            )
+            self.assertEqual("wiki/modules/runtime.md", result["page"])
+            text = (harness.repo / result["page"]).read_text(encoding="utf-8")
+            frontmatter, body, errors = knowledge.parse_frontmatter_text(text)
+            self.assertEqual([], errors)
+            self.assertEqual("Runtime Module", frontmatter["title"])
+            self.assertEqual("module", frontmatter["type"])
+            self.assertEqual(["src/app.txt"], frontmatter["sources"])
+            self.assertEqual("placeholder", frontmatter["status"])
+            self.assertEqual("none", frontmatter["source_fingerprint"])
+            self.assertEqual("fixture-work", frontmatter["verified_by"])
+            self.assertEqual("2099-01-02", frontmatter["last_updated"])
+            self.assertIn("# Runtime Module", body)
+            self.assertNotIn("<TITLE>", text)
+
+            original = text
+            with self.assertRaises(knowledge.KnowledgeError) as caught:
+                knowledge.scaffold_page(
+                    harness.repo,
+                    core.skill_root() / "assets",
+                    page="wiki/modules/runtime.md",
+                    page_type="module",
+                    title="Replacement",
+                    sources=["README.md"],
+                    work_id="fixture-work",
+                )
+            self.assertEqual("page_exists", caught.exception.code)
+            self.assertEqual(
+                original,
+                (harness.repo / "wiki/modules/runtime.md").read_text(
+                    encoding="utf-8"
+                ),
+            )
+
+            invalid_targets = [
+                ("../outside.md", ["src/app.txt"]),
+                ("wiki/modules/escape.md", ["../outside.txt"]),
+                ("wiki/modules/state.md", [".devweave/project.json"]),
+                ("wiki/modules/wiki-source.md", ["wiki/index.md"]),
+                ("wiki/modules/missing-source.md", ["src/missing.txt"]),
+            ]
+            for page, sources in invalid_targets:
+                with self.subTest(page=page, sources=sources), self.assertRaises(
+                    knowledge.KnowledgeError
+                ):
+                    knowledge.scaffold_page(
+                        harness.repo,
+                        core.skill_root() / "assets",
+                        page=page,
+                        page_type="module",
+                        title="Invalid",
+                        sources=sources,
+                        work_id="fixture-work",
+                    )
+                if page.startswith("wiki/"):
+                    self.assertFalse((harness.repo / page).exists())
+
+    def test_seal_rejects_placeholder_and_template_tokens_before_writing(self) -> None:
+        with RepositoryHarness() as harness:
+            harness.init()
+            knowledge.scaffold_page(
+                harness.repo,
+                core.skill_root() / "assets",
+                page="wiki/modules/runtime.md",
+                page_type="module",
+                title="Runtime Module",
+                sources=["src/app.txt"],
+                work_id="fixture-work",
+                today="2099-01-02",
+            )
+            add_to_index(harness.repo, "runtime", "Modules", "Runtime module")
+            page = harness.repo / "wiki/modules/runtime.md"
+            original = page.read_text(encoding="utf-8")
+            with self.assertRaises(knowledge.KnowledgeError) as placeholder:
+                knowledge.seal_pages(
+                    harness.repo,
+                    ["wiki/modules/runtime.md"],
+                    "fixture-work",
+                )
+            self.assertEqual("page_not_ready", placeholder.exception.code)
+            self.assertEqual(original, page.read_text(encoding="utf-8"))
+
+            page.write_text(
+                original.replace("status: placeholder", "status: active")
+                + "\n## Verified behavior\n\n<DETAILS>\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(knowledge.KnowledgeError) as token:
+                knowledge.seal_pages(
+                    harness.repo,
+                    ["wiki/modules/runtime.md"],
+                    "fixture-work",
+                )
+            self.assertEqual("template_token", token.exception.code)
+
+            page.write_text(
+                page.read_text(encoding="utf-8").replace(
+                    "<DETAILS>", "Runtime behavior is source-bound."
+                ),
+                encoding="utf-8",
+            )
+            sealed = knowledge.seal_pages(
+                harness.repo,
+                ["wiki/modules/runtime.md"],
+                "fixture-work",
+                today="2099-01-03",
+            )
+            self.assertEqual("wiki/modules/runtime.md", sealed[0]["page"])
+            frontmatter, _, _ = knowledge.parse_frontmatter_text(
+                page.read_text(encoding="utf-8")
+            )
+            self.assertEqual("active", frontmatter["status"])
+            self.assertEqual("2099-01-03", frontmatter["last_updated"])
+            self.assertEqual(
+                knowledge.source_fingerprint(harness.repo, ["src/app.txt"]),
+                frontmatter["source_fingerprint"],
+            )
+
+    def test_all_canonical_templates_declare_placeholder_scaffold_tokens(self) -> None:
+        templates = core.skill_root() / "assets" / "wiki" / "templates"
+        expected = {
+            "overview",
+            "architecture",
+            "module",
+            "entity",
+            "pattern",
+            "dependency",
+            "decision",
+            "guide",
+            "synthesis",
+        }
+        self.assertEqual(expected, {path.stem for path in templates.glob("*.md")})
+        for page_type in sorted(expected):
+            with self.subTest(page_type=page_type):
+                text = (templates / f"{page_type}.md").read_text(encoding="utf-8")
+                frontmatter, body, errors = knowledge.parse_frontmatter_text(text)
+                self.assertEqual([], errors)
+                self.assertEqual(page_type, frontmatter["type"])
+                self.assertEqual("placeholder", frontmatter["status"])
+                self.assertEqual("<DATE>", frontmatter["last_updated"])
+                self.assertEqual("<WORK_ID>", frontmatter["verified_by"])
+                self.assertIn("<TITLE>", body)
+
+    def test_scaffold_supports_all_nine_types_and_conditional_fields(self) -> None:
+        cases = [
+            ("overview", "wiki/overview.md", {}),
+            ("architecture", "wiki/architecture/system.md", {}),
+            ("module", "wiki/modules/runtime.md", {}),
+            ("entity", "wiki/entities/order.md", {}),
+            ("pattern", "wiki/patterns/repository.md", {}),
+            (
+                "dependency",
+                "wiki/dependencies/python.md",
+                {"package_name": "python", "version": "3.11+"},
+            ),
+            (
+                "decision",
+                "wiki/decisions/wiki.md",
+                {
+                    "decision_date": "2099-01-02",
+                    "decision_status": "accepted",
+                },
+            ),
+            ("guide", "wiki/guides/run.md", {}),
+            ("synthesis", "wiki/synthesis/question.md", {}),
+        ]
+        for page_type, page, extras in cases:
+            with self.subTest(page_type=page_type), RepositoryHarness() as harness:
+                harness.init()
+                if page_type == "overview":
+                    (harness.repo / "wiki/overview.md").unlink()
+                knowledge.scaffold_page(
+                    harness.repo,
+                    core.skill_root() / "assets",
+                    page=page,
+                    page_type=page_type,
+                    title=f"{page_type.title()} Knowledge",
+                    sources=["src/app.txt"],
+                    work_id="fixture-work",
+                    today="2099-01-02",
+                    **extras,
+                )
+                frontmatter, _, errors = knowledge.parse_frontmatter_text(
+                    (harness.repo / page).read_text(encoding="utf-8")
+                )
+                self.assertEqual([], errors)
+                self.assertEqual(page_type, frontmatter["type"])
+                for key, value in extras.items():
+                    self.assertEqual(value, frontmatter[key])
+
+        with RepositoryHarness() as harness:
+            harness.init()
+            assets = core.skill_root() / "assets"
+            invalid_cases = [
+                {
+                    "page": "wiki/dependencies/python.md",
+                    "page_type": "dependency",
+                },
+                {
+                    "page": "wiki/decisions/wiki.md",
+                    "page_type": "decision",
+                    "decision_date": "not-a-date",
+                    "decision_status": "accepted",
+                },
+                {
+                    "page": "wiki/modules/runtime.md",
+                    "page_type": "module",
+                    "package_name": "unexpected",
+                },
+                {
+                    "page": "wiki/entities/wrong.md",
+                    "page_type": "module",
+                },
+            ]
+            for case in invalid_cases:
+                with self.subTest(case=case), self.assertRaises(
+                    knowledge.KnowledgeError
+                ):
+                    knowledge.scaffold_page(
+                        harness.repo,
+                        assets,
+                        title="Invalid",
+                        sources=["src/app.txt"],
+                        work_id="fixture-work",
+                        **case,
+                    )
+
     def test_frontmatter_parser_and_lint_cover_links_uniqueness_and_index(self) -> None:
         parsed, body, errors = knowledge.parse_frontmatter_text(
             "---\ntitle: Example\nsources:\n  - src/app.txt\ntags: [one, two]\n---\n\nBody\n"
@@ -244,7 +626,13 @@ class KnowledgeCoreTests(unittest.TestCase):
                 title="Legacy compatibility",
                 risk_rationale="fixture",
             )
-            for key in ("base_knowledge", "knowledge_context", "knowledge_updates"):
+            for key in (
+                "base_knowledge",
+                "knowledge_context",
+                "knowledge_review_required",
+                "knowledge_review",
+                "knowledge_updates",
+            ):
                 state.pop(key)
             core.atomic_write_json(core.state_path(harness.repo, state["id"]), state)
             loaded = core.load_state(harness.repo, state["id"])
@@ -301,6 +689,14 @@ class KnowledgeLifecycleTests(unittest.TestCase):
     def test_only_affected_page_blocks_and_unrelated_stale_page_warns(self) -> None:
         with RepositoryHarness() as harness:
             state = prepare_sourced_feature(harness, stale_unrelated=True)
+            with self.assertRaises(core.ValidationError) as no_update:
+                core.set_knowledge_review(
+                    harness.repo,
+                    state["id"],
+                    "no-update",
+                    "Affected page 存在時不得略過 refresh。",
+                )
+            self.assertIn("not allowed", no_update.exception.message.lower())
             status = core.work_knowledge_status(harness.repo, state)
             self.assertEqual(["wiki/modules/runtime.md"], status["affected_pages"])
             self.assertEqual(["wiki/modules/runtime.md"], status["pending_refresh"])

@@ -243,10 +243,48 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
       } satisfies TaskProjection;
     }).sort((a, b) => a.id.localeCompare(b.id));
     const planned = isRecord(state.knowledge_updates) ? state.knowledge_updates : null;
+    const reviewState = isRecord(state.knowledge_review) ? state.knowledge_review : null;
+    const reviewRequired = state.knowledge_review_required === true;
+    const disposition = reviewState?.disposition === "promote" || reviewState?.disposition === "no-update"
+      ? reviewState.disposition
+      : null;
+    const affectedPages = stringArray(reviewState?.affected_pages);
+    const coveredChangedPaths = stringArray(reviewState?.covered_changed_paths);
+    const uncoveredChangedPaths = stringArray(reviewState?.uncovered_changed_paths);
+    const sealed = new Set(stringArray(planned?.sealed));
+    const upserts = new Set(stringArray(planned?.upserts));
+    const deletes = new Set(stringArray(planned?.deletes));
+    const existingPages = new Set(knowledge.pages.map((page) => page.path));
+    const pendingRefresh = affectedPages.filter((page) => {
+      const deleted = deletes.has(page) && !existingPages.has(page);
+      const refreshed = upserts.has(page) && sealed.has(page);
+      return !deleted && !refreshed;
+    });
+    const review = {
+      required: reviewRequired,
+      current: Boolean(
+        reviewRequired
+        && disposition
+        && stringValue(reviewState?.rationale).trim()
+        && nullableString(reviewState?.recorded_at)
+        && !nullableString(reviewState?.invalidated_at)
+      ),
+      disposition,
+      rationale: stringValue(reviewState?.rationale),
+      affectedPages,
+      coveredChangedPaths,
+      uncoveredChangedPaths,
+      changeFingerprint: nullableString(reviewState?.change_fingerprint),
+      recordedAt: nullableString(reviewState?.recorded_at),
+      invalidatedAt: nullableString(reviewState?.invalidated_at)
+    };
     const workKnowledge: KnowledgeProjection = {
       ...knowledge,
-      affectedPages: stringArray(planned?.upserts),
-      pendingRefresh: stringArray(planned?.upserts),
+      affectedPages,
+      pendingRefresh,
+      coveredChangedPaths,
+      uncoveredChangedPaths,
+      review,
       planned
     };
     return {
@@ -277,6 +315,8 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
       ])],
       readOnly: stateReadOnly || diagnostics.slice(diagnosticStart).some((item) => item.severity === "critical"),
       updatedAt: nullableString(state.updated_at) ?? undefined,
+      knowledgeProfile: state.knowledge_profile === "bootstrap" ? "bootstrap" : undefined,
+      knowledgeReviewRequired: reviewRequired,
       knowledge: workKnowledge
     };
   }
@@ -306,8 +346,53 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
       diagnostics.push({ severity: "critical", code: "work_phase_invalid", message: "Work-item phase is invalid.", path });
       readOnly = true;
     }
-    if (!Object.prototype.hasOwnProperty.call(state, "base_knowledge")) {
-      diagnostics.push({ severity: "warning", code: "legacy_work", message: "Work item has no base knowledge snapshot; displaying legacy-compatible projection.", path });
+    if (
+      !Object.prototype.hasOwnProperty.call(state, "base_knowledge")
+      || !Object.prototype.hasOwnProperty.call(state, "knowledge_review_required")
+    ) {
+      diagnostics.push({ severity: "warning", code: "legacy_work", message: "Work item predates one or more knowledge-review fields; displaying a legacy-compatible projection.", path });
+    }
+    if (state.knowledge_profile !== undefined && state.knowledge_profile !== "bootstrap") {
+      diagnostics.push({ severity: "critical", code: "knowledge_profile_invalid", message: "Work-item knowledge profile is unknown.", path });
+      readOnly = true;
+    }
+    if (state.knowledge_review_required !== undefined && typeof state.knowledge_review_required !== "boolean") {
+      diagnostics.push({ severity: "critical", code: "knowledge_review_invalid", message: "Work-item knowledge review marker is invalid.", path });
+      readOnly = true;
+    }
+    if (
+      state.knowledge_review_required === true
+      && !Object.prototype.hasOwnProperty.call(state, "base_knowledge")
+    ) {
+      diagnostics.push({ severity: "critical", code: "knowledge_review_invalid", message: "Knowledge review requires a base knowledge snapshot.", path });
+      readOnly = true;
+    }
+    if (state.knowledge_profile === "bootstrap" && state.knowledge_review_required !== true) {
+      diagnostics.push({ severity: "critical", code: "knowledge_profile_invalid", message: "Bootstrap profile requires the new knowledge review contract.", path });
+      readOnly = true;
+    }
+    if (state.knowledge_review_required === true) {
+      const review = isRecord(state.knowledge_review) ? state.knowledge_review : null;
+      const disposition = review?.disposition;
+      const arraysValid = review
+        && ["affected_pages", "covered_changed_paths", "uncovered_changed_paths"]
+          .every((key) => Array.isArray(review[key]) && review[key].every((item: unknown) => typeof item === "string"));
+      if (
+        !review
+        || ![undefined, null, "promote", "no-update"].includes(disposition)
+        || typeof review.rationale !== "string"
+        || !arraysValid
+        || (disposition !== undefined && disposition !== null && (
+          review.rationale.trim().length === 0
+          || typeof review.change_fingerprint !== "string"
+          || review.change_fingerprint.length === 0
+          || typeof review.recorded_at !== "string"
+          || review.recorded_at.length === 0
+        ))
+      ) {
+        diagnostics.push({ severity: "critical", code: "knowledge_review_invalid", message: "Work-item knowledge review contract is invalid or unknown.", path });
+        readOnly = true;
+      }
     }
     return readOnly;
   }
@@ -379,6 +464,7 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
       ...placeholderPages.map((path) => ({ severity: "warning" as const, code: "placeholder", message: "Wiki page is still a placeholder.", path })),
       ...stalePages.map((path) => ({ severity: "warning" as const, code: "stale", message: "Wiki page may be stale against its source fingerprint.", path }))
     ];
+    const bootstrap = assessBootstrap(pages, critical.length > 0);
     return {
       root,
       health: critical.length > 0 ? "critical" : warnings.length > 0 ? "warning" : "healthy",
@@ -389,6 +475,21 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
       warnings,
       affectedPages: [],
       pendingRefresh: [],
+      coveredChangedPaths: [],
+      uncoveredChangedPaths: [],
+      bootstrap,
+      review: {
+        required: false,
+        current: false,
+        disposition: null,
+        rationale: "",
+        affectedPages: [],
+        coveredChangedPaths: [],
+        uncoveredChangedPaths: [],
+        changeFingerprint: null,
+        recordedAt: null,
+        invalidatedAt: null
+      },
       planned: null
     };
   }
@@ -482,8 +583,42 @@ function parseWikiPage(path: string, text: string, truncated: boolean): WikiPage
     sources: stringArray(fields.sources),
     sourceFingerprint: nullableString(fields.source_fingerprint) ?? undefined,
     computedSourceFingerprint: nullableString(fields.computed_source_fingerprint) ?? undefined,
+    verifiedBy: nullableString(fields.verified_by) ?? undefined,
     parseErrors: errors,
     bodyPreview: `${match[2].slice(0, 500)}${truncated || match[2].length > 500 ? "…" : ""}`
+  };
+}
+
+function assessBootstrap(pages: WikiPageProjection[], hasCritical: boolean): KnowledgeProjection["bootstrap"] {
+  const ready = (page: WikiPageProjection): boolean => Boolean(
+    page.status === "active"
+    && page.sources.length > 0
+    && page.sourceFingerprint
+    && page.sourceFingerprint !== "none"
+    && page.verifiedBy
+    && page.parseErrors.length === 0
+  );
+  const overview = pages.find((page) => page.path === "wiki/overview.md" && page.type === "overview" && ready(page));
+  const architecturePages = pages
+    .filter((page) => page.type === "architecture" && ready(page))
+    .map((page) => page.path)
+    .sort();
+  const modulePages = pages
+    .filter((page) => page.type === "module" && ready(page))
+    .map((page) => page.path)
+    .sort();
+  const reasons: string[] = [];
+  if (!overview) reasons.push("overview_not_ready");
+  if (architecturePages.length === 0) reasons.push("architecture_missing");
+  if (modulePages.length === 0) reasons.push("module_missing");
+  if (hasCritical) reasons.push("critical_lint");
+  return {
+    complete: reasons.length === 0,
+    recommended: reasons.length > 0,
+    reasons,
+    overview: overview?.path ?? null,
+    architecturePages,
+    modulePages
   };
 }
 

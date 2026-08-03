@@ -1,0 +1,26 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-004",
+    "AC-012",
+    "AC-015"
+  ],
+  "created_at": "2026-08-03T10:59:19+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "f95d0c5f795efdf0f1e5dd3bd9704e83c17bb131",
+  "id": "EVID-006",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "d49a56cca77efd2ae5991172b53d709d91393744b4679accf4159e8cba8181d9",
+  "stale": false,
+  "status": "passed",
+  "summary": "Router、phase references、contracts、repository policy、README、繁中手冊與 Extension README 已同步；7 個 contract tests 與 skill quick validation 通過。",
+  "tasks": [
+    "TASK-006"
+  ]
+}

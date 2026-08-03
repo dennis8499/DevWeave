@@ -12,6 +12,7 @@ from devweave_core import (
     ExecutionError,
     GATES,
     KINDS,
+    KNOWLEDGE_CONTENT_TYPES,
     RISK_LEVELS,
     ValidationError,
     WorkLock,
@@ -20,6 +21,7 @@ from devweave_core import (
     approve_gate,
     atomic_write_json,
     bind_session,
+    bootstrap_knowledge_work,
     close_work,
     create_work,
     doctor,
@@ -33,10 +35,12 @@ from devweave_core import (
     resolve_work,
     revise_work,
     run_verification,
+    scaffold_knowledge,
     seal_knowledge,
     set_baseline_updates,
     set_knowledge_context,
     set_knowledge_plan,
+    set_knowledge_review,
     set_risk,
     set_scope,
     sync_state,
@@ -99,6 +103,8 @@ def state_summary(
     }
     if repo is not None:
         summary["knowledge"] = work_knowledge_status(repo, state)
+    if state.get("knowledge_profile"):
+        summary["knowledge_profile"] = state["knowledge_profile"]
     return summary
 
 
@@ -215,6 +221,15 @@ def command_baseline(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
 
 
 def command_knowledge(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
+    if args.knowledge_action == "bootstrap":
+        result = bootstrap_knowledge_work(repo)
+        state = result["work"]
+        return {
+            "ok": True,
+            "action": result["action"],
+            "work": state_summary(state, repo) if state else None,
+            "bootstrap": result["bootstrap"],
+        }
     if args.knowledge_action == "status":
         state: dict[str, Any] | None = None
         if args.work:
@@ -238,6 +253,20 @@ def command_knowledge(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
             repo, state["id"], args.page, args.gap
         )
         return {"ok": True, "work": state["id"], "knowledge_context": context}
+    if args.knowledge_action == "review":
+        review = set_knowledge_review(
+            repo,
+            state["id"],
+            args.disposition,
+            args.rationale,
+        )
+        refreshed = resolve_work(repo, state["id"])
+        return {
+            "ok": True,
+            "work": state["id"],
+            "knowledge_review": review,
+            "knowledge": work_knowledge_status(repo, refreshed),
+        }
     if args.knowledge_action == "plan":
         updates = set_knowledge_plan(
             repo,
@@ -247,6 +276,20 @@ def command_knowledge(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
             args.rationale,
         )
         return {"ok": True, "work": state["id"], "knowledge_updates": updates}
+    if args.knowledge_action == "scaffold":
+        scaffold = scaffold_knowledge(
+            repo,
+            state["id"],
+            page=args.page,
+            page_type=args.page_type,
+            title=args.title,
+            sources=args.source,
+            package_name=args.package_name,
+            version=args.version,
+            decision_date=args.decision_date,
+            decision_status=args.decision_status,
+        )
+        return {"ok": True, "work": state["id"], "scaffold": scaffold}
     if args.knowledge_action == "seal":
         result = seal_knowledge(repo, state["id"], args.page)
         return {"ok": True, "work": state["id"], **result}
@@ -471,6 +514,8 @@ def build_parser() -> argparse.ArgumentParser:
     knowledge_subparsers = knowledge_parser.add_subparsers(
         dest="knowledge_action", required=True
     )
+    knowledge_bootstrap_parser = knowledge_subparsers.add_parser("bootstrap")
+    knowledge_bootstrap_parser.set_defaults(handler=command_knowledge)
     knowledge_status_parser = knowledge_subparsers.add_parser("status")
     knowledge_status_parser.add_argument("--work")
     knowledge_status_parser.set_defaults(handler=command_knowledge)
@@ -481,12 +526,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     knowledge_context_parser.add_argument("--gap", action="append", default=[])
     knowledge_context_parser.set_defaults(handler=command_knowledge)
+    knowledge_review_parser = knowledge_subparsers.add_parser("review")
+    knowledge_review_parser.add_argument("--work")
+    knowledge_review_parser.add_argument(
+        "--disposition", choices=("promote", "no-update"), required=True
+    )
+    knowledge_review_parser.add_argument("--rationale", required=True)
+    knowledge_review_parser.set_defaults(handler=command_knowledge)
     knowledge_plan_parser = knowledge_subparsers.add_parser("plan")
     knowledge_plan_parser.add_argument("--work")
     knowledge_plan_parser.add_argument("--upsert", action="append", default=[])
     knowledge_plan_parser.add_argument("--delete", action="append", default=[])
     knowledge_plan_parser.add_argument("--rationale", required=True)
     knowledge_plan_parser.set_defaults(handler=command_knowledge)
+    knowledge_scaffold_parser = knowledge_subparsers.add_parser("scaffold")
+    knowledge_scaffold_parser.add_argument("--work")
+    knowledge_scaffold_parser.add_argument("--page", required=True)
+    knowledge_scaffold_parser.add_argument(
+        "--type",
+        dest="page_type",
+        choices=KNOWLEDGE_CONTENT_TYPES,
+        required=True,
+    )
+    knowledge_scaffold_parser.add_argument("--title", required=True)
+    knowledge_scaffold_parser.add_argument(
+        "--source", action="append", default=[], required=True
+    )
+    knowledge_scaffold_parser.add_argument("--package-name")
+    knowledge_scaffold_parser.add_argument("--version")
+    knowledge_scaffold_parser.add_argument("--decision-date")
+    knowledge_scaffold_parser.add_argument(
+        "--decision-status",
+        choices=("proposed", "accepted", "deprecated", "superseded"),
+    )
+    knowledge_scaffold_parser.set_defaults(handler=command_knowledge)
     knowledge_seal_parser = knowledge_subparsers.add_parser("seal")
     knowledge_seal_parser.add_argument("--work")
     knowledge_seal_parser.add_argument(

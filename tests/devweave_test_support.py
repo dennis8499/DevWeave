@@ -329,7 +329,7 @@ AC-001、AC-002 對應 TASK-001，證據為 {evidence}，且綁定目前 source 
         self.fill_design(work_id, high_risk=risk == "high")
         return core.approve_gate(self.repo, work_id, "build", "Test Approver")
 
-    def implement(self, work_id: str, marker: str) -> None:
+    def implement(self, work_id: str, marker: str, *, review: bool = True) -> None:
         core.update_task(self.repo, work_id, "TASK-001", "start")
         (self.repo / "src" / "app.txt").write_text(
             f"baseline\n{marker}\n", encoding="utf-8"
@@ -341,6 +341,22 @@ AC-001、AC-002 對應 TASK-001，證據為 {evidence}，且綁定目前 source 
             "complete",
             note="切片已完成，驗證將於 verification phase 執行。",
         )
+        state = core.load_state(self.repo, work_id)
+        if review and state.get("knowledge_review_required"):
+            status = core.work_knowledge_status(self.repo, state)
+            disposition = (
+                "promote"
+                if state.get("kind") == "new"
+                or state.get("knowledge_profile") == "bootstrap"
+                or status.get("affected_pages")
+                else "no-update"
+            )
+            core.set_knowledge_review(
+                self.repo,
+                work_id,
+                disposition,
+                "Fixture 依 affected pages 與 durable knowledge 邊界完成 review。",
+            )
 
 
 def load_scenarios() -> list[dict[str, Any]]:

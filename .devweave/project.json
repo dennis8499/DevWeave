@@ -81,7 +81,7 @@
         "low",
         "standard"
       ],
-      "timeout_seconds": 240
+      "timeout_seconds": 360
     }
   ],
   "evidence": {

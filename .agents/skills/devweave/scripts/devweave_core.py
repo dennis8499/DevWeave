@@ -57,6 +57,7 @@ ARTIFACT_NAMES = (
     "plan.md",
     "acceptance.md",
 )
+KNOWLEDGE_CONTENT_TYPES = tuple(sorted(knowledge.PAGE_TYPES - {"index", "log"}))
 FRAMEWORK_PREFIXES = (
     ".devweave/",
     ".agents/skills/devweave/",
@@ -700,12 +701,25 @@ def _new_work_id(repo: Path, kind: str, title: str) -> str:
     return candidate
 
 
+def _empty_knowledge_updates() -> dict[str, Any]:
+    return {
+        "upserts": [],
+        "deletes": [],
+        "coupled": [],
+        "rationale": "",
+        "sealed": [],
+        "change_fingerprint": None,
+        "recorded_at": None,
+    }
+
+
 def create_work(
     repo: Path,
     kind: str,
     title: str,
     risk: str = "standard",
     risk_rationale: str = "",
+    knowledge_profile: str | None = None,
 ) -> dict[str, Any]:
     if kind not in KINDS:
         raise ValidationError("Unknown work kind.", {"kind": kind, "allowed": list(KINDS)})
@@ -715,6 +729,11 @@ def create_work(
         )
     if not title.strip():
         raise ValidationError("Work title must not be empty.")
+    if knowledge_profile not in (None, "bootstrap"):
+        raise ValidationError(
+            "Unknown knowledge profile.",
+            {"profile": knowledge_profile, "allowed": ["bootstrap"]},
+        )
     if _project_requires_bootstrap(repo):
         init_project(repo)
     project = load_project(repo)
@@ -757,19 +776,24 @@ def create_work(
             "base_source": base,
             "base_baseline": base_baseline,
             "base_knowledge": base_knowledge,
+            "knowledge_review_required": True,
             "knowledge_context": {
                 "pages": [],
+                "records": [],
                 "gaps": [],
                 "recorded_at": None,
             },
-            "knowledge_updates": {
-                "upserts": [],
-                "deletes": [],
-                "coupled": [],
+            "knowledge_review": {
+                "disposition": None,
                 "rationale": "",
-                "sealed": [],
+                "affected_pages": [],
+                "covered_changed_paths": [],
+                "uncovered_changed_paths": [],
+                "change_fingerprint": None,
                 "recorded_at": None,
+                "invalidated_at": None,
             },
+            "knowledge_updates": _empty_knowledge_updates(),
             "gates": {
                 gate: {
                     "status": "pending",
@@ -790,6 +814,8 @@ def create_work(
             "last_verification": None,
             "blocker": None,
         }
+        if knowledge_profile is not None:
+            state["knowledge_profile"] = knowledge_profile
         atomic_write_json(root / "state.json", state)
         append_event_unlocked(repo, work_id, "work_started", {"kind": kind, "risk": risk})
     return state
@@ -815,6 +841,18 @@ def load_state(repo: Path, work_id: str) -> dict[str, Any]:
         errors.append("status is invalid")
     if state.get("phase") not in PHASES:
         errors.append("phase is invalid")
+    if "knowledge_profile" in state and state.get("knowledge_profile") != "bootstrap":
+        errors.append("knowledge_profile is invalid")
+    if "knowledge_review_required" in state and not isinstance(
+        state.get("knowledge_review_required"), bool
+    ):
+        errors.append("knowledge_review_required must be a boolean")
+    if state.get("knowledge_review_required") and "base_knowledge" not in state:
+        errors.append("knowledge_review_required needs a base_knowledge snapshot")
+    if state.get("knowledge_profile") == "bootstrap" and state.get(
+        "knowledge_review_required"
+    ) is not True:
+        errors.append("bootstrap knowledge profile requires the new review contract")
     base_baseline = state.get("base_baseline")
     if (
         not isinstance(base_baseline, dict)
@@ -842,6 +880,77 @@ def load_state(repo: Path, work_id: str) -> dict[str, Any]:
             and not isinstance(context.get("recorded_at"), str)
         ):
             errors.append("knowledge_context is invalid")
+        elif state.get("knowledge_review_required"):
+            records = context.get("records")
+            if not isinstance(records, list) or not all(
+                isinstance(item, dict)
+                and all(
+                    key in item
+                    for key in (
+                        "path",
+                        "present",
+                        "status",
+                        "content_hash",
+                        "source_fingerprint",
+                        "computed_source_fingerprint",
+                    )
+                )
+                and isinstance(item.get("path"), str)
+                and isinstance(item.get("present"), bool)
+                and (
+                    item.get("status") is None
+                    or isinstance(item.get("status"), str)
+                )
+                and all(
+                    item.get(key) is None or isinstance(item.get(key), str)
+                    for key in (
+                        "content_hash",
+                        "source_fingerprint",
+                        "computed_source_fingerprint",
+                    )
+                )
+                for item in records or []
+            ):
+                errors.append("knowledge_context.records is invalid")
+            review = state.get("knowledge_review")
+            if not isinstance(review, dict):
+                errors.append("knowledge_review is invalid")
+            else:
+                if review.get("disposition") not in (None, "promote", "no-update"):
+                    errors.append("knowledge_review.disposition is invalid")
+                for key in (
+                    "rationale",
+                ):
+                    if not isinstance(review.get(key), str):
+                        errors.append(f"knowledge_review.{key} must be a string")
+                for key in (
+                    "affected_pages",
+                    "covered_changed_paths",
+                    "uncovered_changed_paths",
+                ):
+                    if not isinstance(review.get(key), list) or not all(
+                        isinstance(item, str) for item in review.get(key, [])
+                    ):
+                        errors.append(f"knowledge_review.{key} must be a string array")
+                for key in (
+                    "change_fingerprint",
+                    "recorded_at",
+                    "invalidated_at",
+                ):
+                    if review.get(key) is not None and not isinstance(
+                        review.get(key), str
+                    ):
+                        errors.append(f"knowledge_review.{key} must be a string or null")
+                if review.get("disposition") is not None and (
+                    not review.get("rationale", "").strip()
+                    or not isinstance(review.get("change_fingerprint"), str)
+                    or not review.get("change_fingerprint")
+                    or not isinstance(review.get("recorded_at"), str)
+                    or not review.get("recorded_at")
+                ):
+                    errors.append(
+                        "knowledge_review disposition requires rationale, change_fingerprint, and recorded_at"
+                    )
         updates = state.get("knowledge_updates")
         if not isinstance(updates, dict):
             errors.append("knowledge_updates is invalid")
@@ -857,6 +966,10 @@ def load_state(repo: Path, work_id: str) -> dict[str, Any]:
                 updates.get("recorded_at"), str
             ):
                 errors.append("knowledge_updates.recorded_at must be a string or null")
+            if updates.get("change_fingerprint") is not None and not isinstance(
+                updates.get("change_fingerprint"), str
+            ):
+                errors.append("knowledge_updates.change_fingerprint must be a string or null")
     risk = state.get("risk")
     if (
         not isinstance(risk, dict)
@@ -972,7 +1085,20 @@ def scope_fingerprint(repo: Path, state: dict[str, Any]) -> str:
         "discovery_evidence": _discovery_evidence(state),
     }
     if "base_knowledge" in state:
-        scope_material["knowledge_context"] = state.get("knowledge_context", {})
+        context = state.get("knowledge_context", {})
+        scope_material["knowledge_context"] = context
+        if state.get("knowledge_review_required"):
+            captured = context.get("records", [])
+            observed = captured
+            if state.get("gates", {}).get("build", {}).get("status") != "approved":
+                project = load_project(repo)
+                current_knowledge = knowledge.knowledge_snapshot(
+                    repo, root=project["knowledge"]["root"]
+                )
+                observed = knowledge.context_records(
+                    current_knowledge, context.get("pages", [])
+                )
+            scope_material["knowledge_context_observed"] = observed
     material += canonical_json(scope_material)
     return sha256_bytes(material)
 
@@ -1101,6 +1227,27 @@ def sync_state_unlocked(repo: Path, state: dict[str, Any]) -> bool:
             changed = True
 
     current_source = git_snapshot(repo)
+    review = state.get("knowledge_review", {})
+    if (
+        state.get("knowledge_review_required")
+        and isinstance(review, dict)
+        and review.get("recorded_at")
+        and review.get("change_fingerprint") != current_source["fingerprint"]
+        and review.get("invalidated_at") is None
+    ):
+        review["invalidated_at"] = utc_now()
+        state["knowledge_review"] = review
+        state["knowledge_updates"] = _empty_knowledge_updates()
+        append_event_unlocked(
+            repo,
+            state["id"],
+            "knowledge_review_invalidated",
+            {
+                "review_fingerprint": review.get("change_fingerprint"),
+                "current_fingerprint": current_source["fingerprint"],
+            },
+        )
+        changed = True
     latest = state.get("last_verification")
     if latest and latest.get("source_fingerprint") != current_source["fingerprint"]:
         for item in state.get("evidence", {}).values():
@@ -1345,6 +1492,13 @@ def _validate_knowledge_context(
     except knowledge.KnowledgeError as exc:
         errors.append(f"Knowledge context cannot be checked: {exc.message}")
         return
+    if state.get("knowledge_review_required"):
+        captured_records = context.get("records", [])
+        current_records = knowledge.context_records(current, pages)
+        if captured_records != current_records:
+            errors.append(
+                "Knowledge context pages or source observations changed after they were recorded."
+            )
     nonfresh: list[str] = []
     for page in pages:
         try:
@@ -1447,6 +1601,82 @@ def _validate_knowledge_acceptance(
             )
 
     affected = knowledge.affected_pages(base, changed_source_paths)
+
+    if state.get("knowledge_review_required"):
+        review = state.get("knowledge_review", {})
+        current_source = git_snapshot(repo)
+        review_current = bool(
+            isinstance(review, dict)
+            and review.get("disposition") in ("promote", "no-update")
+            and review.get("rationale")
+            and review.get("recorded_at")
+            and review.get("invalidated_at") is None
+            and review.get("change_fingerprint")
+            == current_source["fingerprint"]
+        )
+        if not review_current:
+            errors.append(
+                "A current knowledge review is required before G3 acceptance."
+            )
+        elif review["disposition"] == "no-update":
+            if state.get("knowledge_profile") == "bootstrap":
+                errors.append("Knowledge no-update is not allowed for Wiki bootstrap work.")
+            if affected:
+                errors.append(
+                    "Knowledge no-update cannot leave affected Wiki pages unresolved: "
+                    + ", ".join(affected)
+                )
+            if actual or content_targets or coupled or sealed:
+                errors.append(
+                    "Knowledge no-update requires no Wiki diff or knowledge plan."
+                )
+        else:
+            if not 1 <= len(content_targets) <= 5:
+                errors.append(
+                    "A promote knowledge review requires a plan with one to five content targets."
+                )
+            if updates.get("change_fingerprint") != current_source["fingerprint"]:
+                errors.append(
+                    "The knowledge plan is stale relative to the promote knowledge review."
+                )
+
+    if state.get("knowledge_profile") == "bootstrap":
+        if changed_source_paths:
+            errors.append(
+                "Wiki bootstrap work must not modify product source: "
+                + ", ".join(sorted(changed_source_paths))
+            )
+        if deletes:
+            errors.append("Wiki bootstrap may not delete content pages.")
+        if not 3 <= len(upserts) <= 5:
+            errors.append(
+                "Wiki bootstrap must upsert three to five content pages."
+            )
+        overview = f"{root}/overview.md"
+        if overview not in upserts:
+            errors.append("Wiki bootstrap must upsert wiki/overview.md.")
+        bootstrap_records = {
+            page: current.get("pages", {}).get(page) for page in upserts
+        }
+        if not any(
+            isinstance(record, dict) and record.get("type") == "architecture"
+            for record in bootstrap_records.values()
+        ):
+            errors.append("Wiki bootstrap must upsert an architecture page.")
+        if not any(
+            isinstance(record, dict) and record.get("type") == "module"
+            for record in bootstrap_records.values()
+        ):
+            errors.append("Wiki bootstrap must upsert a module page.")
+        assessment = knowledge.bootstrap_assessment(
+            repo, root=root, snapshot=current
+        )
+        if not assessment["complete"]:
+            errors.append(
+                "Wiki bootstrap core knowledge is not complete: "
+                + ", ".join(assessment["reasons"])
+            )
+
     for page in affected:
         if page in deletes and page not in current.get("pages", {}):
             continue
@@ -2021,15 +2251,65 @@ def _raise_knowledge(exc: knowledge.KnowledgeError) -> None:
     ) from exc
 
 
+def bootstrap_knowledge_work(repo: Path) -> dict[str, Any]:
+    """Create or resolve the single repository-wide Wiki bootstrap work item."""
+
+    if _project_requires_bootstrap(repo):
+        init_project(repo)
+    project = load_project(repo)
+    with WorkLock(repo, "knowledge-bootstrap"):
+        try:
+            assessment = knowledge.bootstrap_assessment(
+                repo, root=project["knowledge"]["root"]
+            )
+        except knowledge.KnowledgeError as exc:
+            _raise_knowledge(exc)
+        if assessment["complete"]:
+            return {
+                "action": "already_complete",
+                "work": None,
+                "bootstrap": assessment,
+            }
+        active = [
+            state
+            for state in list_work(repo)
+            if state.get("knowledge_profile") == "bootstrap"
+        ]
+        if len(active) > 1:
+            raise SelectionError(
+                "Multiple active Wiki bootstrap work items exist; choose and reconcile one.",
+                {"candidates": [state["id"] for state in active]},
+            )
+        if active:
+            return {
+                "action": "resume",
+                "work": active[0],
+                "bootstrap": assessment,
+            }
+        state = create_work(
+            repo,
+            kind="feature",
+            title="建立初始 Codebase Wiki",
+            risk="standard",
+            risk_rationale=(
+                "Bootstrap 只提升 source-bound Wiki knowledge，沿用 G1/G2/G3 與完整驗證。"
+            ),
+            knowledge_profile="bootstrap",
+        )
+        return {"action": "created", "work": state, "bootstrap": assessment}
+
+
 def work_knowledge_status(repo: Path, state: dict[str, Any] | None = None) -> dict[str, Any]:
     project = load_project(repo)
     root = project["knowledge"]["root"]
     try:
         current = knowledge.knowledge_snapshot(repo, root=root)
         result = knowledge.knowledge_status(repo, root=root, snapshot=current)
+        bootstrap = knowledge.bootstrap_assessment(repo, root=root, snapshot=current)
     except knowledge.KnowledgeError as exc:
         _raise_knowledge(exc)
-    result["legacy_work"] = state is not None and "base_knowledge" not in state
+    result["bootstrap"] = bootstrap
+    result["legacy_work"] = state is not None and "knowledge_review_required" not in state
     if state is None or "base_knowledge" not in state:
         bootstrap_pending = any(
             item.get("code") == "missing_wiki" for item in result.get("critical", [])
@@ -2044,6 +2324,13 @@ def work_knowledge_status(repo: Path, state: dict[str, Any] | None = None) -> di
                 "changed_paths": [],
                 "planned": None,
                 "bootstrap_pending": bootstrap_pending,
+                "covered_changed_paths": [],
+                "uncovered_changed_paths": [],
+                "review": {
+                    "required": False,
+                    "current": False,
+                    "disposition": None,
+                },
             }
         )
         return result
@@ -2053,6 +2340,23 @@ def work_knowledge_status(repo: Path, state: dict[str, Any] | None = None) -> di
         else []
     )
     affected = knowledge.affected_pages(state["base_knowledge"], changed_source)
+    coverage = knowledge.coverage_paths(current, changed_source)
+    current_source = git_snapshot(repo)
+    review_state = state.get("knowledge_review", {})
+    review = dict(review_state) if isinstance(review_state, dict) else {}
+    review.update(
+        {
+            "required": bool(state.get("knowledge_review_required")),
+            "current": bool(
+                review.get("disposition")
+                and review.get("rationale", "").strip()
+                and review.get("recorded_at")
+                and review.get("invalidated_at") is None
+                and review.get("change_fingerprint")
+                == current_source["fingerprint"]
+            ),
+        }
+    )
     updates = state.get("knowledge_updates", {})
     upserts = set(updates.get("upserts", []))
     deletes = set(updates.get("deletes", []))
@@ -2079,9 +2383,86 @@ def work_knowledge_status(repo: Path, state: dict[str, Any] | None = None) -> di
                 state["base_knowledge"], current
             )[:50],
             "planned": updates,
+            "covered_changed_paths": coverage["covered"][:50],
+            "uncovered_changed_paths": coverage["uncovered"][:50],
+            "review": review,
         }
     )
     return result
+
+
+def set_knowledge_review(
+    repo: Path,
+    work_id: str,
+    disposition: str,
+    rationale: str,
+) -> dict[str, Any]:
+    if disposition not in ("promote", "no-update"):
+        raise ValidationError(
+            "Knowledge review disposition must be promote or no-update.",
+            {"disposition": disposition},
+        )
+    if not rationale.strip():
+        raise ValidationError("Knowledge review rationale must not be empty.")
+    with WorkLock(repo, work_id):
+        state = load_state(repo, work_id)
+        sync_state_unlocked(repo, state)
+        if not state.get("knowledge_review_required"):
+            raise ValidationError(
+                "This legacy work item does not require a retrospective knowledge review."
+            )
+        if state["gates"]["build"].get("status") != "approved" or state[
+            "phase"
+        ] not in ("verification", "acceptance_review"):
+            raise ValidationError(
+                "Knowledge review may be recorded only during verification or acceptance.",
+                {"phase": state["phase"]},
+            )
+        project = load_project(repo)
+        root = project["knowledge"]["root"]
+        try:
+            current_knowledge = knowledge.knowledge_snapshot(repo, root=root)
+        except knowledge.KnowledgeError as exc:
+            _raise_knowledge(exc)
+        current_source = git_snapshot(repo)
+        changed_source = changed_paths_since(repo, state.get("base_source", {}))
+        affected = knowledge.affected_pages(state["base_knowledge"], changed_source)
+        coverage = knowledge.coverage_paths(current_knowledge, changed_source)
+        wiki_changes = knowledge.changed_knowledge_paths(
+            state["base_knowledge"], current_knowledge
+        )
+        if disposition == "no-update":
+            reasons: list[str] = []
+            if state.get("knowledge_profile") == "bootstrap":
+                reasons.append("bootstrap work must promote knowledge")
+            if affected:
+                reasons.append("affected Wiki pages require refresh or delete")
+            if wiki_changes:
+                reasons.append("Wiki already has work-item changes")
+            if reasons:
+                raise ValidationError(
+                    "Knowledge no-update review is not allowed.",
+                    {
+                        "reasons": reasons,
+                        "affected_pages": affected,
+                        "changed_pages": wiki_changes,
+                    },
+                )
+        review = {
+            "disposition": disposition,
+            "rationale": rationale.strip(),
+            "affected_pages": affected[:50],
+            "covered_changed_paths": coverage["covered"][:50],
+            "uncovered_changed_paths": coverage["uncovered"][:50],
+            "change_fingerprint": current_source["fingerprint"],
+            "recorded_at": utc_now(),
+            "invalidated_at": None,
+        }
+        state["knowledge_review"] = review
+        state["knowledge_updates"] = _empty_knowledge_updates()
+        save_state_unlocked(repo, state)
+        append_event_unlocked(repo, work_id, "knowledge_review_set", review)
+        return review
 
 
 def set_knowledge_context(
@@ -2150,6 +2531,7 @@ def set_knowledge_context(
             )
         state["knowledge_context"] = {
             "pages": normalized,
+            "records": knowledge.context_records(snapshot, normalized),
             "gaps": cleaned_gaps,
             "recorded_at": utc_now(),
         }
@@ -2184,6 +2566,20 @@ def set_knowledge_plan(
                 "Knowledge promotion may be planned only during verification or acceptance.",
                 {"phase": state["phase"]},
             )
+        current_source = git_snapshot(repo)
+        if state.get("knowledge_review_required"):
+            review = state.get("knowledge_review", {})
+            if not (
+                isinstance(review, dict)
+                and review.get("disposition") == "promote"
+                and review.get("recorded_at")
+                and review.get("invalidated_at") is None
+                and review.get("change_fingerprint")
+                == current_source["fingerprint"]
+            ):
+                raise ValidationError(
+                    "A current promote knowledge review is required before planning Wiki updates."
+                )
         project = load_project(repo)
         root = project["knowledge"]["root"]
         try:
@@ -2207,6 +2603,17 @@ def set_knowledge_plan(
             raise ValidationError(
                 "A Wiki page cannot be both upserted and deleted.", {"pages": overlap}
             )
+        content_count = len(normalized_upserts) + len(normalized_deletes)
+        if state.get("knowledge_review_required") and not 1 <= content_count <= 5:
+            raise ValidationError(
+                "A promote knowledge plan must declare between one and five content targets.",
+                {"count": content_count},
+            )
+        if content_count > 5:
+            raise ValidationError(
+                "A knowledge plan may declare at most five content targets.",
+                {"count": content_count},
+            )
         unknown_deletes = sorted(
             set(normalized_deletes) - set(state["base_knowledge"].get("pages", {}))
         )
@@ -2222,6 +2629,7 @@ def set_knowledge_plan(
             "coupled": coupled,
             "rationale": rationale.strip(),
             "sealed": [],
+            "change_fingerprint": current_source["fingerprint"],
             "recorded_at": utc_now(),
         }
         save_state_unlocked(repo, state)
@@ -2229,6 +2637,96 @@ def set_knowledge_plan(
             repo, work_id, "knowledge_plan_set", state["knowledge_updates"]
         )
         return state["knowledge_updates"]
+
+
+def scaffold_knowledge(
+    repo: Path,
+    work_id: str,
+    *,
+    page: str,
+    page_type: str,
+    title: str,
+    sources: Sequence[str],
+    package_name: str | None = None,
+    version: str | None = None,
+    decision_date: str | None = None,
+    decision_status: str | None = None,
+) -> dict[str, Any]:
+    """Create one planned new Wiki page from its canonical template."""
+
+    with WorkLock(repo, work_id):
+        state = load_state(repo, work_id)
+        sync_state_unlocked(repo, state)
+        if "base_knowledge" not in state:
+            raise ValidationError(
+                "Legacy work items do not have a knowledge scaffold contract."
+            )
+        if state["gates"]["build"].get("status") != "approved" or state[
+            "phase"
+        ] not in ("verification", "acceptance_review"):
+            raise ValidationError(
+                "Knowledge scaffold requires current G2 approval and verification phase.",
+                {"phase": state["phase"]},
+            )
+        current_source = git_snapshot(repo)
+        if state.get("knowledge_review_required"):
+            review = state.get("knowledge_review", {})
+            if not (
+                isinstance(review, dict)
+                and review.get("disposition") == "promote"
+                and review.get("recorded_at")
+                and review.get("invalidated_at") is None
+                and review.get("change_fingerprint")
+                == current_source["fingerprint"]
+            ):
+                raise ValidationError(
+                    "A current promote knowledge review is required before scaffolding."
+                )
+        project = load_project(repo)
+        root = project["knowledge"]["root"]
+        try:
+            normalized_page = knowledge.normalize_page(page, root)
+        except knowledge.KnowledgeError as exc:
+            _raise_knowledge(exc)
+        updates = state.get("knowledge_updates", {})
+        if updates.get("change_fingerprint") != current_source["fingerprint"]:
+            raise ValidationError(
+                "A current knowledge plan is required before scaffolding."
+            )
+        if normalized_page not in set(updates.get("upserts", [])):
+            raise ValidationError(
+                "Knowledge scaffold target must be a planned upsert.",
+                {"page": normalized_page},
+            )
+        if normalized_page in state["base_knowledge"].get("pages", {}):
+            raise ValidationError(
+                "Knowledge scaffold is only for new planned pages and cannot overwrite existing pages.",
+                {"page": normalized_page},
+            )
+        try:
+            result = knowledge.scaffold_page(
+                repo,
+                assets_root(),
+                page=normalized_page,
+                page_type=page_type,
+                title=title,
+                sources=sources,
+                work_id=work_id,
+                package_name=package_name,
+                version=version,
+                decision_date=decision_date,
+                decision_status=decision_status,
+                root=root,
+            )
+        except knowledge.KnowledgeError as exc:
+            _raise_knowledge(exc)
+        append_event_unlocked(
+            repo,
+            work_id,
+            "knowledge_page_scaffolded",
+            result,
+        )
+        return result
 
 
 def seal_knowledge(
@@ -2712,6 +3210,31 @@ def instructions(repo: Path, state: dict[str, Any]) -> dict[str, Any]:
         "gates": state["gates"],
     }
     payload["knowledge"] = work_knowledge_status(repo, state)
+    if phase in ("verification", "acceptance_review") and not gate_is_approved:
+        incomplete_tasks = any(
+            task.get("status") != "completed"
+            for task in state.get("tasks", {}).values()
+        )
+        review = payload["knowledge"].get("review", {})
+        planned = payload["knowledge"].get("planned") or {}
+        if incomplete_tasks:
+            next_action = "run_next_task"
+        elif review.get("required") and not review.get("current"):
+            next_action = "record_knowledge_review"
+        elif review.get("disposition") == "promote":
+            content_targets = set(planned.get("upserts", [])) | set(
+                planned.get("deletes", [])
+            )
+            if not content_targets:
+                next_action = "plan_knowledge_updates"
+            else:
+                seal_targets = set(planned.get("upserts", [])) | set(
+                    planned.get("coupled", [])
+                )
+                if not seal_targets.issubset(set(planned.get("sealed", []))):
+                    next_action = "promote_and_seal_knowledge"
+        payload["next_action"] = next_action
+        payload["knowledge"]["next_action"] = next_action
     if phase in ("requirements", "scope_review"):
         payload["knowledge"]["read_order"] = [
             f"{knowledge_root(repo)}/index.md",

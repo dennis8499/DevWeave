@@ -1,0 +1,31 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-010",
+    "AC-013"
+  ],
+  "created_at": "2026-08-03T08:54:42+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "f95d0c5f795efdf0f1e5dd3bd9704e83c17bb131",
+  "id": "EVID-002",
+  "kind": "regression",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "19a41766f70587b33c4d99b49e8b3c028f77198d556734041d0e83f98019a9a9",
+  "stale": false,
+  "status": "passed",
+  "summary": "33 個 DevWeave core lifecycle 測試通過，涵蓋 bootstrap、review、coverage、currentness 與 legacy compatibility。",
+  "tasks": [
+    "TASK-002"
+  ]
+}

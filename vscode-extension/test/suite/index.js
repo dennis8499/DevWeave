@@ -10,6 +10,7 @@ async function run() {
   assert.ok(commands.includes("devweave.initialize"));
   assert.ok(commands.includes("devweave.refresh"));
   assert.ok(commands.includes("devweave.copyNextAction"));
+  assert.ok(commands.includes("devweave.wikiBootstrap"));
 }
 
 module.exports = { run };

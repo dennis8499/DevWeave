@@ -68,8 +68,31 @@ export interface WikiPageProjection {
   sources: string[];
   sourceFingerprint?: string;
   computedSourceFingerprint?: string;
+  verifiedBy?: string;
   parseErrors: string[];
   bodyPreview: string;
+}
+
+export interface KnowledgeBootstrapProjection {
+  complete: boolean;
+  recommended: boolean;
+  reasons: string[];
+  overview: string | null;
+  architecturePages: string[];
+  modulePages: string[];
+}
+
+export interface KnowledgeReviewProjection {
+  required: boolean;
+  current: boolean;
+  disposition: "promote" | "no-update" | null;
+  rationale: string;
+  affectedPages: string[];
+  coveredChangedPaths: string[];
+  uncoveredChangedPaths: string[];
+  changeFingerprint: string | null;
+  recordedAt: string | null;
+  invalidatedAt: string | null;
 }
 
 export interface KnowledgeProjection {
@@ -82,6 +105,10 @@ export interface KnowledgeProjection {
   warnings: Diagnostic[];
   affectedPages: string[];
   pendingRefresh: string[];
+  coveredChangedPaths: string[];
+  uncoveredChangedPaths: string[];
+  bootstrap: KnowledgeBootstrapProjection;
+  review: KnowledgeReviewProjection;
   planned?: Record<string, unknown> | null;
 }
 
@@ -113,6 +140,8 @@ export interface WorkItemProjection {
   staleEvidence: string[];
   readOnly: boolean;
   updatedAt?: string;
+  knowledgeProfile?: "bootstrap";
+  knowledgeReviewRequired: boolean;
   knowledge: KnowledgeProjection;
 }
 
@@ -148,7 +177,7 @@ export interface WorkspaceSnapshot {
   selectedWorkId: string | null;
 }
 
-export type PublicCommandName = "new" | "feature" | "refactor" | "bug" | "next" | "status" | "revise" | "approve";
+export type PublicCommandName = "new" | "feature" | "refactor" | "bug" | "next" | "status" | "revise" | "approve" | "wikiBootstrap";
 
 export type PublicCommandIntent =
   | { type: "new"; goal: string }
@@ -157,6 +186,7 @@ export type PublicCommandIntent =
   | { type: "bug"; symptom: string }
   | { type: "next"; workId?: string }
   | { type: "status"; workId?: string }
+  | { type: "wikiBootstrap" }
   | { type: "revise"; workId: string; change: string }
   | { type: "approve"; workId: string };
 

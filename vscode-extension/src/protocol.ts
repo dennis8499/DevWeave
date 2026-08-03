@@ -79,6 +79,8 @@ export function parsePublicCommandIntent(value: unknown): PublicCommandIntent | 
       return noExtraFields(record, ["type", "workId"]) && optionalWorkId(record)
         ? { type: "status", ...(record.workId === undefined ? {} : { workId: record.workId as string }) }
         : null;
+    case "wikiBootstrap":
+      return noExtraFields(record, ["type"]) ? { type: "wikiBootstrap" } : null;
     case "revise":
       return noExtraFields(record, ["type", "workId", "change"]) && isNonEmptyString(record.workId) && isNonEmptyString(record.change)
         ? { type: "revise", workId: record.workId, change: record.change }

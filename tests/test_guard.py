@@ -191,8 +191,14 @@ class GuardTests(unittest.TestCase):
                 )
             )
 
-            harness.implement(state["id"], "verification")
+            harness.implement(state["id"], "verification", review=False)
             self.assertTrue(denied(guard.handle_hook(planned, harness.repo)))
+            core.set_knowledge_review(
+                harness.repo,
+                state["id"],
+                "promote",
+                "Guard fixture promotes a planned module page.",
+            )
             core.set_knowledge_plan(
                 harness.repo,
                 state["id"],
@@ -219,6 +225,10 @@ class GuardTests(unittest.TestCase):
                     )
                 )
             )
+            (harness.repo / "src/app.txt").write_text(
+                "baseline\nsource changed after knowledge plan\n", encoding="utf-8"
+            )
+            self.assertTrue(denied(guard.handle_hook(planned, harness.repo)))
 
 
 if __name__ == "__main__":

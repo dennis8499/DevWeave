@@ -4,6 +4,8 @@ DevWeave 是一套以 repository 為中心、由 Codex 操作的語言中立 SDL
 系統設計、任務、驗證證據與三道人工作業 gate 放在同一個可追溯的 work item 中，讓每次變更
 都有清楚的範圍、決策、驗證結果與驗收紀錄。
 
+內建的 Codebase LLM Wiki 是可重建、source-bound 的知識快取：探索先從固定索引與最多五個內容頁開始，只有遇到知識缺口才回查最小原始碼範圍。
+
 本專案的詳細操作請閱讀 [繁體中文使用手冊](docs/使用手冊.md)。
 
 ## DevWeave 解決什麼問題
@@ -75,6 +77,7 @@ $devweave new 建立第一個可驗證的交付切片
 $devweave feature 新增一項功能
 $devweave refactor 重構指定模組並維持行為
 $devweave bug 描述可重現的錯誤
+$devweave wiki bootstrap
 ```
 
 ### 3. 使用 Codex 完成一個 work item
@@ -86,6 +89,7 @@ $devweave feature 新增 CSV 匯出能力
 $devweave status
 $devweave next
 $devweave approve <work-id>
+$devweave wiki bootstrap
 ```
 
 `next` 會依目前 phase 提供下一步；`approve` 只應在對應的人工作業完成後使用。若有多個
@@ -134,7 +138,7 @@ G2 artifacts：
 ### G3：Verification／Acceptance 核准
 
 G3 會檢查完整 diff、所有 required verification commands、current source-bound evidence、
-AC/TASK 覆蓋、scope、baseline 與 Wiki promotion。不同 work kind 的 evidence 要求不同：
+AC/TASK 覆蓋、scope、baseline 與 current Knowledge Review。不同 work kind 的 evidence 要求不同：
 
 | Work kind | G3 必要 evidence |
 | --- | --- |
@@ -165,16 +169,24 @@ G3 通過且取得人工核准後，才能關閉 work item。
 每個新 work item 在 G1 以 `wiki/index.md` 作為第一個讀取入口。Wiki page 使用 frontmatter、
 repo-relative sources、current source SHA-256 fingerprint 與 `verified_by` provenance。
 
+首次建立核心 Wiki 可使用：
+
+```text
+$devweave wiki bootstrap
+```
+
+命令會先判斷 active、sourced 的 overview、architecture 與 module 是否已齊全；完整時不建立 work item，否則建立或續接一般 `feature` bootstrap work item，沿用 G1/G2/G3。Bootstrap 探索整個 repository，不接受子路徑 scope，也不修改產品程式碼。
+
 G2 與 implementation 期間 Wiki 唯讀；在 verification：
 
 1. 執行 `knowledge status --work <work-id>` 找出 affected pages。
-2. 只對 affected page 宣告 `knowledge plan` 的 upsert 或 delete。
-3. 更新宣告頁面與自動 coupled 的 `wiki/index.md`、`wiki/log.md`。
-4. 以 `knowledge seal` 封存所有頁面。
-5. G3 檢查 append-only promotion log、source fingerprint、index 與 lint。
+2. 每個新式 work item 都做 Knowledge Review：`promote` 或 `no-update`，並留下 rationale。
+3. `promote` 以一個 plan 宣告 1–5 個內容頁；新頁可由九種 canonical template scaffold，完成編輯後改為 active。
+4. `no-update` 只適用於非 bootstrap、沒有 affected page、沒有 Wiki diff 的情況，而且不建立 plan。
+5. 更新宣告頁面與自動 coupled 的 `wiki/index.md`、`wiki/log.md`，再以 `knowledge seal` 封存。
+6. G3 檢查 append-only promotion log、source fingerprint、coverage、review currentness、index 與 lint；placeholder 或未替換 token 不能 seal。
 
-如果本次變更沒有 affected Wiki page，也沒有 Wiki diff，不要建立空的 knowledge plan 或虛構
-「無更新」理由。
+「每個 Work Item 更新 Wiki」指每次都做 Knowledge Review，不代表每次強迫產生 Wiki diff。原始碼與核准 artifacts 仍是最終事實來源；本功能不使用向量資料庫、全文索引或精確 Token 計量。
 
 ## Repository 結構
 

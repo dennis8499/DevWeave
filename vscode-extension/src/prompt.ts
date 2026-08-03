@@ -56,6 +56,8 @@ export class DevWeavePromptComposer implements PromptComposer {
         return `$devweave next${optionalArg(intent.workId)}`;
       case "status":
         return `$devweave status${optionalArg(intent.workId)}`;
+      case "wikiBootstrap":
+        return "$devweave wiki bootstrap";
       case "revise":
         return `$devweave revise ${requiredArg(intent.workId, "workId")} ${requiredArg(intent.change, "change")}`;
       case "approve":
@@ -64,7 +66,7 @@ export class DevWeavePromptComposer implements PromptComposer {
   }
 
   private isMutation(intent: PublicCommandIntent): boolean {
-    return ["new", "feature", "refactor", "bug", "revise", "approve"].includes(intent.type);
+    return ["new", "feature", "refactor", "bug", "revise", "approve", "wikiBootstrap"].includes(intent.type);
   }
 
   private isApproval(intent: PublicCommandIntent): boolean {

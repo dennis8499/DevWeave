@@ -24,6 +24,7 @@
     "onCommand:devweave.initialize",
     "onCommand:devweave.refresh",
     "onCommand:devweave.copyNextAction",
+    "onCommand:devweave.wikiBootstrap",
     "workspaceContains:.devweave/project.json"
   ],
   "contributes": {
@@ -61,6 +62,10 @@
       {
         "command": "devweave.copyNextAction",
         "title": "DevWeave: Copy public $devweave next to Codex Chat"
+      },
+      {
+        "command": "devweave.wikiBootstrap",
+        "title": "DevWeave: Bootstrap Codebase Wiki"
       }
     ],
     "menus": {
@@ -84,6 +89,10 @@
         {
           "command": "devweave.copyNextAction",
           "when": "resourceLangId == markdown"
+        },
+        {
+          "command": "devweave.wikiBootstrap",
+          "when": "workbenchState != empty"
         }
       ]
     }

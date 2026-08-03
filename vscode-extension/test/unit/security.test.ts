@@ -72,3 +72,25 @@ test("workflow mutations remain preview-first and bootstrap uses explicit confir
   assert.match(extension, /showWarningMessage\([\s\S]*modal: true/);
   assert.match(extension, /new BootstrapInstaller\(\)/);
 });
+
+test("Wiki bootstrap has three prompt-only entrances with one public intent", () => {
+  const webview = readFileSync(resolve(extensionRoot, "webview/main.ts"), "utf8");
+  const extension = readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8");
+  const packageJson = JSON.parse(readFileSync(resolve(extensionRoot, "package.json"), "utf8")) as {
+    activationEvents?: string[];
+    contributes?: { commands?: Array<{ command?: string; title?: string }>; menus?: { commandPalette?: Array<{ command?: string }> } };
+  };
+  const commands = packageJson.contributes?.commands ?? [];
+  const palette = packageJson.contributes?.menus?.commandPalette ?? [];
+
+  assert.match(webview, /\["wikiBootstrap", "wiki bootstrap — 建立 Codebase Wiki"\]/);
+  assert.match(webview, /data-action="wiki-bootstrap"/);
+  assert.match(webview, /action === "wiki-bootstrap"[\s\S]*type: "wikiBootstrap"/);
+  assert.ok(commands.some((item) => item.command === "devweave.wikiBootstrap" && item.title === "DevWeave: Bootstrap Codebase Wiki"));
+  assert.ok(palette.some((item) => item.command === "devweave.wikiBootstrap"));
+  assert.ok(packageJson.activationEvents?.includes("onCommand:devweave.wikiBootstrap"));
+  assert.match(extension, /registerCommand\("devweave\.wikiBootstrap"/);
+  assert.match(extension, /previewWikiBootstrap[\s\S]*type: "wikiBootstrap"/);
+  assert.match(extension, /showWarningMessage\([\s\S]*modal: true/);
+  assert.doesNotMatch(extension, /devweave\.py|knowledge bootstrap|workspace\.fs\.writeFile/);
+});

@@ -35,7 +35,7 @@ Commands are executed with `shell=false`. Never convert `argv` to a shell string
 - scope: risk classification, risk rationale, downgrade rationale, paths, and scope rationale;
 - provenance: `base_source`, `base_baseline`, optional `base_knowledge`, Git HEAD/branch/diff fingerprint, and `last_verification`;
 - ledgers: machine task state, evidence summaries, waivers, and baseline-update decisions.
-- knowledge-aware work adds `knowledge_context` (`pages`, `gaps`, `recorded_at`) and `knowledge_updates` (`upserts`, `deletes`, `coupled`, `rationale`, `sealed`, `recorded_at`). Missing fields identify a legacy active item and never add retrospective G1/G3 blockers.
+- knowledge-aware work adds optional `knowledge_profile: "bootstrap"`, `knowledge_review_required`, `knowledge_context` (`pages`, ordered `records`, `gaps`, `recorded_at`), `knowledge_review` (`disposition`, `rationale`, affected/covered/uncovered paths, change fingerprint, timestamps), and `knowledge_updates` (`upserts`, `deletes`, `coupled`, `rationale`, `sealed`, change fingerprint, `recorded_at`). New work defaults `knowledge_review_required: true`; missing review fields identify a legacy active item and never add retrospective G1/G3 blockers.
 
 Valid phases are:
 
@@ -62,6 +62,7 @@ Invalidation is monotonic until reapproval:
 - G1 material change invalidates G1, G2, and G3 and returns to requirements.
 - G2 material change keeps G1 and invalidates G2 and G3 and returns to design.
 - Post-verification source change marks source-bound evidence stale, clears the verification snapshot, invalidates G3, and returns to verification while G2 remains current.
+- A product-source fingerprint change invalidates a recorded Knowledge Review and clears its knowledge plan. Wiki-only changes do not change the product-source fingerprint but are reconciled independently at G3.
 - G3 artifact, evidence, baseline, or waiver change invalidates G3.
 - Closed work remains in place and cannot be reopened; start a new work item.
 
@@ -78,7 +79,13 @@ Sources are normalized, unique, repo-relative paths and may not enter Wiki, `.de
 
 G1 records `wiki/index.md` first and at most five related pages through `knowledge context`; missing, placeholder, stale, invalid, or contradictory knowledge requires a gap before raw-source fallback. G2 and implementation keep Wiki read-only. Source behavior and approved artifacts outrank conflicting Wiki claims.
 
-At verification, affected pages are computed only from this work's changed product paths against each page's sources captured in `base_knowledge`. Affected pages must be an active/current sealed upsert or a declared deletion. Other stale pages are warnings. Any content target automatically authorizes `wiki/index.md` and `wiki/log.md`; both must actually change and be sealed. The log body must preserve its base prefix and append exactly one `promote` heading containing the work ID. `new` also requires an active, sourced, sealed overview.
+`knowledge bootstrap` assesses the whole repository Wiki. If an active, sourced, current overview, architecture page, and module page already exist, it returns `already_complete` without creating work. Otherwise it resumes the single active bootstrap profile or creates a normal feature work item with `knowledge_profile: "bootstrap"`. Bootstrap follows the same G1/G2/G3 lifecycle, accepts no scope argument, changes no product source, plans three to five content pages, and never permits `no-update` or deletion.
+
+Every new-format work item records a current Knowledge Review during verification. `promote` requires a non-empty plan of one to five content upserts/deletes. `no-update` requires a non-bootstrap item, non-empty rationale, no affected page, no Wiki diff, and no plan. Coverage separates changed product paths into covered and uncovered paths using active page-source overlap; durable uncovered changes may be represented by one or more pages rather than one page per source file.
+
+`knowledge scaffold` creates only a planned new upsert, only after current G2 and a current promote review. It renders one of the nine canonical content templates with valid repo-relative sources through an exclusive no-overwrite write. The new page remains `placeholder` until edited active. Dependency scaffolds require package name/version; decision scaffolds require date and `proposed|accepted|deprecated|superseded` status. Seal rejects placeholders, unreplaced template tokens, invalid sources, and critical lint.
+
+At verification, affected pages are computed only from this work's changed product paths against each page's sources captured in `base_knowledge`. Affected pages must be an active/current sealed upsert or a declared deletion. Other stale pages are warnings. A work item may upsert/delete at most five content pages total. Any content target automatically authorizes `wiki/index.md` and `wiki/log.md`; both must actually change and be sealed. The log body must preserve its base prefix and append exactly one `promote` heading containing the work ID. `new` also requires an active, sourced, sealed overview.
 
 Wiki lint treats malformed frontmatter, invalid/missing sources, invalid source fingerprints, ambiguous or broken wikilinks, missing/duplicate index entries, and rewritten log history as critical. Placeholder, unsealed, orphan, stale, coverage-review, and semantic-review findings are warnings unless the page is affected or a declared promotion target.
 
@@ -126,12 +133,15 @@ Knowledge machine commands are:
 
 ```text
 knowledge status [--work <id>]
+knowledge bootstrap
 knowledge context --work <id> --page wiki/index.md [--page ...] [--gap ...]
+knowledge review --work <id> --disposition promote|no-update --rationale <text>
 knowledge plan --work <id> [--upsert ...] [--delete ...] --rationale <text>
+knowledge scaffold --work <id> --page <wiki-path> --type <content-type> --title <title> --source <repo-path> ... [type fields]
 knowledge seal --work <id> --page ...
 ```
 
-`context` and `plan` replace their complete ledgers. `context` is valid only before G1. `plan` is valid only in verification/acceptance with a current G2 and couples index/log automatically. `seal` accepts only planned upserts and coupled pages and preserves the page body and unknown frontmatter fields while writing date, current source fingerprint, and work provenance.
+`bootstrap` is repository-wide and idempotent. `context` and `plan` replace their complete ledgers. `context` is valid only before G1 and records page content/source observations. `review` is valid only in verification/acceptance with current G2. `plan` additionally requires a current promote review for new-format work and couples index/log automatically. `scaffold` accepts only a planned new upsert and never overwrites. `seal` accepts only planned upserts and coupled pages and preserves the page body and unknown frontmatter fields while writing date, current source fingerprint, and work provenance.
 
 `scope` is a replace operation, not an append operation. Supply the entire intended set in one command by repeating the option: `scope --path src --path tests --rationale "..."`.
 
@@ -174,6 +184,7 @@ Diagnostic envelope:
 - `status`: report state, gates, task progress, stale evidence, blocker, and next action in Traditional Chinese.
 - `revise`: record the earliest affected phase and reason before changing an approved artifact.
 - `approve`: validate and approve the current human gate; after G3, close.
+- `wiki bootstrap`: route to `knowledge bootstrap`; report an already complete Wiki, or bind and continue the returned bootstrap work item through the normal lifecycle.
 
 Resolve an explicitly named item first, then an item unambiguously established by the conversation, then the only eligible active item. If multiple candidates remain, show ID, title, kind, phase, and status and ask the user to choose.
 

@@ -34,6 +34,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("devweave.initialize", () => controller.initialize()),
     vscode.commands.registerCommand("devweave.refresh", () => controller.refresh()),
     vscode.commands.registerCommand("devweave.copyNextAction", () => controller.copyNextAction()),
+    vscode.commands.registerCommand("devweave.wikiBootstrap", () => controller.previewWikiBootstrap()),
     vscode.workspace.onDidChangeWorkspaceFolders(() => controller.handleWorkspaceFoldersChanged())
   );
   controller.startWatchers(context);
@@ -195,14 +196,37 @@ class ExtensionController {
     if (bundle.mutation && snapshot.mutationBlocked) {
       throw new Error("DevWeave snapshot is read-only because critical contract diagnostics are present. Use the status command form first.");
     }
-    await this.clipboard.copy(bundle.chatText);
-    await vscode.window.showInformationMessage("DevWeave prompt 已複製到 clipboard；請在 Codex Chat 審閱並送出。", "Open Dashboard");
+    await this.copyBundle(bundle);
     return bundle;
   }
 
   public async copyNextAction(): Promise<void> {
     const work = this.currentWork();
     await this.copy({ type: "next", ...(work ? { workId: work.id } : {}) });
+  }
+
+  public async previewWikiBootstrap(): Promise<void> {
+    const intent = { type: "wikiBootstrap" } as const;
+    try {
+      const bundle = await this.preview(intent);
+      const warningText = bundle.warnings.length > 0
+        ? `\n\n注意：${bundle.warnings.join(" ")}`
+        : "";
+      const confirmation = await vscode.window.showWarningMessage(
+        `預覽 Codex Chat prompt：\n\n${bundle.chatText}${warningText}\n\nExtension 不會執行 CLI 或寫入 Wiki。`,
+        { modal: true },
+        "Copy prompt",
+        "Cancel"
+      );
+      if (confirmation === "Copy prompt") {
+        await this.copyBundle(bundle);
+      }
+    } catch (error) {
+      await vscode.window.showErrorMessage(
+        error instanceof Error ? error.message : "無法產生 Wiki bootstrap prompt。",
+        "Open Dashboard"
+      );
+    }
   }
 
   public async openFile(relativePath: string): Promise<void> {
@@ -219,6 +243,11 @@ class ExtensionController {
       return this.snapshot.workItems.find((work) => work.id === this.selectedWorkId);
     }
     return this.snapshot.workItems.length === 1 ? this.snapshot.workItems[0] : undefined;
+  }
+
+  private async copyBundle(bundle: PromptBundle): Promise<void> {
+    await this.clipboard.copy(bundle.chatText);
+    await vscode.window.showInformationMessage("DevWeave prompt 已複製到 clipboard；請在 Codex Chat 審閱並送出。", "Open Dashboard");
   }
 
   private scheduleRefresh(): void {
@@ -294,6 +323,28 @@ function unavailableSnapshot(message: string): WorkspaceSnapshot {
       warnings: [diagnostic],
       affectedPages: [],
       pendingRefresh: [],
+      coveredChangedPaths: [],
+      uncoveredChangedPaths: [],
+      bootstrap: {
+        complete: false,
+        recommended: true,
+        reasons: ["overview_not_ready", "architecture_missing", "module_missing"],
+        overview: null,
+        architecturePages: [],
+        modulePages: []
+      },
+      review: {
+        required: false,
+        current: false,
+        disposition: null,
+        rationale: "",
+        affectedPages: [],
+        coveredChangedPaths: [],
+        uncoveredChangedPaths: [],
+        changeFingerprint: null,
+        recordedAt: null,
+        invalidatedAt: null
+      },
       planned: null
     },
     diagnostics: [diagnostic],

@@ -2,11 +2,11 @@
 title: <TITLE>
 type: decision
 sources: [<SOURCE_PATH>]
-last_updated: 1970-01-01
+last_updated: <DATE>
 tags: [decision]
-status: active
+status: placeholder
 source_fingerprint: none
-verified_by: bootstrap
+verified_by: <WORK_ID>
 decision_date: 1970-01-01
 decision_status: accepted
 ---
@@ -20,4 +20,3 @@ decision_status: accepted
 ## Consequences
 
 ## Evidence
-

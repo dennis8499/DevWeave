@@ -113,7 +113,22 @@ function snapshotFixture(): WorkspaceSnapshot {
     hookPresent: true,
     skillPresent: true,
     workItems: [],
-    knowledge: { root: "wiki", health: "healthy", pages: [], placeholderPages: [], stalePages: [], critical: [], warnings: [], affectedPages: [], pendingRefresh: [], planned: null },
+    knowledge: {
+      root: "wiki",
+      health: "healthy",
+      pages: [],
+      placeholderPages: [],
+      stalePages: [],
+      critical: [],
+      warnings: [],
+      affectedPages: [],
+      pendingRefresh: [],
+      coveredChangedPaths: [],
+      uncoveredChangedPaths: [],
+      bootstrap: { complete: false, recommended: true, reasons: ["overview_not_ready", "architecture_missing", "module_missing"], overview: null, architecturePages: [], modulePages: [] },
+      review: { required: false, current: false, disposition: null, rationale: "", affectedPages: [], coveredChangedPaths: [], uncoveredChangedPaths: [], changeFingerprint: null, recordedAt: null, invalidatedAt: null },
+      planned: null
+    },
     diagnostics: [],
     mutationBlocked: false,
     source: "filesystem",
@@ -184,6 +199,23 @@ test("snapshot reader keeps managed false explicit and preserves multiple active
   assert.ok(snapshot.diagnostics.some((item) => item.code === "legacy_work"));
 });
 
+test("snapshot reader marks work with base knowledge but no review marker as legacy", async () => {
+  const entries = managedEntries();
+  const state = JSON.parse(entries[".devweave/work-items/demo/state.json"] ?? "{}") as Record<string, unknown>;
+  state.base_knowledge = { files: {}, pages: {}, fingerprint: "fixture" };
+  entries[".devweave/work-items/demo/state.json"] = JSON.stringify(state);
+  const reader = new WorkspaceSnapshotReader(new MemoryFileSystem(entries), {
+    rootName: "legacy-review",
+    rootPath: "file:///legacy-review",
+    now: () => "2026-08-03T01:00:00Z"
+  });
+
+  const snapshot = await reader.readWorkspace();
+
+  assert.equal(snapshot.workItems[0]?.knowledgeReviewRequired, false);
+  assert.ok(snapshot.diagnostics.some((item) => item.code === "legacy_work"));
+});
+
 test("snapshot reader fails closed for malformed and unsupported project/state", async () => {
   const malformed = managedEntries();
   malformed[".devweave/project.json"] = "{";
@@ -205,6 +237,75 @@ test("snapshot reader fails closed for malformed and unsupported project/state",
   assert.ok(unsupportedSnapshot.diagnostics.some((item) => item.code === "unsupported_schema"));
   assert.ok(unsupportedSnapshot.diagnostics.some((item) => item.code === "work_unsupported_schema"));
   assert.equal(unsupportedSnapshot.workItems[0]?.readOnly, true);
+
+  const unknownKnowledge = managedEntries();
+  const unknownState = JSON.parse(unknownKnowledge[".devweave/work-items/demo/state.json"] ?? "{}") as Record<string, unknown>;
+  unknownState.base_knowledge = { files: {}, pages: {}, fingerprint: "base" };
+  unknownState.knowledge_profile = "unknown-profile";
+  unknownState.knowledge_review_required = true;
+  unknownState.knowledge_review = {
+    disposition: "unknown-disposition",
+    rationale: "invalid",
+    affected_pages: [],
+    covered_changed_paths: [],
+    uncovered_changed_paths: [],
+    change_fingerprint: "source",
+    recorded_at: "2026-08-03T01:00:00Z",
+    invalidated_at: null
+  };
+  unknownKnowledge[".devweave/work-items/demo/state.json"] = JSON.stringify(unknownState);
+  const unknownSnapshot = await new WorkspaceSnapshotReader(new MemoryFileSystem(unknownKnowledge), {
+    rootName: "unknown-knowledge",
+    rootPath: "file:///unknown-knowledge"
+  }).readWorkspace();
+  assert.equal(unknownSnapshot.mutationBlocked, true);
+  assert.ok(unknownSnapshot.diagnostics.some((item) => item.code === "knowledge_profile_invalid"));
+  assert.ok(unknownSnapshot.diagnostics.some((item) => item.code === "knowledge_review_invalid"));
+
+  const emptyRationale = managedEntries();
+  const emptyReviewState = JSON.parse(emptyRationale[".devweave/work-items/demo/state.json"] ?? "{}") as Record<string, unknown>;
+  emptyReviewState.base_knowledge = { files: {}, pages: {}, fingerprint: "base" };
+  emptyReviewState.knowledge_review_required = true;
+  emptyReviewState.knowledge_review = {
+    disposition: "promote",
+    rationale: "",
+    affected_pages: [],
+    covered_changed_paths: [],
+    uncovered_changed_paths: [],
+    change_fingerprint: "source",
+    recorded_at: "2026-08-03T01:00:00Z",
+    invalidated_at: null
+  };
+  emptyRationale[".devweave/work-items/demo/state.json"] = JSON.stringify(emptyReviewState);
+  const emptyReviewSnapshot = await new WorkspaceSnapshotReader(new MemoryFileSystem(emptyRationale), {
+    rootName: "empty-review",
+    rootPath: "file:///empty-review"
+  }).readWorkspace();
+  assert.equal(emptyReviewSnapshot.mutationBlocked, true);
+  assert.equal(emptyReviewSnapshot.workItems[0]?.knowledge.review.current, false);
+  assert.ok(emptyReviewSnapshot.diagnostics.some((item) => item.code === "knowledge_review_invalid"));
+
+  const missingBase = managedEntries();
+  const missingBaseState = JSON.parse(missingBase[".devweave/work-items/demo/state.json"] ?? "{}") as Record<string, unknown>;
+  missingBaseState.knowledge_profile = "bootstrap";
+  missingBaseState.knowledge_review_required = true;
+  missingBaseState.knowledge_review = {
+    disposition: null,
+    rationale: "",
+    affected_pages: [],
+    covered_changed_paths: [],
+    uncovered_changed_paths: [],
+    change_fingerprint: null,
+    recorded_at: null,
+    invalidated_at: null
+  };
+  missingBase[".devweave/work-items/demo/state.json"] = JSON.stringify(missingBaseState);
+  const missingBaseSnapshot = await new WorkspaceSnapshotReader(new MemoryFileSystem(missingBase), {
+    rootName: "missing-base",
+    rootPath: "file:///missing-base"
+  }).readWorkspace();
+  assert.equal(missingBaseSnapshot.mutationBlocked, true);
+  assert.ok(missingBaseSnapshot.diagnostics.some((item) => item.code === "knowledge_review_invalid"));
 });
 
 test("snapshot reader marks stale Wiki metadata and missing hook without rebuilding fingerprints", async () => {
@@ -219,6 +320,68 @@ test("snapshot reader marks stale Wiki metadata and missing hook without rebuild
   assert.ok(snapshot.diagnostics.some((item) => item.code === "hook_missing"));
   assert.deepEqual(snapshot.knowledge.stalePages, ["wiki/stale.md"]);
   assert.equal(snapshot.knowledge.pages.find((page) => page.path === "wiki/stale.md")?.computedSourceFingerprint, "new");
+});
+
+test("snapshot reader projects syntactic bootstrap, review coverage, and verified-by without Git", async () => {
+  const entries = managedEntries();
+  entries[".devweave/work-items/demo/state.json"] = JSON.stringify({
+    schema_version: 1,
+    id: "demo",
+    title: "Bootstrap Wiki",
+    kind: "feature",
+    status: "active",
+    phase: "verification",
+    risk: { level: "standard" },
+    scope: { paths: ["wiki/**"], rationale: "knowledge only" },
+    gates: { scope: { status: "approved" }, build: { status: "approved" }, acceptance: { status: "pending" } },
+    tasks: { "TASK-001": { status: "completed", evidence: [] } },
+    base_knowledge: { files: {}, pages: {}, fingerprint: "base" },
+    knowledge_profile: "bootstrap",
+    knowledge_review_required: true,
+    knowledge_review: {
+      disposition: "promote",
+      rationale: "Durable repository knowledge.",
+      affected_pages: ["wiki/modules/runtime.md"],
+      covered_changed_paths: ["src/app.ts"],
+      uncovered_changed_paths: ["docs/new.md"],
+      change_fingerprint: "source-1",
+      recorded_at: "2026-08-03T01:00:00Z",
+      invalidated_at: null
+    },
+    knowledge_updates: {
+      upserts: ["wiki/modules/new.md"],
+      deletes: [],
+      coupled: ["wiki/index.md", "wiki/log.md"],
+      sealed: [],
+      rationale: "Promote one new page.",
+      change_fingerprint: "source-1",
+      recorded_at: "2026-08-03T01:01:00Z"
+    },
+    updated_at: "2026-08-03T01:02:00Z"
+  });
+  entries["wiki/overview.md"] = "---\ntitle: Overview\ntype: overview\nstatus: active\nsources: [src/app.ts]\nsource_fingerprint: sha256:overview\nverified_by: prior-work\n---\n# Overview";
+  entries["wiki/architecture/system.md"] = "---\ntitle: System\ntype: architecture\nstatus: active\nsources: [src/app.ts]\nsource_fingerprint: sha256:architecture\nverified_by: prior-work\n---\n# System";
+  entries["wiki/modules/runtime.md"] = "---\ntitle: Runtime\ntype: module\nstatus: active\nsources: [src/app.ts]\nsource_fingerprint: sha256:module\nverified_by: prior-work\n---\n# Runtime";
+
+  const snapshot = await new WorkspaceSnapshotReader(new MemoryFileSystem(entries), {
+    rootName: "knowledge",
+    rootPath: "file:///knowledge"
+  }).readWorkspace();
+  const work = snapshot.workItems[0];
+
+  assert.equal(snapshot.knowledge.bootstrap.complete, true);
+  assert.equal(snapshot.knowledge.bootstrap.recommended, false);
+  assert.equal(work?.knowledgeProfile, "bootstrap");
+  assert.equal(work?.knowledge.review.current, true);
+  assert.equal(work?.knowledge.review.disposition, "promote");
+  assert.deepEqual(work?.knowledge.affectedPages, ["wiki/modules/runtime.md"]);
+  assert.deepEqual(work?.knowledge.coveredChangedPaths, ["src/app.ts"]);
+  assert.deepEqual(work?.knowledge.uncoveredChangedPaths, ["docs/new.md"]);
+  assert.deepEqual(work?.knowledge.pendingRefresh, ["wiki/modules/runtime.md"]);
+  assert.equal(
+    snapshot.knowledge.pages.find((page) => page.path === "wiki/overview.md")?.verifiedBy,
+    "prior-work"
+  );
 });
 
 test("public prompt composition is deterministic, sanitized, and machine-command free", () => {
@@ -275,6 +438,7 @@ test("every public command produces the documented command text", () => {
     [{ type: "next" }, "$devweave next", false],
     [{ type: "status", workId: "demo" }, "$devweave status demo", false],
     [{ type: "status" }, "$devweave status", false],
+    [{ type: "wikiBootstrap" }, "$devweave wiki bootstrap", true],
     [{ type: "revise", workId: "demo", change: "調整公開命令欄位" }, "$devweave revise demo 調整公開命令欄位", true],
     [{ type: "approve", workId: "demo" }, "$devweave approve demo", true]
   ];
@@ -297,6 +461,8 @@ test("public Webview protocol accepts public intents and rejects machine actions
   assert.deepEqual(parsePublicCommandIntent({ type: "next", workId: "demo" }), { type: "next", workId: "demo" });
   assert.deepEqual(parsePublicCommandIntent({ type: "status" }), { type: "status" });
   assert.deepEqual(parsePublicCommandIntent({ type: "status", workId: "demo" }), { type: "status", workId: "demo" });
+  assert.deepEqual(parsePublicCommandIntent({ type: "wikiBootstrap" }), { type: "wikiBootstrap" });
+  assert.equal(parsePublicCommandIntent({ type: "wikiBootstrap", workId: "demo" }), null);
   assert.equal(parsePublicCommandIntent({ type: "feature", request: "   " }), null);
   assert.equal(parsePublicCommandIntent({ type: "bug", symptom: "" }), null);
   assert.equal(parsePublicCommandIntent({ type: "revise", workId: "", change: "change" }), null);

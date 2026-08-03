@@ -1,0 +1,26 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-011",
+    "AC-012",
+    "AC-014"
+  ],
+  "created_at": "2026-08-03T10:35:59+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "f95d0c5f795efdf0f1e5dd3bd9704e83c17bb131",
+  "id": "EVID-005",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "fcf28ffd6d01cafe9dc44179f8b3f75e8c30fbe78fcd281542cbde4e6c543f5a",
+  "stale": false,
+  "status": "passed",
+  "summary": "Extension 三個 Wiki bootstrap 入口共用 prompt-only intent；25 unit tests、typecheck、production bundle 與 Extension Host smoke 均通過。",
+  "tasks": [
+    "TASK-005"
+  ]
+}
