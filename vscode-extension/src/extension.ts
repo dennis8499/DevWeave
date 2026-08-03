@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { BootstrapBundle, BootstrapInstaller, BootstrapReport } from "./bootstrap";
 import { ClipboardAdapter, VscodeClipboardAdapter } from "./clipboard";
 import { DashboardPanel } from "./dashboard";
 import { FileSystemPort } from "./filesystem";
@@ -6,6 +7,7 @@ import { ActionIntent, Diagnostic, PromptBundle, WorkspaceSnapshot } from "./mod
 import { DevWeavePromptComposer } from "./prompt";
 import { WorkspaceSnapshotReader } from "./snapshot";
 import { WorkItemsTreeProvider } from "./tree";
+import { readBootstrapBundle, VscodeBootstrapResourceReader, VscodeBootstrapWorkspace } from "./vscode-bootstrap";
 import { VscodeFileSystemPort } from "./vscode-filesystem";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -14,6 +16,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const tree = new WorkItemsTreeProvider();
   const dashboard = new DashboardPanel(context, {
     refresh: () => controller.refresh(),
+    initialize: () => controller.initialize(),
     preview: (intent) => controller.preview(intent),
     copy: (intent) => controller.copy(intent),
     openFile: (path) => controller.openFile(path),
@@ -28,6 +31,7 @@ export function activate(context: vscode.ExtensionContext): void {
     dashboard,
     vscode.window.registerTreeDataProvider("devweave.workItems", tree),
     vscode.commands.registerCommand("devweave.openDashboard", (workId?: string) => controller.openDashboard(workId)),
+    vscode.commands.registerCommand("devweave.initialize", () => controller.initialize()),
     vscode.commands.registerCommand("devweave.refresh", () => controller.refresh()),
     vscode.commands.registerCommand("devweave.copyNextAction", () => controller.copyNextAction()),
     vscode.workspace.onDidChangeWorkspaceFolders(() => controller.handleWorkspaceFoldersChanged())
@@ -48,6 +52,7 @@ class ExtensionController {
   private selectedWorkId: string | null = null;
   private reader: WorkspaceSnapshotReader | undefined;
   private readonly composer = new DevWeavePromptComposer();
+  private readonly bootstrapInstaller = new BootstrapInstaller();
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   public constructor(
@@ -124,6 +129,64 @@ class ExtensionController {
   public async preview(intent: ActionIntent): Promise<PromptBundle> {
     const snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
     return this.composer.compose(intent, snapshot);
+  }
+
+  public async initialize(): Promise<{ report: BootstrapReport; snapshot: WorkspaceSnapshot }> {
+    const root = await this.resolveRoot(true);
+    if (!root) {
+      const report = bootstrapFailure("workspace", this.multipleRootMessage());
+      return { report, snapshot: this.snapshot };
+    }
+    const snapshot = await this.refresh();
+    if (snapshot.projectExists) {
+      if (snapshot.mutationBlocked) {
+        const report = bootstrapConflict(snapshot.projectPath, "目前 project.json 存在但 snapshot 有 critical diagnostic；不會自動修復或覆寫既有內容。");
+        await vscode.window.showErrorMessage("DevWeave workspace 有 conflict/diagnostic，初始化未執行。", "Open Dashboard");
+        return { report, snapshot };
+      }
+      const report: BootstrapReport = {
+        ok: true,
+        status: "already_initialized",
+        created: [],
+        adopted: [],
+        skipped: [],
+        conflicts: [],
+        errors: [],
+        rolledBack: []
+      };
+      await vscode.window.showInformationMessage("目前 workspace 已完成 DevWeave 初始化。", "Open Dashboard");
+      return { report, snapshot };
+    }
+    const confirmation = await vscode.window.showWarningMessage(
+      "這會在目前 workspace 建立 DevWeave engine、skill、hook、project、baseline 與 Wiki starter。是否繼續？",
+      { modal: true },
+      "Initialize DevWeave",
+      "Cancel"
+    );
+    if (confirmation !== "Initialize DevWeave") {
+      const report = bootstrapFailure("workspace", "使用者取消初始化；repository 未寫入。");
+      return { report, snapshot };
+    }
+
+    try {
+      const resources = new VscodeBootstrapResourceReader(this.context.extensionUri);
+      const bundle = await readBootstrapBundle(resources) as BootstrapBundle;
+      const report = await this.bootstrapInstaller.install(bundle, resources, new VscodeBootstrapWorkspace(root));
+      const refreshed = await this.refresh();
+      this.output.appendLine(`[bootstrap] ${JSON.stringify(report)}`);
+      if (report.ok) {
+        await vscode.window.showInformationMessage("DevWeave 初始化完成；已重新整理 workspace snapshot。", "Open Dashboard");
+      } else {
+        await vscode.window.showErrorMessage("DevWeave 初始化未完成，請檢查 conflict/error 路徑。", "Open Dashboard");
+      }
+      return { report, snapshot: refreshed };
+    } catch (error) {
+      const report = bootstrapFailure("bootstrap", error instanceof Error ? error.message : String(error));
+      const refreshed = await this.refresh();
+      this.output.appendLine(`[bootstrap] ${JSON.stringify(report)}`);
+      await vscode.window.showErrorMessage("DevWeave bootstrap bundle 無法載入，workspace 未宣稱初始化成功。", "Open Dashboard");
+      return { report, snapshot: refreshed };
+    }
   }
 
   public async copy(intent: ActionIntent): Promise<PromptBundle> {
@@ -259,4 +322,30 @@ function isAllowedDevWeavePath(value: string): boolean {
     || normalized.startsWith("wiki/")
     || normalized === ".codex/hooks.json"
     || normalized.startsWith(".agents/skills/devweave/");
+}
+
+function bootstrapFailure(path: string, reason: string): BootstrapReport {
+  return {
+    ok: false,
+    status: "failed",
+    created: [],
+    adopted: [],
+    skipped: [],
+    conflicts: [],
+    errors: [{ path, reason }],
+    rolledBack: []
+  };
+}
+
+function bootstrapConflict(path: string, reason: string): BootstrapReport {
+  return {
+    ok: false,
+    status: "conflict",
+    created: [],
+    adopted: [],
+    skipped: [],
+    conflicts: [{ path, reason }],
+    errors: [],
+    rolledBack: []
+  };
 }

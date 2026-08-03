@@ -6,6 +6,7 @@ import test from "node:test";
 const extensionRoot = resolve(process.cwd());
 const runtimeFiles = [
   "src/clipboard.ts",
+  "src/bootstrap.ts",
   "src/dashboard.ts",
   "src/extension.ts",
   "src/filesystem.ts",
@@ -15,6 +16,7 @@ const runtimeFiles = [
   "src/snapshot.ts",
   "src/tree.ts",
   "src/vscode-filesystem.ts",
+  "src/vscode-bootstrap.ts",
   "webview/main.ts"
 ];
 
@@ -22,11 +24,16 @@ function runtimeSource(): string {
   return runtimeFiles.map((file) => readFileSync(resolve(extensionRoot, file), "utf8")).join("\n");
 }
 
-test("Extension runtime has no process, shell, repository-write, or external-network path", () => {
+test("Extension runtime has no process, shell, or external-network path and confines writes to bootstrap", () => {
   const source = runtimeSource();
   assert.doesNotMatch(source, /from ["']node:child_process["']|from ["']child_process["']/);
   assert.doesNotMatch(source, /\b(?:exec|execFile|spawn|fork|createTerminal)\s*\(/);
-  assert.doesNotMatch(source, /workspace\.fs\.(?:writeFile|delete|rename)\s*\(/);
+  const extensionSource = readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8");
+  assert.doesNotMatch(extensionSource, /workspace\.fs\.(?:writeFile|delete|rename)\s*\(/);
+  const bootstrapAdapter = readFileSync(resolve(extensionRoot, "src/vscode-bootstrap.ts"), "utf8");
+  assert.match(bootstrapAdapter, /workspace\.fs\.writeFile\s*\(/);
+  assert.match(bootstrapAdapter, /useTrash: false/);
+  assert.match(bootstrapAdapter, /code === "FileNotFound"/);
   assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/);
   assert.doesNotMatch(source, /commands\.executeCommand\s*\(/);
   assert.match(source, /env\.clipboard\.writeText\s*\(/);
@@ -42,13 +49,21 @@ test("package and Webview keep the approved dependency and CSP boundary", () => 
   assert.doesNotMatch(readFileSync(resolve(extensionRoot, "webview/main.ts"), "utf8"), /readText\s*\(\s*item\.rawLog/);
 });
 
-test("all mutation UI routes are preview-first", () => {
+test("workflow mutations remain preview-first and bootstrap uses explicit confirmation", () => {
   const webview = readFileSync(resolve(extensionRoot, "webview/main.ts"), "utf8");
   const dashboard = readFileSync(resolve(extensionRoot, "src/dashboard.ts"), "utf8");
+  const extension = readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8");
+  const protocol = readFileSync(resolve(extensionRoot, "src/protocol.ts"), "utf8");
   assert.match(webview, /data-action="preview"/);
   assert.match(webview, /data-action="confirm-copy"/);
   assert.match(webview, /type: "previewAction"/);
   assert.match(webview, /type: "copyAction"/);
   assert.match(dashboard, /case "previewAction"/);
   assert.match(dashboard, /case "copyAction"/);
+  assert.match(webview, /data-action="initialize"/);
+  assert.match(webview, /type: "initialize"/);
+  assert.match(protocol, /case "initialize"/);
+  assert.match(dashboard, /case "initialize"/);
+  assert.match(extension, /showWarningMessage\([\s\S]*modal: true/);
+  assert.match(extension, /new BootstrapInstaller\(\)/);
 });

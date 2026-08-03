@@ -1,7 +1,9 @@
 import type { ActionIntent, GateName, PromptBundle, RiskLevel, WorkKind, WorkspaceSnapshot } from "./model";
+import type { BootstrapReport } from "./bootstrap";
 
 export type WebviewToHostMessage =
   | { type: "refresh" }
+  | { type: "initialize" }
   | { type: "selectWork"; workId: string | null }
   | { type: "openFile"; path: string }
   | { type: "previewAction"; intent: ActionIntent }
@@ -9,6 +11,7 @@ export type WebviewToHostMessage =
 
 export type HostToWebviewMessage =
   | { type: "snapshot"; snapshot: WorkspaceSnapshot }
+  | { type: "bootstrapResult"; report: BootstrapReport; snapshot: WorkspaceSnapshot }
   | { type: "actionPreview"; bundle: PromptBundle }
   | { type: "copyResult"; ok: true; bundle: PromptBundle }
   | { type: "copyResult"; ok: false; message: string }
@@ -23,6 +26,8 @@ export function parseWebviewMessage(value: unknown): WebviewToHostMessage | null
   switch (record.type) {
     case "refresh":
       return Object.keys(record).every((key) => key === "type") ? { type: "refresh" } : null;
+    case "initialize":
+      return noExtraFields(record, ["type"]) ? { type: "initialize" } : null;
     case "selectWork":
       return (record.workId === null || typeof record.workId === "string")
         ? { type: "selectWork", workId: record.workId }

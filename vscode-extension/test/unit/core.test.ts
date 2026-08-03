@@ -319,6 +319,8 @@ test("Webview protocol accepts typed actions and rejects malformed messages", ()
   assert.deepEqual(parseWebviewMessage({ type: "copyAction", intent: action }), { type: "copyAction", intent: action });
   assert.deepEqual(parseWebviewMessage({ type: "selectWork", workId: null }), { type: "selectWork", workId: null });
   assert.deepEqual(parseWebviewMessage({ type: "refresh" }), { type: "refresh" });
+  assert.deepEqual(parseWebviewMessage({ type: "initialize" }), { type: "initialize" });
+  assert.equal(parseWebviewMessage({ type: "initialize", unexpected: true }), null);
   assert.equal(parseWebviewMessage({ type: "refresh", unexpected: true }), null);
   assert.equal(parseWebviewMessage({ type: "copyAction", intent: { type: "approve" } }), null);
   assert.equal(parseWebviewMessage({ type: "executeCommand", command: "python" }), null);

@@ -28,6 +28,9 @@ Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；`devweave.p
 
 - `vscode-extension/` 是 TypeScript Extension Host、vanilla Webview 與 esbuild bundle；Python DevWeave engine、JSON contract、work state、events、evidence、baseline 與 Wiki 仍是權威來源。
 - `WorkspaceSnapshotReader` 只使用 VS Code workspace file API 讀取 project/work artifacts、evidence、events、baseline、Wiki、hook 與 skill metadata；不呼叫 Python、shell、Git、外部網路或 repository write API，也不自行重建 fingerprint。
+- `BootstrapInstaller` 是受控的唯一 bootstrap write seam；它接收 build-time source-derived bundle 與 workspace filesystem adapter，集中執行 manifest path containment、SHA-256/byte-length integrity、parent/symlink/type preflight、same-byte adoption、idempotence 與 write-failure rollback。
+- `VscodeBootstrapWorkspace` 僅透過 VS Code `workspace.fs` 寫入固定 manifest destinations；`ExtensionController` 只負責 workspace root、native modal confirmation、installer invocation、snapshot refresh 與 result reporting。既有合法 `project.json` 或 critical diagnostic 不會觸發自動重建。
+- `esbuild.mjs` 從 repository 的 DevWeave skill、hook 與 starter templates 產生 VSIX 內 `dist/bootstrap/manifest.json`；每個 source 都有 byte length/SHA-256，runtime 不下載、不執行 source，也不依賴 Codex Chat、Python、shell、Git 或 network 完成 bootstrap。
 - `PromptComposer` 是唯一 action seam，將 `ActionIntent` 轉成 deterministic、repo-relative、sanitized `PromptBundle`；Webview 只能經 `previewAction` 顯示預覽，再由使用者確認 `copyAction` 到 Codex Chat。Extension 不直接執行 mutation。
 - Activity Bar TreeView 提供 repository/work-item navigation；Dashboard/Webview 提供 welcome、doctor、phase/gate、task/evidence、Wiki-first、acceptance 與唯讀 audit projection。多 work item 必須明確選取，不以第一筆資料默選。
 - UI 使用 VS Code theme tokens、Codicons、CSP、ARIA/focus、high-contrast、reduced-motion 與非色彩單獨狀態表達；主要內容保持不透明，僅在控制項使用輕微透明效果。
@@ -38,3 +41,5 @@ Provenance: `20260802-200224-feature-wiki-first`（待 G3 核准）。
 Companion Skills provenance: `20260802-215810-feature-matt-pocock-skills`（待 G3 核准）。
 
 Control Center provenance: `20260803-090218-feature-devweave-control-center-vs-code-extensio`（待 G3 核准）。
+
+Bootstrap provenance: `20260803-112312-feature-vs-code-devweave`（待 G3 核准）。

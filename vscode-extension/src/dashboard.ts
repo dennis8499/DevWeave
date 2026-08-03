@@ -1,9 +1,11 @@
 import * as vscode from "vscode";
+import { BootstrapReport } from "./bootstrap";
 import { ActionIntent, PromptBundle, WorkspaceSnapshot } from "./model";
 import { HostToWebviewMessage, parseWebviewMessage } from "./protocol";
 
 export interface DashboardCallbacks {
   refresh(): Promise<WorkspaceSnapshot>;
+  initialize(): Promise<{ report: BootstrapReport; snapshot: WorkspaceSnapshot }>;
   preview(intent: ActionIntent): Promise<PromptBundle>;
   copy(intent: ActionIntent): Promise<PromptBundle>;
   openFile(relativePath: string): Promise<void>;
@@ -74,6 +76,11 @@ export class DashboardPanel implements vscode.Disposable {
         case "refresh": {
           const snapshot = await this.callbacks.refresh();
           await this.sendSnapshot(snapshot);
+          return;
+        }
+        case "initialize": {
+          const result = await this.callbacks.initialize();
+          await this.sendMessage({ type: "bootstrapResult", report: result.report, snapshot: result.snapshot });
           return;
         }
         case "selectWork":

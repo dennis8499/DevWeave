@@ -1,0 +1,30 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-002",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007"
+  ],
+  "created_at": "2026-08-03T06:12:10+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "f59733fff93ac049e90a15cc44815153e2c61201",
+  "id": "EVID-006",
+  "kind": "regression",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "ae62d5568db2a93f2ef457e8044ff5df4c5128158cf998c09cef68e94a66b9fe",
+  "stale": false,
+  "status": "passed",
+  "summary": "vscode-extension npm test 通過 23/23；BootstrapInstaller blank/conflict/idempotent/hash/path/symlink/rollback/date/Windows-POSIX cases 與既有 snapshot、prompt、protocol、security regression 全數通過。",
+  "tasks": [
+    "TASK-002",
+    "TASK-003",
+    "TASK-004"
+  ]
+}

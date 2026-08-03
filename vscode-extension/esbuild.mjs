@@ -1,10 +1,12 @@
 import { build } from "esbuild";
-import { cp, mkdir, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const production = process.argv.includes("--production");
 const root = fileURLToPath(new URL("./", import.meta.url));
+const repositoryRoot = join(root, "..");
 const outdir = join(root, "dist");
 const esbuildPath = (value) => value.replaceAll("\\", "/");
 const esbuildRoot = esbuildPath(root);
@@ -43,3 +45,105 @@ await build({
 
 await cp(join(root, "webview", "styles.css"), join(outdir, "webview", "styles.css"));
 await cp(join(root, "media", "devweave.svg"), join(outdir, "media", "devweave.svg"));
+
+await createBootstrapBundle(repositoryRoot, outdir);
+
+async function createBootstrapBundle(repo, outputRoot) {
+  const bootstrapRoot = join(outputRoot, "bootstrap");
+  const skillSource = join(repo, ".agents", "skills", "devweave");
+  const hooksSource = join(repo, ".codex", "hooks.json");
+  const assetsRoot = join(skillSource, "assets");
+  const templatesRoot = join(bootstrapRoot, "templates");
+
+  await mkdir(templatesRoot, { recursive: true });
+  await cp(skillSource, join(bootstrapRoot, "skill"), { recursive: true });
+  await cp(hooksSource, join(bootstrapRoot, "hooks.json"));
+  await cp(join(assetsRoot, "baseline-product.md.tmpl"), join(templatesRoot, "baseline-product.md"));
+  await cp(join(assetsRoot, "baseline-architecture.md.tmpl"), join(templatesRoot, "baseline-architecture.md"));
+  await cp(join(assetsRoot, "baseline-quality.md.tmpl"), join(templatesRoot, "baseline-quality.md"));
+  await cp(join(assetsRoot, "wiki", "starter", "index.md.tmpl"), join(templatesRoot, "wiki-index.md"));
+  await cp(join(assetsRoot, "wiki", "starter", "overview.md.tmpl"), join(templatesRoot, "wiki-overview.md"));
+  await cp(join(assetsRoot, "wiki", "starter", "log.md.tmpl"), join(templatesRoot, "wiki-log.md"));
+  await writeFile(join(templatesRoot, "project.json"), `${JSON.stringify(defaultProject(), null, 2)}\n`, "utf8");
+
+  const directories = [
+    ".devweave",
+    ".devweave/cache",
+    ".devweave/cache/sessions",
+    ".devweave/work-items",
+    ".devweave/baseline",
+    ".devweave/baseline/capabilities",
+    "wiki",
+    "wiki/architecture",
+    "wiki/modules",
+    "wiki/entities",
+    "wiki/patterns",
+    "wiki/decisions",
+    "wiki/dependencies",
+    "wiki/guides",
+    "wiki/synthesis"
+  ];
+  const fileMappings = [
+    { source: "hooks.json", destination: ".codex/hooks.json", transform: "copy" },
+    { source: "templates/project.json", destination: ".devweave/project.json", transform: "copy" },
+    { source: "templates/baseline-product.md", destination: ".devweave/baseline/product.md", transform: "copy" },
+    { source: "templates/baseline-architecture.md", destination: ".devweave/baseline/architecture.md", transform: "copy" },
+    { source: "templates/baseline-quality.md", destination: ".devweave/baseline/quality.md", transform: "copy" },
+    { source: "templates/wiki-index.md", destination: "wiki/index.md", transform: "date" },
+    { source: "templates/wiki-overview.md", destination: "wiki/overview.md", transform: "date" },
+    { source: "templates/wiki-log.md", destination: "wiki/log.md", transform: "date" }
+  ];
+  const skillFiles = await collectFiles(join(bootstrapRoot, "skill"));
+  for (const source of skillFiles) {
+    fileMappings.push({
+      source: `skill/${source}`,
+      destination: `.agents/skills/devweave/${source.replaceAll("\\", "/")}`,
+      transform: "copy"
+    });
+  }
+
+  const files = [];
+  for (const mapping of fileMappings) {
+    const bytes = await readFile(join(bootstrapRoot, mapping.source));
+    files.push({
+      source: mapping.source.replaceAll("\\", "/"),
+      destination: mapping.destination,
+      transform: mapping.transform,
+      byteLength: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex")
+    });
+  }
+  await writeFile(join(bootstrapRoot, "manifest.json"), `${JSON.stringify({
+    schemaVersion: 1,
+    bundleVersion: "0.1.0",
+    directories,
+    files
+  }, null, 2)}\n`, "utf8");
+}
+
+async function collectFiles(directory, prefix = "") {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const relative = prefix ? join(prefix, entry.name) : entry.name;
+    if (entry.isDirectory()) {
+      files.push(...await collectFiles(join(directory, entry.name), relative));
+    } else if (entry.isFile()) {
+      files.push(relative);
+    }
+  }
+  return files;
+}
+
+function defaultProject() {
+  return {
+    schema_version: 1,
+    managed: true,
+    locale: "zh-TW",
+    commands: [],
+    verification_profiles: { low: [], standard: [], high: [] },
+    protected_mutations: ["product-code", "tests", "schema", "dependencies", "build", "ci"],
+    evidence: { raw_log_limit_bytes: 5000000, version_summaries: true },
+    knowledge: { enabled: true, root: "wiki" }
+  };
+}

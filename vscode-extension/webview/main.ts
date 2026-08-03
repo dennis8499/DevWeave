@@ -18,6 +18,12 @@ window.addEventListener("message", (event) => {
     selectedWorkId = snapshot.selectedWorkId ?? snapshot.workItems?.[0]?.id ?? null;
     render();
   }
+  if (message.type === "bootstrapResult") {
+    snapshot = message.snapshot;
+    selectedWorkId = snapshot.selectedWorkId ?? snapshot.workItems?.[0]?.id ?? null;
+    render();
+    renderBootstrapResult(message.report);
+  }
   if (message.type === "copyResult") {
     renderCopyResult(message);
   }
@@ -39,6 +45,8 @@ document.addEventListener("click", (event) => {
   const action = button.dataset.action;
   if (action === "refresh") {
     api.postMessage({ type: "refresh" });
+  } else if (action === "initialize") {
+    api.postMessage({ type: "initialize" });
   } else if (action === "preview") {
     const intent = parseIntent(button.dataset.intent);
     if (intent) {
@@ -135,12 +143,13 @@ function renderRepositoryState(): string {
   const current = snapshot;
   const managed = current.managed === true ? "Managed" : current.managed === false ? "Explicit activation required" : "Not initialized";
   const action = current.mutationBlocked
-    ? { type: "doctor" }
-    : current.projectExists ? { type: "status", all: true } : { type: "init", goal: "建立第一個可驗證的 DevWeave work item" };
-  const actionLabel = current.mutationBlocked ? "Copy diagnostic prompt" : current.projectExists ? "Copy status refresh" : "Copy initialization prompt";
+    ? quickIntentButton({ type: "doctor" }, "Copy diagnostic prompt", "primary")
+    : current.projectExists
+      ? quickIntentButton({ type: "status", all: true }, "Copy status refresh", "primary")
+      : `<button class="primary" data-action="initialize">Initialize DevWeave</button>`;
   return `<section class="hero-card">
-    <div><span class="pill ${current.managed === true ? "success" : "warning"}">${escapeHtml(managed)}</span><h2>${current.projectExists ? "DevWeave is ready to inspect" : "Start with DevWeave initialization"}</h2><p class="muted">Extension 不會執行 CLI；所有狀態變更都必須經 Codex Chat 與既有 gate。</p></div>
-    ${quickIntentButton(action, actionLabel, "primary")}
+    <div><span class="pill ${current.managed === true ? "success" : "warning"}">${escapeHtml(managed)}</span><h2>${current.projectExists ? "DevWeave is ready to inspect" : "Start with DevWeave initialization"}</h2><p class="muted">${current.projectExists ? "既有 workflow action 仍會先 preview 並由 Codex Chat 執行。" : "確認後由 Extension 直接建立 DevWeave runtime、project、baseline 與 Wiki starter。"}</p></div>
+    ${action}
   </section>${renderRepositoryMetadata(current)}`;
 }
 
@@ -351,6 +360,18 @@ function renderCopyResult(message: any): void {
   panel.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 }
 
+function renderBootstrapResult(report: any): void {
+  const panel = document.querySelector<HTMLElement>("#copy-preview");
+  if (!panel) return;
+  const list = (values: string[]) => values?.length ? `<ul>${values.map((value) => `<li><code>${escapeHtml(value)}</code></li>`).join("")}</ul>` : "<p class=\"muted\">none</p>";
+  const conflicts = (report.conflicts ?? []).map((item: any) => `<li><code>${escapeHtml(item.path)}</code> · ${escapeHtml(item.reason)}</li>`).join("");
+  const errors = (report.errors ?? []).map((item: any) => `<li><code>${escapeHtml(item.path)}</code> · ${escapeHtml(item.reason)}</li>`).join("");
+  panel.classList.remove("hidden");
+  panel.innerHTML = `<div class="preview-heading"><div><p class="eyebrow">DEVWEAVE BOOTSTRAP</p><h2>${report.ok ? "Initialization complete" : "Initialization not completed"}</h2></div><span class="pill ${report.ok ? "success" : "danger"}">${escapeHtml(report.status ?? "failed")}</span></div><p class="muted">這次操作未經 Codex Chat；Extension 只寫入固定 bootstrap manifest 目標。</p><h3>Created</h3>${list(report.created ?? [])}<h3>Adopted</h3>${list(report.adopted ?? [])}<h3>Skipped</h3>${list(report.skipped ?? [])}${conflicts ? `<h3>Conflicts</h3><ul>${conflicts}</ul>` : ""}${errors ? `<h3>Errors</h3><ul>${errors}</ul>` : ""}${(report.rolledBack ?? []).length ? `<h3>Rolled back</h3>${list(report.rolledBack)}` : ""}`;
+  setStatus(report.ok ? "DevWeave bootstrap 完成。" : "DevWeave bootstrap 未完成，請先處理 conflict/error。", !report.ok);
+  panel.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+}
+
 function setStatus(message: string, error: boolean): void {
   const status = document.querySelector<HTMLElement>("#copy-status");
   if (status) {
@@ -375,7 +396,7 @@ function parseIntent(value: string | undefined): ActionIntent | null {
 function isHostMessage(value: unknown): value is HostToWebviewMessage {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const type = (value as { type?: unknown }).type;
-  return type === "snapshot" || type === "actionPreview" || type === "copyResult" || type === "protocolError" || type === "error";
+  return type === "snapshot" || type === "bootstrapResult" || type === "actionPreview" || type === "copyResult" || type === "protocolError" || type === "error";
 }
 
 function icon(status: string): string {

@@ -1,7 +1,7 @@
 {
   "name": "devweave-control-center",
   "displayName": "DevWeave Control Center",
-  "description": "A read-only DevWeave dashboard and Codex Chat prompt composer for VS Code.",
+  "description": "A DevWeave dashboard with confirmed workspace bootstrap and Codex Chat prompt composition for VS Code.",
   "version": "0.1.0",
   "publisher": "devweave",
   "license": "MIT",
@@ -21,6 +21,7 @@
   "activationEvents": [
     "onView:devweave.workItems",
     "onCommand:devweave.openDashboard",
+    "onCommand:devweave.initialize",
     "onCommand:devweave.refresh",
     "onCommand:devweave.copyNextAction",
     "workspaceContains:.devweave/project.json"
@@ -50,6 +51,10 @@
         "title": "DevWeave: Open Control Center"
       },
       {
+        "command": "devweave.initialize",
+        "title": "DevWeave: Initialize Workspace"
+      },
+      {
         "command": "devweave.refresh",
         "title": "DevWeave: Refresh Snapshot"
       },
@@ -72,6 +77,10 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "devweave.initialize",
+          "when": "workbenchState != empty"
+        },
         {
           "command": "devweave.copyNextAction",
           "when": "resourceLangId == markdown"

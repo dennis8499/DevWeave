@@ -7,6 +7,7 @@ async function run() {
   await extension.activate();
   const commands = await vscode.commands.getCommands(true);
   assert.ok(commands.includes("devweave.openDashboard"));
+  assert.ok(commands.includes("devweave.initialize"));
   assert.ok(commands.includes("devweave.refresh"));
   assert.ok(commands.includes("devweave.copyNextAction"));
 }
