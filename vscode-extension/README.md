@@ -41,3 +41,15 @@ Codebase Wiki bootstrap 有三個等價入口：公開命令下拉選單、Knowl
 表單不提供 Doctor、Validate、Task、Knowledge、Evidence、Close、gate 參數或任意 `ActionIntent JSON` composer。`approve` 只帶 work ID；目前 gate 仍在 Dashboard 中唯讀呈現。
 
 Extension 會明確標示 `Filesystem snapshot`、`Last engine-observed state` 與 refresh warning；它不會自行執行 `sync_state` 或重建 fingerprint。
+
+## 打包方式
+
+```
+cd .\vscode-extension
+
+# 先產生 production bundle
+npm run package
+
+# 再封裝成 VSIX
+npx --yes @vscode/vsce package --allow-missing-repository
+```
