@@ -1,0 +1,29 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-003",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-012"
+  ],
+  "created_at": "2026-08-03T02:29:34+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "99a71cafeb734362336ed73345f8c987908bf2ff",
+  "id": "EVID-005",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "bb39093d76b9d10da67b47ba7c805f0101d3a5c67d33c9bfd81a037de57d0b1e",
+  "stale": false,
+  "status": "passed",
+  "summary": "Dashboard/Webview UI now exposes next safe action, G1/G2/G3 track, artifact trace, task board, verification command/evidence metadata, acceptance baseline/Wiki/waiver state, audit log, snapshot freshness, Wiki index-first rule and VS Code-token accessibility styling; multiple work selection is explicit.",
+  "tasks": [
+    "TASK-005"
+  ]
+}

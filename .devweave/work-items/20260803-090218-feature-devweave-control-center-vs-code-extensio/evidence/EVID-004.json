@@ -1,0 +1,27 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-002",
+    "AC-005",
+    "AC-010",
+    "AC-014"
+  ],
+  "created_at": "2026-08-03T02:22:39+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "99a71cafeb734362336ed73345f8c987908bf2ff",
+  "id": "EVID-004",
+  "kind": "test",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "28f437f534c5ddb8a41da4741c59080c0b96aa7f47c9624749205a6417482a7a",
+  "stale": false,
+  "status": "passed",
+  "summary": "Typed Webview protocol round-trip/malformed-message tests, clipboard adapter seam, debounced workspace watchers, safe DevWeave file opener and production bundle pass; no command execution or repository write API is present in Extension runtime.",
+  "tasks": [
+    "TASK-004"
+  ]
+}

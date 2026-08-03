@@ -1,0 +1,97 @@
+{
+  "name": "devweave-control-center",
+  "displayName": "DevWeave Control Center",
+  "description": "A read-only DevWeave dashboard and Codex Chat prompt composer for VS Code.",
+  "version": "0.1.0",
+  "publisher": "devweave",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "DevWeave",
+    "SDLC",
+    "Codex",
+    "workflow"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onView:devweave.workItems",
+    "onCommand:devweave.openDashboard",
+    "onCommand:devweave.refresh",
+    "onCommand:devweave.copyNextAction",
+    "workspaceContains:.devweave/project.json"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "devweave",
+          "title": "DevWeave",
+          "icon": "./media/devweave.svg"
+        }
+      ]
+    },
+    "views": {
+      "devweave": [
+        {
+          "id": "devweave.workItems",
+          "name": "Work Items",
+          "when": "workbenchState != empty"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "devweave.openDashboard",
+        "title": "DevWeave: Open Control Center"
+      },
+      {
+        "command": "devweave.refresh",
+        "title": "DevWeave: Refresh Snapshot"
+      },
+      {
+        "command": "devweave.copyNextAction",
+        "title": "DevWeave: Copy Next Action to Codex Chat"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "devweave.openDashboard",
+          "when": "view == devweave.workItems",
+          "group": "navigation@1"
+        },
+        {
+          "command": "devweave.refresh",
+          "when": "view == devweave.workItems",
+          "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "devweave.copyNextAction",
+          "when": "resourceLangId == markdown"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "package": "node esbuild.mjs --production",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"test/unit/**/*.test.ts\"",
+    "test:smoke": "npm run build && tsx test/smoke.test.ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/node": "^22.10.0",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

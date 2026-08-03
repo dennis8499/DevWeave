@@ -2,6 +2,69 @@
   "commands": [
     {
       "argv": [
+        "npm.cmd",
+        "run",
+        "package"
+      ],
+      "cwd": "vscode-extension",
+      "id": "extension-package",
+      "required_for": [
+        "high",
+        "low",
+        "standard"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "argv": [
+        "npm.cmd",
+        "run",
+        "test:smoke"
+      ],
+      "cwd": "vscode-extension",
+      "id": "extension-smoke",
+      "required_for": [
+        "high",
+        "standard"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "argv": [
+        "node.exe",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "test/unit/core.test.ts",
+        "test/unit/security.test.ts"
+      ],
+      "cwd": "vscode-extension",
+      "id": "extension-tests",
+      "required_for": [
+        "high",
+        "low",
+        "standard"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "argv": [
+        "npm.cmd",
+        "run",
+        "typecheck"
+      ],
+      "cwd": "vscode-extension",
+      "id": "extension-typecheck",
+      "required_for": [
+        "high",
+        "low",
+        "standard"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "argv": [
         "python",
         "-B",
         "-m",
@@ -42,12 +105,23 @@
   "schema_version": 1,
   "verification_profiles": {
     "high": [
+      "extension-package",
+      "extension-smoke",
+      "extension-tests",
+      "extension-typecheck",
       "unit-tests"
     ],
     "low": [
+      "extension-package",
+      "extension-tests",
+      "extension-typecheck",
       "unit-tests"
     ],
     "standard": [
+      "extension-package",
+      "extension-smoke",
+      "extension-tests",
+      "extension-typecheck",
       "unit-tests"
     ]
   }

@@ -1,0 +1,37 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013",
+    "AC-014"
+  ],
+  "created_at": "2026-08-03T02:58:28+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "99a71cafeb734362336ed73345f8c987908bf2ff",
+  "id": "EVID-015",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "77dc8e7b6563f73a4b37b47b3b6397357e67851a8323e4e8350a9dc6596dfa8b",
+  "stale": false,
+  "status": "passed",
+  "summary": "高風險獨立 code review：確認 Extension 只使用 workspace.fs read/stat/readDirectory 與 clipboard API；無 child_process、shell、repository write、Git、Codex execution 或 external network；Webview strict CSP、typed fail-closed protocol、repo-relative path/credential/raw-log sanitization、schema/legacy compatibility、bounded reads、watcher freshness warning、TreeView/Webview accessibility tokens 與 copy-only governance warning 均符合 approved design。Rollback 為停用或移除 vscode-extension，不需 state migration；command profiles 僅由 DevWeave engine 管理。",
+  "tasks": [
+    "TASK-009"
+  ]
+}

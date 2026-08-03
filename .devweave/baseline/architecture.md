@@ -24,6 +24,17 @@ Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；`devweave.p
 - Hook 是 Codex guardrail 而非 OS sandbox，G3 必須重新 reconcile 完整 Wiki diff。
 - Companion Skills 採精確 allowlist 與未修改的 project-local copies；不安裝 Matt Pocock 的 setup/spec/ticket/implement orchestration。Instruction conflict 由 root policy 解決，upstream 更新必須建立新的 DevWeave feature。
 
+## DevWeave Control Center VS Code Extension
+
+- `vscode-extension/` 是 TypeScript Extension Host、vanilla Webview 與 esbuild bundle；Python DevWeave engine、JSON contract、work state、events、evidence、baseline 與 Wiki 仍是權威來源。
+- `WorkspaceSnapshotReader` 只使用 VS Code workspace file API 讀取 project/work artifacts、evidence、events、baseline、Wiki、hook 與 skill metadata；不呼叫 Python、shell、Git、外部網路或 repository write API，也不自行重建 fingerprint。
+- `PromptComposer` 是唯一 action seam，將 `ActionIntent` 轉成 deterministic、repo-relative、sanitized `PromptBundle`；Webview 只能經 `previewAction` 顯示預覽，再由使用者確認 `copyAction` 到 Codex Chat。Extension 不直接執行 mutation。
+- Activity Bar TreeView 提供 repository/work-item navigation；Dashboard/Webview 提供 welcome、doctor、phase/gate、task/evidence、Wiki-first、acceptance 與唯讀 audit projection。多 work item 必須明確選取，不以第一筆資料默選。
+- UI 使用 VS Code theme tokens、Codicons、CSP、ARIA/focus、high-contrast、reduced-motion 與非色彩單獨狀態表達；主要內容保持不透明，僅在控制項使用輕微透明效果。
+- `extension-typecheck`、`extension-tests`、`extension-package` 與 `extension-smoke` 透過 DevWeave command profiles 管理；Extension 不提供 branch、commit、push、PR、release、版本比較或還原。
+
 Provenance: `20260802-200224-feature-wiki-first`（待 G3 核准）。
 
 Companion Skills provenance: `20260802-215810-feature-matt-pocock-skills`（待 G3 核准）。
+
+Control Center provenance: `20260803-090218-feature-devweave-control-center-vs-code-extensio`（待 G3 核准）。
