@@ -1,7 +1,7 @@
 {
   "name": "devweave-control-center",
   "displayName": "DevWeave Control Center",
-  "description": "A DevWeave dashboard with confirmed workspace bootstrap and Codex Chat prompt composition for VS Code.",
+  "description": "A DevWeave readonly dashboard with confirmed workspace bootstrap and public Codex Chat command composition for VS Code.",
   "version": "0.1.0",
   "publisher": "devweave",
   "license": "MIT",
@@ -60,7 +60,7 @@
       },
       {
         "command": "devweave.copyNextAction",
-        "title": "DevWeave: Copy Next Action to Codex Chat"
+        "title": "DevWeave: Copy public $devweave next to Codex Chat"
       }
     ],
     "menus": {

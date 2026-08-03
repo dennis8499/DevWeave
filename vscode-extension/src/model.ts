@@ -148,41 +148,25 @@ export interface WorkspaceSnapshot {
   selectedWorkId: string | null;
 }
 
-export type ActionIntent =
-  | { type: "init"; goal?: string }
-  | { type: "doctor" }
-  | { type: "project" }
-  | { type: "commandList" }
-  | { type: "commandSet"; id: string; cwd: string; argv: string[]; timeout: number; requiredFor: RiskLevel[] }
-  | { type: "commandRemove"; id: string }
-  | { type: "start"; kind: WorkKind; title: string; risk: RiskLevel; rationale: string }
-  | { type: "status"; workId?: string; all?: boolean }
-  | { type: "instructions"; workId: string }
-  | { type: "validate"; workId: string; gate?: GateName }
-  | { type: "bind"; workId: string }
-  | { type: "risk"; workId: string; level: RiskLevel; rationale: string; downgradeRationale?: string }
-  | { type: "scope"; workId: string; paths: string[]; rationale: string }
-  | { type: "baseline"; workId: string; targets: string[]; rationale: string }
-  | { type: "knowledgeStatus"; workId?: string }
-  | { type: "knowledgeContext"; workId: string; pages: string[]; gaps: string[] }
-  | { type: "knowledgePlan"; workId: string; upserts: string[]; deletes: string[]; rationale: string }
-  | { type: "knowledgeSeal"; workId: string; pages: string[] }
-  | { type: "taskStart"; workId: string; taskId: string }
-  | { type: "taskComplete"; workId: string; taskId: string; evidence?: string[]; note?: string }
-  | { type: "taskBlock"; workId: string; taskId: string; note: string }
-  | { type: "evidenceAdd"; workId: string; kind: string; status: "passed" | "failed" | "waived"; summary: string; covers: string[]; tasks: string[]; observedResult?: string; bindsCurrentSource?: boolean }
-  | { type: "verify"; workId: string; command: string; kind: string; covers: string[]; tasks: string[]; expect?: "zero" | "nonzero" | "any" }
-  | { type: "waiverAdd"; workId: string; kind: string; target: string; reason: string; gate?: GateName }
-  | { type: "approve"; workId: string; gate?: GateName }
-  | { type: "revise"; workId: string; from: "requirements" | "design" | "implementation"; reason: string }
-  | { type: "close"; workId: string };
+export type PublicCommandName = "new" | "feature" | "refactor" | "bug" | "next" | "status" | "revise" | "approve";
+
+export type PublicCommandIntent =
+  | { type: "new"; goal: string }
+  | { type: "feature"; request: string }
+  | { type: "refactor"; request: string }
+  | { type: "bug"; symptom: string }
+  | { type: "next"; workId?: string }
+  | { type: "status"; workId?: string }
+  | { type: "revise"; workId: string; change: string }
+  | { type: "approve"; workId: string };
+
+// Keep the established name as a public-only compatibility alias for callers inside the extension.
+export type ActionIntent = PublicCommandIntent;
 
 export interface PromptBundle {
   chatText: string;
-  machineCommand?: string;
+  command: PublicCommandName;
   workId?: string;
-  gate?: GateName;
-  targetPaths: string[];
   warnings: string[];
   mutation: boolean;
 }

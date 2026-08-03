@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FileSystemPort, DirectoryEntry } from "../../src/filesystem";
-import { ActionIntent, WorkspaceSnapshot } from "../../src/model";
+import { PublicCommandIntent, WorkspaceSnapshot } from "../../src/model";
 import { DevWeavePromptComposer } from "../../src/prompt";
-import { parseActionIntent, parseWebviewMessage } from "../../src/protocol";
+import { parsePublicCommandIntent, parseWebviewMessage } from "../../src/protocol";
 import { WorkspaceSnapshotReader } from "../../src/snapshot";
 
 class MemoryFileSystem implements FileSystemPort {
@@ -221,101 +221,87 @@ test("snapshot reader marks stale Wiki metadata and missing hook without rebuild
   assert.equal(snapshot.knowledge.pages.find((page) => page.path === "wiki/stale.md")?.computedSourceFingerprint, "new");
 });
 
-test("prompt composition is deterministic, repo-relative, and shell-safe", () => {
+test("public prompt composition is deterministic, sanitized, and machine-command free", () => {
   const composer = new DevWeavePromptComposer();
   const snapshot = snapshotFixture();
-  const intent: ActionIntent = {
-    type: "commandSet",
-    id: "safe-command",
-    cwd: ".",
-    argv: ["python", "-B", "-m", "unittest", "discover"],
-    timeout: 120,
-    requiredFor: ["high", "standard"]
+  const intent: PublicCommandIntent = {
+    type: "feature",
+    request: "Review C:\\Users\\owner\\repo; ghp_1234567890123456"
   };
   const first = composer.compose(intent, snapshot);
   const second = composer.compose(intent, snapshot);
 
   assert.deepEqual(first, second);
-  assert.match(first.machineCommand ?? "", /--required-for "high" "standard"/);
-  assert.match(first.machineCommand ?? "", /-- "python"/);
+  assert.equal(first.command, "feature");
+  assert.equal(first.chatText.startsWith("$devweave feature "), true);
   assert.equal(first.mutation, true);
-  assert.deepEqual(first.targetPaths, [".devweave/project.json"]);
+  assert.equal("machineCommand" in first, false);
+  assert.equal("targetPaths" in first, false);
+  assert.equal("gate" in first, false);
   assert.equal(first.chatText.includes("C:\\"), false);
   assert.equal(first.chatText.includes("|"), false);
-  assert.equal(first.chatText.includes("secret"), false);
+  assert.equal(first.chatText.includes("ghp_1234567890123456"), false);
 });
 
 test("prompt composer redacts absolute paths and credential-like values", () => {
   const composer = new DevWeavePromptComposer();
   const bundle = composer.compose({
-    type: "scope",
-    workId: "demo",
-    paths: ["C:\\Users\\owner\\repo", "src"],
-    rationale: "Review C:\\Users\\owner\\repo; ghp_1234567890123456"
+    type: "bug",
+    symptom: "Review C:\\Users\\owner\\repo; ghp_1234567890123456"
   }, snapshotFixture());
 
   assert.equal(bundle.chatText.includes("C:\\Users"), false);
   assert.equal(bundle.chatText.includes("ghp_1234567890123456"), false);
-  assert.deepEqual(bundle.targetPaths, ["[invalid-repo-relative-path]", "src"]);
   assert.ok(bundle.warnings.some((warning) => warning.includes("absolute")));
   assert.ok(bundle.warnings.some((warning) => warning.includes("credential")));
 });
 
-test("mutation prompt is disabled when the snapshot has a critical diagnostic", () => {
+test("mutation public prompt is disabled when the snapshot has a critical diagnostic", () => {
   const composer = new DevWeavePromptComposer();
   const snapshot = { ...snapshotFixture(), mutationBlocked: true, diagnostics: [{ severity: "critical" as const, code: "json_parse", message: "invalid" }] };
-  const bundle = composer.compose({ type: "taskStart", workId: "demo", taskId: "TASK-001" }, snapshot);
-
-  assert.equal(bundle.mutation, true);
-  assert.equal(bundle.machineCommand, undefined);
-  assert.match(bundle.chatText, /read-only diagnostic state/);
-  assert.ok(bundle.warnings.some((warning) => warning.includes("mutation prompt")));
+  assert.throws(() => composer.compose({ type: "feature", request: "Feature" }, snapshot), /read-only diagnostic state/);
+  assert.equal(composer.compose({ type: "status" }, snapshot).chatText, "$devweave status");
 });
 
-test("every ActionIntent produces a preview bundle", () => {
+test("every public command produces the documented command text", () => {
   const composer = new DevWeavePromptComposer();
   const snapshot = snapshotFixture();
-  const intents: ActionIntent[] = [
-    { type: "init", goal: "bootstrap" },
-    { type: "doctor" },
-    { type: "project" },
-    { type: "commandList" },
-    { type: "commandSet", id: "x", cwd: ".", argv: ["echo", "ok"], timeout: 10, requiredFor: [] },
-    { type: "commandRemove", id: "x" },
-    { type: "start", kind: "feature", title: "Feature", risk: "standard", rationale: "Need it" },
-    { type: "status", all: true },
-    { type: "instructions", workId: "demo" },
-    { type: "validate", workId: "demo", gate: "build" },
-    { type: "bind", workId: "demo" },
-    { type: "risk", workId: "demo", level: "high", rationale: "Impact" },
-    { type: "scope", workId: "demo", paths: ["vscode-extension/**"], rationale: "Boundary" },
-    { type: "baseline", workId: "demo", targets: ["architecture"], rationale: "Record" },
-    { type: "knowledgeStatus", workId: "demo" },
-    { type: "knowledgeContext", workId: "demo", pages: ["wiki/index.md"], gaps: ["placeholder"] },
-    { type: "knowledgePlan", workId: "demo", upserts: ["wiki/overview.md"], deletes: [], rationale: "Refresh" },
-    { type: "knowledgeSeal", workId: "demo", pages: ["wiki/overview.md"] },
-    { type: "taskStart", workId: "demo", taskId: "TASK-001" },
-    { type: "taskComplete", workId: "demo", taskId: "TASK-001", evidence: ["evidence-1"] },
-    { type: "taskBlock", workId: "demo", taskId: "TASK-001", note: "Blocked" },
-    { type: "evidenceAdd", workId: "demo", kind: "test", status: "passed", summary: "Passed", covers: ["AC-001"], tasks: ["TASK-001"] },
-    { type: "verify", workId: "demo", command: "unit-tests", kind: "test", covers: ["AC-001"], tasks: ["TASK-001"], expect: "zero" },
-    { type: "waiverAdd", workId: "demo", kind: "risk", target: "AC-001", reason: "Accepted", gate: "build" },
-    { type: "approve", workId: "demo", gate: "build" },
-    { type: "revise", workId: "demo", from: "design", reason: "Change" },
-    { type: "close", workId: "demo" }
+  const cases: Array<[PublicCommandIntent, string, boolean]> = [
+    [{ type: "new", goal: "建立第一個切片" }, "$devweave new 建立第一個切片", true],
+    [{ type: "feature", request: "新增 CSV 匯出" }, "$devweave feature 新增 CSV 匯出", true],
+    [{ type: "refactor", request: "整理 prompt seam" }, "$devweave refactor 整理 prompt seam", true],
+    [{ type: "bug", symptom: "初始化失敗" }, "$devweave bug 初始化失敗", true],
+    [{ type: "next", workId: "demo" }, "$devweave next demo", false],
+    [{ type: "next" }, "$devweave next", false],
+    [{ type: "status", workId: "demo" }, "$devweave status demo", false],
+    [{ type: "status" }, "$devweave status", false],
+    [{ type: "revise", workId: "demo", change: "調整公開命令欄位" }, "$devweave revise demo 調整公開命令欄位", true],
+    [{ type: "approve", workId: "demo" }, "$devweave approve demo", true]
   ];
 
-  for (const intent of intents) {
+  for (const [intent, expected, mutation] of cases) {
     const bundle = composer.compose(intent, snapshot);
-    assert.ok(bundle.chatText.length > 0, intent.type);
-    assert.ok(bundle.machineCommand?.startsWith("python -B .agents/skills/devweave/scripts/devweave.py --repo ."), intent.type);
-    assert.equal(bundle.chatText.includes(".devweave/work-items/"), false, intent.type);
+    assert.equal(bundle.chatText, expected, intent.type);
+    assert.equal(bundle.command, intent.type, intent.type);
+    assert.equal(bundle.mutation, mutation, intent.type);
+    assert.equal(bundle.chatText.includes("python"), false, intent.type);
+    assert.equal(bundle.chatText.includes("--repo"), false, intent.type);
+    assert.equal(bundle.chatText.includes("gate"), false, intent.type);
   }
 });
 
-test("Webview protocol accepts typed actions and rejects malformed messages", () => {
-  const action: ActionIntent = { type: "approve", workId: "demo", gate: "build" };
-  assert.deepEqual(parseActionIntent(action), action);
+test("public Webview protocol accepts public intents and rejects machine actions", () => {
+  const action: PublicCommandIntent = { type: "approve", workId: "demo" };
+  assert.deepEqual(parsePublicCommandIntent(action), action);
+  assert.deepEqual(parsePublicCommandIntent({ type: "next" }), { type: "next" });
+  assert.deepEqual(parsePublicCommandIntent({ type: "next", workId: "demo" }), { type: "next", workId: "demo" });
+  assert.deepEqual(parsePublicCommandIntent({ type: "status" }), { type: "status" });
+  assert.deepEqual(parsePublicCommandIntent({ type: "status", workId: "demo" }), { type: "status", workId: "demo" });
+  assert.equal(parsePublicCommandIntent({ type: "feature", request: "   " }), null);
+  assert.equal(parsePublicCommandIntent({ type: "bug", symptom: "" }), null);
+  assert.equal(parsePublicCommandIntent({ type: "revise", workId: "", change: "change" }), null);
+  assert.equal(parsePublicCommandIntent({ type: "revise", workId: "demo", change: "   " }), null);
+  assert.equal(parsePublicCommandIntent({ type: "approve" }), null);
   assert.deepEqual(parseWebviewMessage({ type: "copyAction", intent: action }), { type: "copyAction", intent: action });
   assert.deepEqual(parseWebviewMessage({ type: "selectWork", workId: null }), { type: "selectWork", workId: null });
   assert.deepEqual(parseWebviewMessage({ type: "refresh" }), { type: "refresh" });
@@ -324,5 +310,11 @@ test("Webview protocol accepts typed actions and rejects malformed messages", ()
   assert.equal(parseWebviewMessage({ type: "refresh", unexpected: true }), null);
   assert.equal(parseWebviewMessage({ type: "copyAction", intent: { type: "approve" } }), null);
   assert.equal(parseWebviewMessage({ type: "executeCommand", command: "python" }), null);
-  assert.equal(parseActionIntent({ type: "taskStart", workId: "demo" }), null);
+  assert.equal(parsePublicCommandIntent({ type: "doctor" }), null);
+  assert.equal(parsePublicCommandIntent({ type: "commandSet", id: "x" }), null);
+  assert.equal(parsePublicCommandIntent({ type: "taskStart", workId: "demo" }), null);
+  assert.equal(parsePublicCommandIntent({ type: "knowledgePlan", workId: "demo" }), null);
+  assert.equal(parsePublicCommandIntent({ type: "close", workId: "demo" }), null);
+  assert.equal(parsePublicCommandIntent({ type: "revise", workId: "demo" }), null);
+  assert.equal(parsePublicCommandIntent({ type: "approve", workId: "demo", gate: "build" }), null);
 });

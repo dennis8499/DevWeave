@@ -54,10 +54,15 @@ test("workflow mutations remain preview-first and bootstrap uses explicit confir
   const dashboard = readFileSync(resolve(extensionRoot, "src/dashboard.ts"), "utf8");
   const extension = readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8");
   const protocol = readFileSync(resolve(extensionRoot, "src/protocol.ts"), "utf8");
-  assert.match(webview, /data-action="preview"/);
+  assert.match(webview, /id="public-command-form"/);
+  assert.match(webview, /Preview public command/);
   assert.match(webview, /data-action="confirm-copy"/);
   assert.match(webview, /type: "previewAction"/);
   assert.match(webview, /type: "copyAction"/);
+  assert.match(webview, /new.*feature.*refactor.*bug.*next.*status.*revise.*approve/s);
+  assert.doesNotMatch(webview, /ActionIntent JSON|compose-json|data-intent/);
+  assert.doesNotMatch(webview, /type: "(?:doctor|commandSet|taskStart|knowledgePlan|close|validate)"/);
+  assert.doesNotMatch(webview, /targetPaths|machineCommand|bundle\.gate/);
   assert.match(dashboard, /case "previewAction"/);
   assert.match(dashboard, /case "copyAction"/);
   assert.match(webview, /data-action="initialize"/);

@@ -3,7 +3,7 @@ import { BootstrapBundle, BootstrapInstaller, BootstrapReport } from "./bootstra
 import { ClipboardAdapter, VscodeClipboardAdapter } from "./clipboard";
 import { DashboardPanel } from "./dashboard";
 import { FileSystemPort } from "./filesystem";
-import { ActionIntent, Diagnostic, PromptBundle, WorkspaceSnapshot } from "./model";
+import { Diagnostic, PromptBundle, PublicCommandIntent, WorkspaceSnapshot } from "./model";
 import { DevWeavePromptComposer } from "./prompt";
 import { WorkspaceSnapshotReader } from "./snapshot";
 import { WorkItemsTreeProvider } from "./tree";
@@ -126,7 +126,7 @@ class ExtensionController {
     void this.refresh();
   }
 
-  public async preview(intent: ActionIntent): Promise<PromptBundle> {
+  public async preview(intent: PublicCommandIntent): Promise<PromptBundle> {
     const snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
     return this.composer.compose(intent, snapshot);
   }
@@ -189,11 +189,11 @@ class ExtensionController {
     }
   }
 
-  public async copy(intent: ActionIntent): Promise<PromptBundle> {
+  public async copy(intent: PublicCommandIntent): Promise<PromptBundle> {
     const bundle = await this.preview(intent);
     const snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
     if (bundle.mutation && snapshot.mutationBlocked) {
-      throw new Error("DevWeave snapshot is read-only because critical contract diagnostics are present. Copy doctor/status first.");
+      throw new Error("DevWeave snapshot is read-only because critical contract diagnostics are present. Use the status command form first.");
     }
     await this.clipboard.copy(bundle.chatText);
     await vscode.window.showInformationMessage("DevWeave prompt 已複製到 clipboard；請在 Codex Chat 審閱並送出。", "Open Dashboard");
@@ -202,11 +202,7 @@ class ExtensionController {
 
   public async copyNextAction(): Promise<void> {
     const work = this.currentWork();
-    if (!work) {
-      await this.copy({ type: "status", all: true });
-      return;
-    }
-    await this.copy({ type: "instructions", workId: work.id });
+    await this.copy({ type: "next", ...(work ? { workId: work.id } : {}) });
   }
 
   public async openFile(relativePath: string): Promise<void> {

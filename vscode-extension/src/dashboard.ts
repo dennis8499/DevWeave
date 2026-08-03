@@ -1,13 +1,13 @@
 import * as vscode from "vscode";
 import { BootstrapReport } from "./bootstrap";
-import { ActionIntent, PromptBundle, WorkspaceSnapshot } from "./model";
+import { PromptBundle, PublicCommandIntent, WorkspaceSnapshot } from "./model";
 import { HostToWebviewMessage, parseWebviewMessage } from "./protocol";
 
 export interface DashboardCallbacks {
   refresh(): Promise<WorkspaceSnapshot>;
   initialize(): Promise<{ report: BootstrapReport; snapshot: WorkspaceSnapshot }>;
-  preview(intent: ActionIntent): Promise<PromptBundle>;
-  copy(intent: ActionIntent): Promise<PromptBundle>;
+  preview(intent: PublicCommandIntent): Promise<PromptBundle>;
+  copy(intent: PublicCommandIntent): Promise<PromptBundle>;
   openFile(relativePath: string): Promise<void>;
   selectWork(workId: string | null): void;
   protocolError(message: string): void;
