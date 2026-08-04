@@ -6,7 +6,7 @@ last_updated: 2026-08-04
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260804-085630-feature-g1-g2
+verified_by: 20260804-102428-feature-vs-code-extension-wiki
 ---
 
 # Activity Log
@@ -30,3 +30,8 @@ verified_by: 20260804-085630-feature-g1-g2
 ## [2026-08-04] promote | 20260804-085630-feature-g1-g2
 
 - Refresh [[overview]]、[[devweave-knowledge-workflow]] 與 [[knowledge-engine]]，記錄 G1/G2 關鍵決策逐題問答、Companion Skill 階段邊界、Gate Double Check、explicit approval 與 `revise` 回流規則。
+
+## [2026-08-04] promote | 20260804-102428-feature-vs-code-extension-wiki
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]] 與 [[knowledge-engine]]，補充 VS Code Control Center 的 projection、Wiki-first/G3 邊界與 Extension integration。
+- 新增 [[vscode-extension]]，記錄 Enter 套用的 case-insensitive contains 搜尋、局部 render、single-flight refresh、deterministic snapshot、0.2.0 bootstrap repair、embedded help 與安全邊界。

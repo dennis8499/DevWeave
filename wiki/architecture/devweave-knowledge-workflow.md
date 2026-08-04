@@ -1,12 +1,12 @@
 ---
 title: DevWeave Knowledge Workflow
 type: architecture
-sources: [.agents/skills/devweave, AGENTS.md, README.md, docs/使用手冊.md]
+sources: [.agents/skills/devweave, AGENTS.md, README.md, docs/使用手冊.md, vscode-extension/src]
 last_updated: 2026-08-04
 tags: [architecture]
 status: active
-source_fingerprint: "sha256:8ffca49e8f46595f0f943593670dfd0550045977d3b710051061637e6e0f3ad5"
-verified_by: 20260804-085630-feature-g1-g2
+source_fingerprint: "sha256:142196dd250948c47ea1225fd9b3c85f8f552419f10fc18cbc6584e5a0e1bde8"
+verified_by: 20260804-102428-feature-vs-code-extension-wiki
 ---
 
 # DevWeave Knowledge Workflow
@@ -25,6 +25,14 @@ DevWeave 將 Codebase Wiki 納入既有 Work Item lifecycle，而不是建立第
 6. Verification 的 `knowledge review` 保存 disposition、rationale、affected/covered/uncovered paths 與 product change fingerprint。後續產品 fingerprint 改變會使 review invalid，並清空 plan/seals。
 7. `promote` 建立一至五個 content upsert/delete；新頁經 canonical scaffold 先成為 placeholder。完成 active 內容後同步 index、append-only log，再 seal source fingerprint 與 Work Item provenance。`no-update` 僅在非 bootstrap、無 affected page、無 Wiki diff 時成立。
 8. G3 重新比對完整 Wiki diff、affected pages、plan、coupling、log、seal、baseline 與 current evidence；它只驗證實作是否符合已批准內容，不默默補入新需求或設計。人工核准後才可 close。
+
+## VS Code Control Center integration
+
+VS Code Extension 是這條 lifecycle 的唯讀 projection client。Host 以 `WorkspaceSnapshotReader` 讀取 project、work item、Wiki、evidence 與 bootstrap completeness；它不執行 Python engine、shell、Git、network 或 Codex API。使用者確認初始化後，`BootstrapInstaller` 才能套用 0.2.0 allowlisted control bundle；部分 workspace 只補齊缺檔，既有不同 bytes 的檔案保留為 conflict。
+
+Knowledge section 的查詢是 Extension-local 行為，不會改寫 G1 context 或 Wiki：`WikiSearchModel` 保留 draft/applied query，按 Enter 後才以 case-insensitive contains 搜尋 title、path 與 body preview；type filter 是精確匹配，結果與 metric 透過局部 render 更新。檔案 watcher 仍自動 refresh，但由 250ms debounce、single-flight 與 latest-pending coordinator 合併 burst，snapshot 的平行讀取最後以 deterministic order 合併。
+
+說明頁是 Extension bundle 內的 lazy local content，不寫入 target repository，也不需要網路。這些 UI／package 知識在 G3 promote 更新，若需求或設計改變仍須回到同一 Work Item 的 `revise` 與 Gate lifecycle。
 
 ## Boundaries
 

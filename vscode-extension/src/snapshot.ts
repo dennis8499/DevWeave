@@ -12,15 +12,37 @@ import {
   WorkItemProjection,
   WorkspaceSnapshot
 } from "./model";
+import { createHash } from "node:crypto";
 import { DirectoryEntry, FileSystemPort, joinRelativePath } from "./filesystem";
+import type { BootstrapBundleFile } from "./bootstrap";
 
 const ARTIFACT_NAMES = ["brief.md", "requirements.md", "design.md", "plan.md", "acceptance.md"];
 const MAX_EVENTS = 100;
+export const DEFAULT_BOOTSTRAP_PATHS = [
+  "AGENTS.md",
+  "skills-lock.json",
+  ".codex/hooks.json",
+  ".devweave/project.json",
+  ".devweave/baseline/product.md",
+  ".devweave/baseline/architecture.md",
+  ".devweave/baseline/quality.md",
+  "wiki/index.md",
+  "wiki/overview.md",
+  "wiki/log.md",
+  ".agents/skills/devweave/SKILL.md"
+];
+
+interface DiagnosticResult<T> {
+  value: T;
+  diagnostics: Diagnostic[];
+}
 
 export interface SnapshotReaderOptions {
   rootName: string | null;
   rootPath: string | null;
   now?: () => string;
+  bootstrapPaths?: readonly string[];
+  bootstrapFiles?: readonly Pick<BootstrapBundleFile, "destination" | "transform" | "byteLength" | "sha256">[];
 }
 
 export interface WorkspaceSnapshotReaderPort {
@@ -37,13 +59,16 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
     const diagnostics: Diagnostic[] = [];
     const capturedAt = (this.options.now ?? (() => new Date().toISOString()))();
     const projectPath = ".devweave/project.json";
-    const projectExists = await this.files.exists(projectPath);
-    const hooksPresent = await this.files.exists(".codex/hooks.json");
-    const skillPresent = await this.files.exists(".agents/skills/devweave/SKILL.md");
-    const baselineFiles = await this.files.exists(".devweave/baseline")
-      ? await this.collectFiles(".devweave/baseline")
-      : [];
-    const knowledge = await this.readKnowledge("wiki", diagnostics);
+    const knowledgeDiagnostics: Diagnostic[] = [];
+    const [projectExists, hooksPresent, skillPresent, baselineFiles, knowledge, bootstrap] = await Promise.all([
+      this.files.exists(projectPath),
+      this.files.exists(".codex/hooks.json"),
+      this.files.exists(".agents/skills/devweave/SKILL.md"),
+      this.files.exists(".devweave/baseline").then((exists) => exists ? this.collectFiles(".devweave/baseline") : []),
+      this.readKnowledge("wiki", knowledgeDiagnostics),
+      this.readBootstrapCompleteness()
+    ]);
+    diagnostics.push(...knowledgeDiagnostics);
 
     if (!projectExists) {
       diagnostics.push({
@@ -66,6 +91,7 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
         baselineFiles,
         hookPresent: hooksPresent,
         skillPresent,
+        bootstrap,
         workItems: [],
         knowledge,
         diagnostics,
@@ -154,6 +180,7 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
       baselineFiles,
       hookPresent: hooksPresent,
       skillPresent,
+      bootstrap,
       workItems,
       knowledge,
       diagnostics,
@@ -165,6 +192,36 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
     };
   }
 
+  private async readBootstrapCompleteness(): Promise<WorkspaceSnapshot["bootstrap"]> {
+    const expected = [...new Set([
+      ...(this.options.bootstrapPaths ?? DEFAULT_BOOTSTRAP_PATHS),
+      ...(this.options.bootstrapFiles?.map((file) => file.destination) ?? [])
+    ])].sort();
+    const fileContracts = new Map((this.options.bootstrapFiles ?? []).map((file) => [file.destination, file]));
+    const checks = await Promise.all(expected.map(async (path) => {
+      if (!(await this.files.exists(path))) return { missing: path, conflict: null };
+      const contract = fileContracts.get(path);
+      if (!contract || contract.transform !== "copy" || !this.files.readBytes) return { missing: null, conflict: null };
+      try {
+        const bytes = await this.files.readBytes(path);
+        const hash = createHash("sha256").update(Buffer.from(bytes)).digest("hex");
+        return bytes.byteLength === contract.byteLength && hash === contract.sha256
+          ? { missing: null, conflict: null }
+          : { missing: null, conflict: path };
+      } catch {
+        return { missing: null, conflict: path };
+      }
+    }));
+    const missing = checks.flatMap((check) => check.missing ? [check.missing] : []).sort();
+    const conflicts = checks.flatMap((check) => check.conflict ? [check.conflict] : []).sort();
+    return {
+      complete: missing.length === 0 && conflicts.length === 0,
+      expected,
+      missing,
+      conflicts
+    };
+  }
+
   private async readWorkItems(
     knowledge: KnowledgeProjection,
     diagnostics: Diagnostic[]
@@ -172,27 +229,37 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
     if (!(await this.files.exists(".devweave/work-items"))) {
       return [];
     }
-    const entries = await this.files.readDirectory(".devweave/work-items");
-    const workItems: WorkItemProjection[] = [];
-    for (const entry of entries.filter((item) => item.kind === "directory")) {
+    const entries = (await this.files.readDirectory(".devweave/work-items"))
+      .filter((item) => item.kind === "directory")
+      .sort((left, right) => left.name.localeCompare(right.name));
+    const results = await Promise.all(entries.map(async (entry): Promise<DiagnosticResult<WorkItemProjection | null>> => {
+      const localDiagnostics: Diagnostic[] = [];
       const relativeRoot = joinRelativePath(".devweave/work-items", entry.name);
       const statePath = joinRelativePath(relativeRoot, "state.json");
       if (!(await this.files.exists(statePath))) {
-        continue;
+        return { value: null, diagnostics: localDiagnostics };
       }
-      const read = await this.safeReadJson(statePath, diagnostics);
+      const read = await this.safeReadJson(statePath, localDiagnostics);
       if (!read.value) {
-        diagnostics.push({
+        localDiagnostics.push({
           severity: "critical",
           code: "work_invalid",
           message: `Work item state could not be parsed: ${entry.name}.`,
           path: statePath
         });
-        continue;
+        return { value: null, diagnostics: localDiagnostics };
       }
-      workItems.push(await this.toWorkItem(entry.name, relativeRoot, read.value, knowledge, diagnostics));
-    }
-    return workItems.sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+      return {
+        value: await this.toWorkItem(entry.name, relativeRoot, read.value, knowledge, localDiagnostics),
+        diagnostics: localDiagnostics
+      };
+    }));
+    const workItems: WorkItemProjection[] = [];
+    results.forEach((result) => {
+      diagnostics.push(...result.diagnostics);
+      if (result.value) workItems.push(result.value);
+    });
+    return workItems.sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "") || left.id.localeCompare(right.id));
   }
 
   private async toWorkItem(
@@ -204,18 +271,20 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
   ): Promise<WorkItemProjection> {
     const diagnosticStart = diagnostics.length;
     const stateReadOnly = this.validateWorkState(id, state, diagnostics);
-    const artifacts: ArtifactProjection[] = [];
-    for (const name of ARTIFACT_NAMES) {
+    const artifacts = await Promise.all(ARTIFACT_NAMES.map(async (name): Promise<ArtifactProjection> => {
       const path = joinRelativePath(root, name);
-      if (await this.files.exists(path)) {
-        const read = await this.files.readText(path);
-        artifacts.push({ path, exists: true, text: read.text, truncated: read.truncated });
-      } else {
-        artifacts.push({ path, exists: false, text: "", truncated: false });
+      if (!(await this.files.exists(path))) {
+        return { path, exists: false, text: "", truncated: false };
       }
-    }
-    const evidence = await this.readEvidence(root, diagnostics);
-    const events = await this.readEvents(root);
+      const read = await this.files.readText(path);
+      return { path, exists: true, text: read.text, truncated: read.truncated };
+    }));
+    const [evidenceResult, events] = await Promise.all([
+      this.readEvidence(root),
+      this.readEvents(root)
+    ]);
+    diagnostics.push(...evidenceResult.diagnostics);
+    const evidence = evidenceResult.value;
     const waivers = Array.isArray(state.waivers) ? state.waivers.flatMap((raw): WaiverProjection[] => {
       if (!isRecord(raw)) {
         return [];
@@ -397,21 +466,23 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
     return readOnly;
   }
 
-  private async readEvidence(root: string, diagnostics: Diagnostic[]): Promise<EvidenceProjection[]> {
+  private async readEvidence(root: string): Promise<DiagnosticResult<EvidenceProjection[]>> {
     const evidenceRoot = joinRelativePath(root, "evidence");
     if (!(await this.files.exists(evidenceRoot))) {
-      return [];
+      return { value: [], diagnostics: [] };
     }
-    const entries = await this.files.readDirectory(evidenceRoot);
-    const results: EvidenceProjection[] = [];
-    for (const entry of entries.filter((item) => item.kind === "file" && item.name.endsWith(".json"))) {
+    const entries = (await this.files.readDirectory(evidenceRoot))
+      .filter((item) => item.kind === "file" && item.name.endsWith(".json"))
+      .sort((left, right) => left.name.localeCompare(right.name));
+    const results = await Promise.all(entries.map(async (entry): Promise<DiagnosticResult<EvidenceProjection | null>> => {
+      const diagnostics: Diagnostic[] = [];
       const path = joinRelativePath(evidenceRoot, entry.name);
       const read = await this.safeReadJson(path, diagnostics);
       const value = read.value;
       if (!value) {
-        continue;
+        return { value: null, diagnostics };
       }
-      results.push({
+      return { value: {
         id: stringValue(value.id, entry.name.replace(/\.json$/, "")),
         kind: stringValue(value.kind),
         status: stringValue(value.status),
@@ -425,9 +496,11 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
         stale: Boolean(value.stale),
         bindsCurrentSource: Boolean(value.binds_current_source),
         sourceFingerprint: nullableString(value.source_fingerprint) ?? undefined
-      });
-    }
-    return results.sort((a, b) => a.id.localeCompare(b.id));
+      }, diagnostics };
+    }));
+    const diagnostics = results.flatMap((result) => result.diagnostics);
+    const values = results.flatMap((result) => result.value ? [result.value] : []);
+    return { value: values.sort((left, right) => left.id.localeCompare(right.id)), diagnostics };
   }
 
   private async readEvents(root: string): Promise<string[]> {
@@ -440,15 +513,13 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
   }
 
   private async readKnowledge(root: string, diagnostics: Diagnostic[]): Promise<KnowledgeProjection> {
-    const pages: WikiPageProjection[] = [];
+    let pages: WikiPageProjection[] = [];
     if (await this.files.exists(root)) {
-      for (const path of await this.collectFiles(root)) {
-        if (!path.endsWith(".md")) {
-          continue;
-        }
+      const paths = (await this.collectFiles(root)).filter((path) => path.endsWith(".md"));
+      pages = await Promise.all(paths.map(async (path) => {
         const read = await this.files.readText(path);
-        pages.push(parseWikiPage(path, read.text, read.truncated));
-      }
+        return parseWikiPage(path, read.text, read.truncated);
+      }));
     }
     const placeholderPages = pages.filter((page) => page.status === "placeholder").map((page) => page.path);
     const stalePages = pages.filter((page) => page.status === "stale" || Boolean(

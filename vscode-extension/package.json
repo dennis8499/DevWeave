@@ -2,7 +2,7 @@
   "name": "devweave-control-center",
   "displayName": "DevWeave Control Center｜開發流程總覽",
   "description": "以繁體中文呈現 DevWeave 檔案快照；工作流程命令交接到 Codex Chat，初始化則需確認固定 bootstrap 寫入。",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "devweave",
   "license": "MIT",
   "engines": {
@@ -99,7 +99,7 @@
   },
   "scripts": {
     "build": "node esbuild.mjs",
-    "package": "node esbuild.mjs --production",
+    "package": "node esbuild.mjs --production && node scripts/package-vsix.mjs && node scripts/verify-package.mjs",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"test/unit/**/*.test.ts\"",
     "test:smoke": "npm run build && tsx test/smoke.test.ts"

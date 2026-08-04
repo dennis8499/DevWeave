@@ -1,0 +1,39 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013",
+    "AC-014",
+    "AC-015"
+  ],
+  "created_at": "2026-08-04T03:21:47+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "0ed44ae86ced4b864b60ee3eaeb2775e6f2f2688",
+  "id": "EVID-012",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "4458c47b88ab4c648bec8728c21cbe4ca7dfb77c6ec573b621144b813c07a400",
+  "stale": false,
+  "status": "passed",
+  "summary": "完成 high-risk independent review：檢查 allowlisted manifest source/destination、byte length/SHA-256、path normalization、non-overwrite conflict、rollback、CSP、no process/shell/network、bootstrap-only write boundary、legacy projection 與 dirty 0.1.0 VSIX 保留；無未解 blocker。",
+  "tasks": [
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005"
+  ]
+}

@@ -1,6 +1,6 @@
 # DevWeave Control Center
 
-DevWeave Control Center 是以新手為先的 VS Code Extension。它把 DevWeave repository 的檔案狀態整理成四個區域：`總覽`、`工作項目`、`知識`、`驗證與稽核`，讓你先知道目前狀態與下一步，再按需要查看治理細節。
+DevWeave Control Center 是以新手為先的 VS Code Extension。它把 DevWeave repository 的檔案狀態整理成五個區域：`總覽`、`工作項目`、`知識`、`驗證與稽核`、`說明`，讓你先知道目前狀態與下一步，再按需要查看治理細節。
 
 ## 先記住三件事
 
@@ -11,7 +11,7 @@ DevWeave Control Center 是以新手為先的 VS Code Extension。它把 DevWeav
 ## 第一次使用
 
 1. 在 VS Code 開啟 DevWeave repository，從 Activity Bar 開啟 DevWeave Control Center。
-2. 若尚未初始化，按「初始化 DevWeave」並確認寫入範圍。完成後依提示確認 Codex hook、設定 verification commands，再建立第一個 work item。
+2. 若尚未初始化，按「初始化 DevWeave」並確認寫入範圍；若只完成部分初始化，按「初始化／補齊 DevWeave」。補齊只建立無衝突缺檔，不覆寫既有內容。完成後依提示確認 Codex hook、設定 verification commands，再建立第一個 work item。
 3. 在「總覽」先看 repository state、目前工作、snapshot 來源、阻塞原因與主要 CTA。
 4. 從「工作項目」分開查看進行中的 work 與已結束的歷史；closed work 只有在明確選取後才會顯示，不能被自動當成目前工作。
 5. 選擇一個任務，按 Preview public command，確認「會做什麼／不會做什麼／複製後要做什麼」，再複製到 Codex Chat。
@@ -29,7 +29,7 @@ Dashboard 用任務語言分組，旁邊仍保留技術命令名稱：
 
 ## Wiki 與驗證
 
-「知識」區域會顯示 Wiki health、bootstrap 建議、受影響或待更新頁面，並提供搜尋、分類與「顯示全部」入口。Wiki bootstrap 有三個等價入口：
+「知識」區域會顯示 Wiki health、bootstrap 建議、受影響或待更新頁面，並提供搜尋、分類與「顯示全部」入口。文字搜尋是標題／路徑／摘要的大小寫不敏感包含式查詢，輸入後按 Enter 才套用；分類是精確 type 篩選。Wiki bootstrap 有三個等價入口：
 
 - 公開命令選單的「建立 Codebase Wiki」
 - Knowledge 面板的 bootstrap CTA
@@ -61,12 +61,8 @@ npm run package
 npm run test:smoke
 ```
 
-`npm run package` 會產生 production bundle；`npm run test:smoke` 會使用 VS Code Extension Host 驗證 activation、Activity Bar view 與公開 commands。
+`npm run package` 會產生 0.2.0 production bundle、完整 bootstrap manifest 與 `devweave-control-center-0.2.0.vsix`；`npm run test:smoke` 會使用 VS Code Extension Host 驗證 activation、Activity Bar view 與公開 commands。
 
 ## 打包 VSIX
 
-```powershell
-cd .\vscode-extension
-npm run package
-npx --yes @vscode/vsce package --allow-missing-repository
-```
+既有的 `devweave-control-center-0.1.0.vsix` 不會被覆寫；package verification 會檢查兩個 artifact、manifest integrity 與 VSIX 必要 entries。

@@ -17,6 +17,9 @@ const runtimeFiles = [
   "src/tree.ts",
   "src/vscode-filesystem.ts",
   "src/vscode-bootstrap.ts",
+  "src/refresh-coordinator.ts",
+  "src/render-scheduler.ts",
+  "src/wiki-search.ts",
   "webview/main.ts"
 ];
 
@@ -103,7 +106,16 @@ test("P2 preferences and Wiki browsing stay Extension-local and discoverable", (
   assert.match(webview, /show-all-wiki/);
   assert.match(webview, /wiki-query/);
   assert.match(webview, /wiki-type/);
-  assert.match(webview, /filtered\.slice\(0, 12\)/);
+  assert.match(webview, /輸入後按 Enter 套用搜尋/);
+  assert.match(webview, /wikiSearch\.updateDraft/);
+  assert.match(webview, /wikiSearch\.submit/);
+  assert.match(webview, /id="wiki-results"/);
+  assert.match(webview, /knowledgeRenderScheduler/);
+  assert.doesNotMatch(webview, /renderKnowledgeOnly/);
+  assert.match(webview, /case "help"/);
+  assert.match(webview, /bootstrap\.complete/);
+  assert.match(webview, /初始化／補齊 DevWeave/);
+  assert.match(readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8"), /\.inspect\(bundle, resources, workspace\)/);
   assert.doesNotMatch(webview, /Snapshot may be newer than engine-observed state/);
   assert.match(extension, /workspaceState\.get/);
   assert.match(extension, /workspaceState\.update/);

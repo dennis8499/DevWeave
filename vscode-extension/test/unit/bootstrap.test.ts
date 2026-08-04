@@ -90,6 +90,7 @@ test("BootstrapInstaller installs a missing project file through the workspace s
   const report = await new BootstrapInstaller({ now: () => "2026-08-03" }).install(bundle(), resources, workspace);
 
   assert.equal(report.ok, true);
+  assert.equal(report.complete, true);
   assert.equal(report.status, "initialized");
   assert.ok(report.created.includes(".devweave/project.json"));
   assert.equal(workspace.text(".devweave/project.json"), '{"managed":true}\n');
@@ -104,10 +105,57 @@ test("BootstrapInstaller fails closed when an existing target conflicts", async 
   const report = await new BootstrapInstaller({ now: () => "2026-08-03" }).install(bundle(), resources, workspace);
 
   assert.equal(report.ok, false);
-  assert.equal(report.status, "conflict");
+  assert.equal(report.status, "partial");
   assert.ok(report.conflicts.some((item) => item.path === ".devweave/project.json"));
-  assert.deepEqual(report.created, []);
+  assert.ok(report.created.includes("wiki"));
   assert.equal(workspace.text(".devweave/project.json"), '{"managed":false}\n');
+});
+
+test("BootstrapInstaller inspects a partial workspace without writing", async () => {
+  const partial = bundle();
+  partial.files.push({
+    source: "second.json",
+    destination: ".devweave/second.json",
+    transform: "copy",
+    byteLength: 16,
+    sha256: "6783a86f115c3d54918b7e911557fb8f4339f76091e4b4d4d11d4086ff41efec"
+  });
+  const workspace = new MemoryBootstrapWorkspace();
+  workspace.seedDirectory(".devweave");
+  workspace.seedFile(".devweave/project.json", '{"managed":false}\n');
+  const resources = new MemoryBootstrapResources({ "project.json": '{"managed":true}\n', "second.json": '{"second":true}\n' });
+
+  const inspection = await new BootstrapInstaller().inspect(partial, resources, workspace);
+
+  assert.equal(inspection.complete, false);
+  assert.ok(inspection.missing.includes(".devweave/second.json"));
+  assert.ok(inspection.conflicts.some((item) => item.path === ".devweave/project.json"));
+  assert.equal(await workspace.stat(".devweave/second.json"), "absent");
+});
+
+test("BootstrapInstaller repairs non-conflicting files without overwriting a conflict", async () => {
+  const partial = bundle();
+  partial.files.push({
+    source: "second.json",
+    destination: ".devweave/second.json",
+    transform: "copy",
+    byteLength: 16,
+    sha256: "6783a86f115c3d54918b7e911557fb8f4339f76091e4b4d4d11d4086ff41efec"
+  });
+  const workspace = new MemoryBootstrapWorkspace();
+  workspace.seedDirectory(".devweave");
+  workspace.seedFile(".devweave/project.json", '{"managed":false}\n');
+  const resources = new MemoryBootstrapResources({ "project.json": '{"managed":true}\n', "second.json": '{"second":true}\n' });
+
+  const report = await new BootstrapInstaller().install(partial, resources, workspace);
+
+  assert.equal(report.ok, false);
+  assert.equal(report.complete, false);
+  assert.equal(report.status, "partial");
+  assert.ok(report.created.includes(".devweave/second.json"));
+  assert.ok(report.conflicts.some((item) => item.path === ".devweave/project.json"));
+  assert.equal(workspace.text(".devweave/project.json"), '{"managed":false}\n');
+  assert.equal(workspace.text(".devweave/second.json"), '{"second":true}\n');
 });
 
 test("BootstrapInstaller is idempotent for compatible existing bytes", async () => {
@@ -119,6 +167,7 @@ test("BootstrapInstaller is idempotent for compatible existing bytes", async () 
   const report = await installer.install(bundle(), resources, workspace);
 
   assert.equal(report.ok, true);
+  assert.equal(report.complete, true);
   assert.equal(report.status, "already_initialized");
   assert.deepEqual(report.created, []);
   assert.ok(report.adopted.includes(".devweave/project.json"));
@@ -161,9 +210,9 @@ test("BootstrapInstaller rejects a symlink ancestor before writing", async () =>
   const report = await new BootstrapInstaller({ now: () => "2026-08-03" }).install(bundle(), resources, workspace);
 
   assert.equal(report.ok, false);
-  assert.equal(report.status, "conflict");
+  assert.equal(report.status, "partial");
   assert.ok(report.conflicts.some((item) => item.path === ".devweave"));
-  assert.deepEqual(report.created, []);
+  assert.ok(report.created.includes("wiki"));
   assert.equal(await workspace.stat(".devweave/project.json"), "absent");
 });
 

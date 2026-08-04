@@ -5,8 +5,8 @@ sources: [.agents/skills/devweave/SKILL.md, AGENTS.md, README.md, docs/使用手
 last_updated: 2026-08-04
 tags: [overview]
 status: active
-source_fingerprint: "sha256:0c85bac04d6b1f224e24e5ae5691899d79be4a09fc855b9906e50bc9cf19791e"
-verified_by: 20260804-085630-feature-g1-g2
+source_fingerprint: "sha256:cd34d3ceb382e6f4f3aaa56a53ec0bb162715e48eb1e554951e169abee73252b"
+verified_by: 20260804-102428-feature-vs-code-extension-wiki
 ---
 
 # DevWeave Codebase Overview
@@ -32,13 +32,16 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 - Python engine 是 workflow 與 knowledge policy 的權威來源；JSON/JSONL ledger 只能經 CLI 更新。互動式問答規則位於 router 與 phase guidance，並不新增 pending-question engine、CLI、schema 或第二套 ledger。
 - `knowledge_core.py` 負責 Wiki parser、source/content fingerprint、lint、coverage、bootstrap assessment、canonical scaffold 與 seal。
 - `devweave_core.py` 負責 Work Item state、gate currentness、review/plan invalidation、G3 reconciliation 與 evidence。
-- VS Code Extension 只讀 filesystem projection，三個 Wiki bootstrap 入口都只預覽/複製 `$devweave wiki bootstrap`，不執行 CLI、不寫 Wiki；Control Center 以總覽、工作項目、知識、驗證與稽核四區呈現，顯示偏好只存於 Extension workspaceState。
+- VS Code Extension 只讀 filesystem projection，三個 Wiki bootstrap 入口都只預覽/複製 `$devweave wiki bootstrap`，不執行 CLI、不寫 Wiki；Control Center 以總覽、工作項目、知識、驗證、稽核與說明六區呈現，顯示偏好只存於 Extension workspaceState。
 - Extension 的 public command UI 以任務語言分組，所有 workflow decision 仍透過 prompt handoff 回到 Codex Chat；active work 與 closed history 分離，Wiki 頁面瀏覽提供有界搜尋、分類與顯示全部入口。
+- Extension 的 Wiki 搜尋以 Enter 套用大小寫不敏感的 title/path/body-preview 包含式查詢；輸入期間保留同一個 input DOM，結果區使用局部 render。Watcher 由 debounce 與 single-flight refresh coordinator 合併，snapshot 的獨立讀取平行化後仍依固定順序輸出。
+- 0.2.0 bootstrap bundle 提供完整控制面：六組核准 skills、通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter；初始化只建立缺少且無衝突的檔案，說明手冊留在 Extension 內，不落地到 target repository。
 
 ## 關鍵模組
 
 - [[devweave-knowledge-workflow]]：Bootstrap、Query、Review、Promotion 的完整生命週期與真實來源優先序。
 - [[knowledge-engine]]：knowledge machine commands、狀態投影、template scaffold、coverage 與 seal 邊界。
+- [[vscode-extension]]：Control Center 的 Wiki 搜尋、refresh/snapshot、bootstrap repair、embedded help 與安全邊界。
 
 ## 真實來源與限制
 

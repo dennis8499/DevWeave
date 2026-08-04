@@ -6,7 +6,7 @@ last_updated: 2026-08-04
 tags: [index]
 status: active
 source_fingerprint: none
-verified_by: 20260804-085630-feature-g1-g2
+verified_by: 20260804-102428-feature-vs-code-extension-wiki
 ---
 
 # Codebase Wiki — 索引
@@ -26,6 +26,7 @@ verified_by: 20260804-085630-feature-g1-g2
 ## Modules
 
 - [[knowledge-engine]] | Wiki model、coverage、canonical scaffold、seal、machine lifecycle 與互動問答的 router boundary
+- [[vscode-extension]] | Control Center 的 Wiki 搜尋、refresh/snapshot、完整 bootstrap repair、embedded help 與安全邊界
 
 ## Entities
 

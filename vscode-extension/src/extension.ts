@@ -1,11 +1,12 @@
 import * as vscode from "vscode";
-import { BootstrapBundle, BootstrapInstaller, BootstrapReport } from "./bootstrap";
+import { BootstrapBundle, BootstrapBundleFile, BootstrapInstaller, BootstrapReport } from "./bootstrap";
 import { ClipboardAdapter, VscodeClipboardAdapter } from "./clipboard";
 import { DashboardPanel } from "./dashboard";
 import { FileSystemPort } from "./filesystem";
 import { DashboardPreferences, Diagnostic, DisplayMode, PromptBundle, PublicCommandIntent, WorkspaceSnapshot } from "./model";
 import { DevWeavePromptComposer } from "./prompt";
 import { WorkspaceSnapshotReader } from "./snapshot";
+import { RefreshCoordinator } from "./refresh-coordinator";
 import { WorkItemsTreeProvider } from "./tree";
 import { readBootstrapBundle, VscodeBootstrapResourceReader, VscodeBootstrapWorkspace } from "./vscode-bootstrap";
 import { VscodeFileSystemPort } from "./vscode-filesystem";
@@ -55,6 +56,9 @@ class ExtensionController {
   private snapshot: WorkspaceSnapshot = unavailableSnapshot("No workspace selected.");
   private selectedWorkId: string | null = null;
   private reader: WorkspaceSnapshotReader | undefined;
+  private refreshCoordinator: RefreshCoordinator<WorkspaceSnapshot> | undefined;
+  private bootstrapBundle: BootstrapBundle | undefined;
+  private bootstrapBundlePromise: Promise<BootstrapBundle | undefined> | undefined;
   private readonly composer = new DevWeavePromptComposer();
   private readonly bootstrapInstaller = new BootstrapInstaller();
   private readonly preferencesKey = "devweave.controlCenter.preferences";
@@ -76,7 +80,7 @@ class ExtensionController {
     if (folders.length === 0) {
       return;
     }
-    for (const pattern of [".devweave/project.json", ".devweave/work-items/**", ".devweave/baseline/**", "wiki/**", ".codex/hooks.json", ".agents/skills/devweave/**"]) {
+    for (const pattern of [".devweave/project.json", ".devweave/work-items/**", ".devweave/baseline/**", "wiki/**", ".codex/hooks.json", "AGENTS.md", "skills-lock.json", ".agents/skills/**"]) {
       for (const folder of folders) {
         const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder.uri, pattern));
         watcher.onDidChange(() => this.scheduleRefresh(), undefined, context.subscriptions);
@@ -91,19 +95,17 @@ class ExtensionController {
     const root = await this.resolveRoot(false);
     if (!root) {
       this.snapshot = unavailableSnapshot(this.multipleRootMessage());
-    } else {
-      this.activeRoot = root;
-      const port: FileSystemPort = new VscodeFileSystemPort(root);
-      this.reader = new WorkspaceSnapshotReader(port, {
-        rootName: root.path.split("/").filter(Boolean).at(-1) ?? "Repository",
-        rootPath: root.toString()
-      });
-      this.snapshot = await this.reader.readWorkspace();
-      this.snapshot = { ...this.snapshot, selectedWorkId: resolveWorkSelection(this.snapshot, this.selectedWorkId) };
-      this.selectedWorkId = this.snapshot.selectedWorkId;
+      this.tree?.update(this.snapshot);
+      await this.dashboard?.refresh(this.snapshot);
+      return this.snapshot;
     }
-    this.tree?.update(this.snapshot);
-    await this.dashboard?.refresh(this.snapshot);
+    const bundle = await this.loadBootstrapBundle();
+    this.ensureRefreshCoordinator(
+      root,
+      bundle ? [...bundle.directories, ...bundle.files.map((file) => file.destination)] : undefined,
+      bundle?.files
+    );
+    await this.refreshCoordinator?.request();
     return this.snapshot;
   }
 
@@ -129,7 +131,56 @@ class ExtensionController {
   public handleWorkspaceFoldersChanged(): void {
     this.activeRoot = undefined;
     this.selectedWorkId = null;
+    this.refreshCoordinator?.dispose();
+    this.refreshCoordinator = undefined;
+    this.reader = undefined;
     void this.refresh();
+  }
+
+  private ensureRefreshCoordinator(root: vscode.Uri, bootstrapPaths?: readonly string[], bootstrapFiles?: BootstrapBundleFile[]): void {
+    if (this.activeRoot?.toString() === root.toString() && this.refreshCoordinator && this.reader) {
+      return;
+    }
+    this.refreshCoordinator?.dispose();
+    this.activeRoot = root;
+    const port: FileSystemPort = new VscodeFileSystemPort(root);
+    this.reader = new WorkspaceSnapshotReader(port, {
+      rootName: root.path.split("/").filter(Boolean).at(-1) ?? "Repository",
+      rootPath: root.toString(),
+      bootstrapPaths,
+      bootstrapFiles
+    });
+    this.refreshCoordinator = new RefreshCoordinator<WorkspaceSnapshot>({
+      read: () => this.reader?.readWorkspace() ?? Promise.reject(new Error("Workspace snapshot reader is unavailable.")),
+      publish: (next) => this.publishSnapshot(next),
+      onError: (error) => this.output.appendLine(`[refresh] ${error instanceof Error ? error.message : String(error)}`)
+    });
+  }
+
+  private publishSnapshot(next: WorkspaceSnapshot): void {
+    this.snapshot = { ...next, selectedWorkId: resolveWorkSelection(next, this.selectedWorkId) };
+    this.selectedWorkId = this.snapshot.selectedWorkId;
+    this.tree?.update(this.snapshot);
+    void this.dashboard?.refresh(this.snapshot);
+  }
+
+  private async loadBootstrapBundle(): Promise<BootstrapBundle | undefined> {
+    if (this.bootstrapBundle) return this.bootstrapBundle;
+    if (!this.bootstrapBundlePromise) {
+      this.bootstrapBundlePromise = (async () => {
+        try {
+          const resources = new VscodeBootstrapResourceReader(this.context.extensionUri);
+          const bundle = await readBootstrapBundle(resources);
+          if (!isBootstrapBundle(bundle)) throw new Error("Bootstrap manifest is malformed.");
+          this.bootstrapBundle = bundle;
+          return bundle;
+        } catch (error) {
+          this.output.appendLine(`[bootstrap] manifest unavailable: ${error instanceof Error ? error.message : String(error)}`);
+          return undefined;
+        }
+      })();
+    }
+    return this.bootstrapBundlePromise;
   }
 
   public async preview(intent: PublicCommandIntent): Promise<PromptBundle> {
@@ -153,18 +204,28 @@ class ExtensionController {
       return { report, snapshot: this.snapshot };
     }
     const snapshot = await this.refresh();
-    if (snapshot.projectExists) {
-      if (snapshot.mutationBlocked) {
-        const report = bootstrapConflict(snapshot.projectPath, "目前 project.json 存在但 snapshot 有 critical diagnostic；不會自動修復或覆寫既有內容。");
-        await vscode.window.showErrorMessage("DevWeave workspace 有 conflict/diagnostic，初始化未執行。", "Open Dashboard");
-        return { report, snapshot };
-      }
+    if (snapshot.mutationBlocked) {
+      const report = bootstrapConflict(snapshot.projectPath, "目前 project.json 存在但 snapshot 有 critical diagnostic；不會自動修復或覆寫既有內容。");
+      await vscode.window.showErrorMessage("DevWeave workspace 有 conflict/diagnostic，初始化未執行。", "Open Dashboard");
+      return { report, snapshot };
+    }
+    const resources = new VscodeBootstrapResourceReader(this.context.extensionUri);
+    const bundle = await this.loadBootstrapBundle();
+    if (!bundle) {
+      const report = bootstrapFailure("manifest.json", "Bootstrap bundle manifest 無法載入；workspace 未寫入。");
+      return { report, snapshot };
+    }
+    const workspace = new VscodeBootstrapWorkspace(root);
+    const inspection = await this.bootstrapInstaller.inspect(bundle, resources, workspace);
+    if (inspection.complete) {
       const report: BootstrapReport = {
         ok: true,
+        complete: true,
         status: "already_initialized",
         created: [],
-        adopted: [],
-        skipped: [],
+        adopted: inspection.adopted,
+        skipped: inspection.skipped,
+        missing: [],
         conflicts: [],
         errors: [],
         rolledBack: []
@@ -172,8 +233,11 @@ class ExtensionController {
       await vscode.window.showInformationMessage("目前 workspace 已完成 DevWeave 初始化。", "Open Dashboard");
       return { report, snapshot };
     }
+    const isRepair = snapshot.projectExists;
     const confirmation = await vscode.window.showWarningMessage(
-      "這會在目前 workspace 建立 DevWeave engine、skill、hook、project、baseline 與 Wiki starter。是否繼續？",
+      isRepair
+        ? `DevWeave control bundle 尚未完整（剩餘 ${inspection.missing.length + inspection.conflicts.length} 項）。這會只補齊無衝突缺檔，不覆寫既有不同內容。是否繼續？`
+        : "這會在目前 workspace 建立 DevWeave control bundle、六組 skills、hook、project、baseline 與 Wiki starter。是否繼續？",
       { modal: true },
       "Initialize DevWeave",
       "Cancel"
@@ -184,12 +248,10 @@ class ExtensionController {
     }
 
     try {
-      const resources = new VscodeBootstrapResourceReader(this.context.extensionUri);
-      const bundle = await readBootstrapBundle(resources) as BootstrapBundle;
-      const report = await this.bootstrapInstaller.install(bundle, resources, new VscodeBootstrapWorkspace(root));
+      const report = await this.bootstrapInstaller.install(bundle, resources, workspace);
       const refreshed = await this.refresh();
       this.output.appendLine(`[bootstrap] ${JSON.stringify(report)}`);
-      if (report.ok) {
+      if (report.complete) {
         await vscode.window.showInformationMessage("DevWeave 初始化完成；已重新整理 workspace snapshot。", "Open Dashboard");
       } else {
         await vscode.window.showErrorMessage("DevWeave 初始化未完成，請檢查 conflict/error 路徑。", "Open Dashboard");
@@ -330,6 +392,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function isBootstrapBundle(value: unknown): value is BootstrapBundle {
+  return isRecord(value)
+    && value.schemaVersion === 1
+    && typeof value.bundleVersion === "string"
+    && Array.isArray(value.directories)
+    && Array.isArray(value.files)
+    && value.files.every((file) => isRecord(file) && typeof file.destination === "string" && typeof file.source === "string");
+}
+
 function unavailableSnapshot(message: string): WorkspaceSnapshot {
   const diagnostic: Diagnostic = { severity: "warning", code: "workspace_unavailable", message };
   return {
@@ -346,6 +417,7 @@ function unavailableSnapshot(message: string): WorkspaceSnapshot {
     baselineFiles: [],
     hookPresent: false,
     skillPresent: false,
+    bootstrap: { complete: false, expected: [], missing: [], conflicts: [] },
     workItems: [],
     knowledge: {
       root: "wiki",
@@ -402,16 +474,20 @@ function isAllowedDevWeavePath(value: string): boolean {
     || normalized.startsWith(".devweave/baseline/")
     || normalized.startsWith("wiki/")
     || normalized === ".codex/hooks.json"
-    || normalized.startsWith(".agents/skills/devweave/");
+    || normalized === "AGENTS.md"
+    || normalized === "skills-lock.json"
+    || normalized.startsWith(".agents/skills/");
 }
 
 function bootstrapFailure(path: string, reason: string): BootstrapReport {
   return {
     ok: false,
+    complete: false,
     status: "failed",
     created: [],
     adopted: [],
     skipped: [],
+    missing: [],
     conflicts: [],
     errors: [{ path, reason }],
     rolledBack: []
@@ -421,10 +497,12 @@ function bootstrapFailure(path: string, reason: string): BootstrapReport {
 function bootstrapConflict(path: string, reason: string): BootstrapReport {
   return {
     ok: false,
+    complete: false,
     status: "conflict",
     created: [],
     adopted: [],
     skipped: [],
+    missing: [],
     conflicts: [{ path, reason }],
     errors: [],
     rolledBack: []

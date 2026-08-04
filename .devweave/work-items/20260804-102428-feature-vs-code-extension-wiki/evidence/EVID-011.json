@@ -1,0 +1,42 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013",
+    "AC-014",
+    "AC-015"
+  ],
+  "created_at": "2026-08-04T03:21:44+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "0ed44ae86ced4b864b60ee3eaeb2775e6f2f2688",
+  "id": "EVID-011",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "4458c47b88ab4c648bec8728c21cbe4ca7dfb77c6ec573b621144b813c07a400",
+  "stale": false,
+  "status": "passed",
+  "summary": "完成 final acceptance review：核對 WikiSearchModel 的 Enter/contains 與 stable input、RefreshCoordinator burst/latest 行為、bootstrap 空 workspace/partial/conflict/rollback projection、Dashboard completeness/help、0.2.0 manifest/VSIX 與既有 0.1.0 artifact 保留；typecheck、Extension 50 tests、package、VS Code smoke 與 Repository 84 tests 均通過。",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005"
+  ]
+}

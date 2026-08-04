@@ -5,8 +5,8 @@ sources: [.agents/skills/devweave/assets/wiki/templates, .agents/skills/devweave
 last_updated: 2026-08-04
 tags: [module]
 status: active
-source_fingerprint: "sha256:917b432e9eb384b44d0ba0e00eef0894137bb1ab787b2221a9b1839c77b2ae4c"
-verified_by: 20260804-085630-feature-g1-g2
+source_fingerprint: "sha256:a26c4baa6c2dce5df743314a0240c272aa47d4d77144ba0aa96bfe92047162a8"
+verified_by: 20260804-102428-feature-vs-code-extension-wiki
 ---
 
 # Knowledge Engine
@@ -54,3 +54,15 @@ DevWeave 仍是唯一 router；Companion Skills 是階段內方法，不建立�
 - `vscode-extension/src/presentation.ts` 是 Extension-local 的 presentation seam，集中 public command 任務語言、非權威 snapshot guidance、review readiness、diagnostic copy 與 audit event mapping；它不改變 Python schema 或 `$devweave` prompt contract。
 - Control Center Webview 以總覽、工作項目、知識、驗證與稽核分區；active work 與 closed history 分組，Knowledge 列表以 snapshot 內資料提供搜尋、分類與 bounded initial list，使用者可明確顯示全部。
 - `setDisplayMode` 只更新 Extension `workspaceState`。初始化仍是使用者確認後的固定 bootstrap write；其他命令只預覽／複製 prompt 到 Codex Chat，送出後由使用者 Refresh 取得新的檔案投影。
+
+## VS Code Extension contract
+
+Control Center 依賴 engine 產生的 filesystem projection，但不把 Extension 當成 machine lifecycle 的權威來源。`WorkspaceSnapshotReader` 只讀取 project、hook、skills、baseline、Wiki 與 Work Item artifacts；`WorkspaceSnapshot.bootstrap` 另外依 bundle destination/hash contract 回報 expected、missing、conflicts 與 complete。`project.json` 存在本身不能代表完整初始化。
+
+Extension 的 Wiki 搜尋不新增 knowledge machine command 或索引服務。`WikiSearchModel` 將輸入拆成 draft 與 applied query，Enter 才套用大小寫不敏感的包含式搜尋，欄位是 title、path 與 body preview；分類是 exact type filter，show-all 只改變可見頁數。Webview 保留輸入 DOM，結果與 metrics 是局部更新，`RenderScheduler` 合併同一 event loop 的 local renders。
+
+Watcher refresh 與手動 refresh 共用 `RefreshCoordinator`。Coordinator 一次只允許一個 snapshot read；burst 期間保留最新 pending request，成功結果不被較舊 read 回退。Reader 對互不依賴的檔案操作使用平行讀取，但以 sorted path/id 合併 projection 與 diagnostics，維持 engine contract 的 deterministic output。
+
+Bootstrap bundle 的來源與目的地由 build-time manifest 固定：`devweave` 加上五個核准 companion skills、通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。`BootstrapInstaller.inspect()` 先做 read-only integrity/path preflight；install 只建立缺少且不衝突的檔案，same bytes 視為 adopted，different bytes 列 conflict，寫入失敗則 rollback 本輪建立的檔案。Dashboard 以 completeness projection 提供初始化／補齊入口。
+
+說明內容嵌入 Extension bundle 並在首次切換 help section 時 render；它不落地到 workspace、不發 network request。Extension runtime 維持 no process、no shell、no external network，除使用者確認的固定 bootstrap path 外不提供 workspace write seam。

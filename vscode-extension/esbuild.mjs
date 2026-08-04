@@ -51,12 +51,20 @@ await createBootstrapBundle(repositoryRoot, outdir);
 async function createBootstrapBundle(repo, outputRoot) {
   const bootstrapRoot = join(outputRoot, "bootstrap");
   const skillSource = join(repo, ".agents", "skills", "devweave");
+  const companionSkills = ["codebase-design", "diagnosing-bugs", "grill-me", "grilling", "tdd"];
   const hooksSource = join(repo, ".codex", "hooks.json");
+  const agentsSource = join(root, "assets", "bootstrap", "AGENTS.md");
+  const skillsLockSource = join(repo, "skills-lock.json");
   const assetsRoot = join(skillSource, "assets");
   const templatesRoot = join(bootstrapRoot, "templates");
 
   await mkdir(templatesRoot, { recursive: true });
   await cp(skillSource, join(bootstrapRoot, "skill"), { recursive: true });
+  for (const skill of companionSkills) {
+    await cp(join(repo, ".agents", "skills", skill), join(bootstrapRoot, "companions", skill), { recursive: true });
+  }
+  await cp(agentsSource, join(bootstrapRoot, "AGENTS.md"));
+  await cp(skillsLockSource, join(bootstrapRoot, "skills-lock.json"));
   await cp(hooksSource, join(bootstrapRoot, "hooks.json"));
   await cp(join(assetsRoot, "baseline-product.md.tmpl"), join(templatesRoot, "baseline-product.md"));
   await cp(join(assetsRoot, "baseline-architecture.md.tmpl"), join(templatesRoot, "baseline-architecture.md"));
@@ -84,6 +92,8 @@ async function createBootstrapBundle(repo, outputRoot) {
     "wiki/synthesis"
   ];
   const fileMappings = [
+    { source: "AGENTS.md", destination: "AGENTS.md", transform: "copy" },
+    { source: "skills-lock.json", destination: "skills-lock.json", transform: "copy" },
     { source: "hooks.json", destination: ".codex/hooks.json", transform: "copy" },
     { source: "templates/project.json", destination: ".devweave/project.json", transform: "copy" },
     { source: "templates/baseline-product.md", destination: ".devweave/baseline/product.md", transform: "copy" },
@@ -101,6 +111,16 @@ async function createBootstrapBundle(repo, outputRoot) {
       transform: "copy"
     });
   }
+  for (const skill of companionSkills) {
+    const companionFiles = await collectFiles(join(bootstrapRoot, "companions", skill));
+    for (const source of companionFiles) {
+      fileMappings.push({
+        source: `companions/${skill}/${source}`,
+        destination: `.agents/skills/${skill}/${source.replaceAll("\\", "/")}`,
+        transform: "copy"
+      });
+    }
+  }
 
   const files = [];
   for (const mapping of fileMappings) {
@@ -115,7 +135,7 @@ async function createBootstrapBundle(repo, outputRoot) {
   }
   await writeFile(join(bootstrapRoot, "manifest.json"), `${JSON.stringify({
     schemaVersion: 1,
-    bundleVersion: "0.1.0",
+    bundleVersion: "0.2.0",
     directories,
     files
   }, null, 2)}\n`, "utf8");

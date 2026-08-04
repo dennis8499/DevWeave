@@ -7,6 +7,7 @@ export interface DirectoryEntry {
 
 export interface FileSystemPort {
   exists(relativePath: string): Promise<boolean>;
+  readBytes?(relativePath: string): Promise<Uint8Array>;
   readText(relativePath: string, maxBytes?: number): Promise<{ text: string; truncated: boolean }>;
   readDirectory(relativePath: string): Promise<DirectoryEntry[]>;
 }

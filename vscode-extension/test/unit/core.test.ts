@@ -112,6 +112,7 @@ function snapshotFixture(): WorkspaceSnapshot {
     baselineFiles: [],
     hookPresent: true,
     skillPresent: true,
+    bootstrap: { complete: true, expected: [], missing: [], conflicts: [] },
     workItems: [],
     knowledge: {
       root: "wiki",

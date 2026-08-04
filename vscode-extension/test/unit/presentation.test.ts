@@ -95,6 +95,7 @@ function snapshot(workItems: WorkItemProjection[] = []): WorkspaceSnapshot {
     baselineFiles: [],
     hookPresent: true,
     skillPresent: true,
+    bootstrap: { complete: true, expected: [], missing: [], conflicts: [] },
     workItems,
     knowledge: knowledge(),
     diagnostics: [],

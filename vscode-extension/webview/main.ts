@@ -27,6 +27,9 @@ import {
   presentAuditEvent
 } from "../src/presentation";
 import { resolveWorkSelection } from "../src/work-selection";
+import { RenderScheduler } from "../src/render-scheduler";
+import { WikiSearchModel } from "../src/wiki-search";
+import { helpContent } from "./help-content";
 
 declare function acquireVsCodeApi<T>(): { postMessage(message: T): void };
 
@@ -42,13 +45,21 @@ let pendingIntent: PublicCommandIntent | null = null;
 let previewBundle: PromptBundle | null = null;
 let copiedBundle: PromptBundle | null = null;
 let bootstrapReport: BootstrapReport | null = null;
-let wikiQuery = "";
-let wikiType = "all";
-let showAllWikiPages = false;
 let showAllAudit = false;
 let busyAction: string | null = null;
 let statusMessage = "正在等待 workspace 檔案快照。";
 let statusError = false;
+
+const wikiSearch = new WikiSearchModel();
+const frameScheduler = (callback: () => void): void => {
+  if (typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(() => callback());
+  } else {
+    window.setTimeout(callback, 0);
+  }
+};
+const renderScheduler = new RenderScheduler(() => render(), frameScheduler);
+const knowledgeRenderScheduler = new RenderScheduler(() => renderKnowledgeResults(), frameScheduler);
 
 window.addEventListener("message", (event) => {
   const message = event.data;
@@ -137,7 +148,7 @@ document.addEventListener("click", (event) => {
     copiedBundle = null;
     statusMessage = "已取消這次 prompt preview。";
     statusError = false;
-    render();
+    renderScheduler.request();
   } else if (action === "open") {
     const path = button.dataset.path;
     if (path && !busyAction) api.postMessage({ type: "openFile", path });
@@ -145,7 +156,7 @@ document.addEventListener("click", (event) => {
     const section = button.dataset.section;
     if (isDashboardSection(section)) {
       selectedSection = section;
-      render();
+      renderScheduler.request();
     }
   } else if (action === "select-command") {
     const command = button.dataset.command;
@@ -153,14 +164,14 @@ document.addEventListener("click", (event) => {
       selectedCommand = command;
       selectedSection = "overview";
       clearPromptResult();
-      render();
+      renderScheduler.request();
       focusByKey("command-select");
     }
   } else if (action === "start-work") {
     selectedCommand = "new";
     selectedSection = "overview";
     clearPromptResult();
-    render();
+    renderScheduler.request();
     focusByKey("command-select");
   } else if (action === "set-display-mode") {
     const mode = button.dataset.mode;
@@ -169,11 +180,11 @@ document.addEventListener("click", (event) => {
       beginHostAction("display-mode", { type: "setDisplayMode", mode }, "正在儲存顯示偏好…");
     }
   } else if (action === "show-all-wiki") {
-    showAllWikiPages = true;
-    render();
+    wikiSearch.setShowAll(true);
+    knowledgeRenderScheduler.request();
   } else if (action === "show-all-audit") {
     showAllAudit = true;
-    render();
+    renderScheduler.request();
   }
 });
 
@@ -183,24 +194,23 @@ document.addEventListener("change", (event) => {
     clearPromptResult();
     selectedWorkId = target.value || null;
     if (!busyAction) api.postMessage({ type: "selectWork", workId: selectedWorkId });
-    render();
+    renderScheduler.request();
   } else if (target.id === "command-select") {
     if (isPublicCommandName(target.value)) {
       clearPromptResult();
       selectedCommand = target.value;
-      render();
+      renderScheduler.request();
     }
   } else if (target.id === "wiki-type") {
-    wikiType = target.value || "all";
-    render();
+    wikiSearch.setType(target.value || "all");
+    knowledgeRenderScheduler.request();
   }
 });
 
 document.addEventListener("input", (event) => {
   const target = event.target as HTMLInputElement;
   if (target.id === "wiki-query") {
-    wikiQuery = target.value;
-    renderKnowledgeOnly();
+    wikiSearch.updateDraft(target.value);
   }
 });
 
@@ -216,7 +226,7 @@ document.addEventListener("submit", (event) => {
       ? "請先選擇一個進行中的 work，再預覽這個審查操作。"
       : "請補齊必要欄位。";
     statusError = true;
-    render();
+    renderScheduler.request();
     return;
   }
   pendingIntent = intent;
@@ -227,13 +237,20 @@ document.addEventListener("submit", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  const target = event.target as HTMLElement;
+  if (target.id === "wiki-query" && event.key === "Enter") {
+    event.preventDefault();
+    wikiSearch.submit();
+    knowledgeRenderScheduler.request();
+    return;
+  }
   if (event.key === "Escape" && previewBundle) {
     pendingIntent = null;
     previewBundle = null;
     copiedBundle = null;
     statusMessage = "已取消這次 prompt preview。";
     statusError = false;
-    render();
+    renderScheduler.request();
   }
 });
 
@@ -284,7 +301,8 @@ function renderSectionNavigation(): string {
     ["overview", "總覽", "先了解 workspace 與下一步"],
     ["work", "工作項目", "查看進行中與歷史工作"],
     ["knowledge", "知識", "查看 Wiki 與待更新頁面"],
-    ["verification", "驗證與稽核", "查看 reviewer readiness 與事件時間軸"]
+    ["verification", "驗證與稽核", "查看 reviewer readiness 與事件時間軸"],
+    ["help", "說明", "查看 Extension 內嵌使用手冊"]
   ];
   return `<nav class="section-tabs" aria-label="Control Center 區域" role="tablist">${sections.map(([id, label, description]) => `<button class="section-tab ${selectedSection === id ? "active" : ""}" data-action="section" data-section="${id}" data-focus-key="section-${id}" role="tab" aria-selected="${selectedSection === id}" aria-controls="section-content" title="${escapeAttr(description)}">${label}</button>`).join("")}</nav>`;
 }
@@ -296,7 +314,12 @@ function renderSection(): string {
     case "work": return renderWorkSection();
     case "knowledge": return renderKnowledgeSection();
     case "verification": return renderVerificationSection();
+    case "help": return renderHelpSection();
   }
+}
+
+function renderHelpSection(): string {
+  return `<section class="section-card section-intro"><p class="eyebrow">DEVWEAVE HELP</p><h2>Extension 使用手冊</h2><p class="muted">這份說明嵌在 Extension 內，首次開啟時才載入；不會寫入 workspace，也不會連線到網路。</p></section><section class="section-card help-content">${helpContent.map((section) => `<article class="help-section"><h3>${escapeHtml(section.title)}</h3>${section.paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("")}${section.items?.length ? `<ul>${section.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : ""}</article>`).join("")}</section>`;
 }
 
 function renderOverview(): string {
@@ -321,12 +344,19 @@ function renderRepositoryState(): string {
   if (!current.projectExists) {
     return `<section class="hero-card"><div><span class="pill warning">尚未初始化</span><h2>先建立 DevWeave workspace</h2><p class="muted">這是唯一會在你確認後直接寫入固定 bootstrap bundle 的操作；其他公開命令只會複製 prompt。</p></div><button class="primary" data-action="initialize" ${busyAction ? "disabled" : ""}>初始化 DevWeave</button></section>`;
   }
+  if (!current.bootstrap.complete) {
+    const remaining = [...new Set([...current.bootstrap.missing, ...current.bootstrap.conflicts])];
+    const missing = remaining.slice(0, 4).map((path) => `<code>${escapeHtml(path)}</code>`).join("、");
+    const more = remaining.length > 4 ? ` 等 ${remaining.length} 項` : "";
+    return `<section class="hero-card"><div><span class="pill warning">DevWeave 尚未完整</span><h2>補齊 DevWeave control bundle</h2><p class="muted">目前 project.json 已存在，但仍缺少或衝突於 ${missing || "控制檔案"}${more}。補齊只會建立無衝突缺檔，不覆寫既有內容。</p></div><button class="primary" data-action="initialize" ${busyAction ? "disabled" : ""}>初始化／補齊 DevWeave</button></section>`;
+  }
   return `<section class="hero-card"><div><span class="pill success">檔案快照可讀取</span><h2>先用總覽理解目前狀態</h2><p class="muted">Extension 不執行 engine；公開命令會先預覽，確認後複製到 Codex Chat。</p></div><button class="secondary" data-action="section" data-section="work">查看工作項目</button></section>`;
 }
 
 function renderOnboarding(current: WorkspaceSnapshot, active: WorkItemProjection[]): string {
   const steps: string[] = [];
   if (!current.hookPresent) steps.push("確認 Codex repository hook");
+  if (!current.bootstrap.complete) steps.push("補齊 DevWeave control bundle");
   if (!current.commands.length || !Object.values(current.verificationProfiles).some((ids) => ids.length > 0)) steps.push("設定 verification commands");
   if (current.projectExists && active.length === 0) steps.push("建立第一個 work item");
   if (!steps.length) return "";
@@ -342,7 +372,8 @@ function renderGuidance(guidance: SnapshotGuidance): string {
 
 function renderSnapshotMetadata(current: WorkspaceSnapshot, work: WorkItemProjection | null): string {
   const profiles = Object.entries(current.verificationProfiles).map(([name, ids]) => `${name}: ${(ids as string[]).join(", ") || "尚未設定"}`).join(" · ") || "尚未設定";
-  return `<details class="details-card" ${preferences.displayMode === "advanced" ? "open" : ""}><summary>檔案來源與技術詳細資訊</summary><div class="metric-grid"><div class="metric"><span>Snapshot</span><strong>${escapeHtml(current.capturedAt)}</strong></div><div class="metric"><span>工作項目最後更新時間</span><strong>${escapeHtml(work?.updatedAt ?? "目前沒有 active work")}</strong></div><div class="metric"><span>來源</span><strong>Filesystem snapshot</strong></div><div class="metric"><span>Verification profile</span><strong>${escapeHtml(profiles)}</strong></div></div><div class="meta-line"><span class="pill ${current.hookPresent ? "success" : "warning"}">${current.hookPresent ? "hook 已找到" : "hook 待確認"}</span><span class="pill ${current.skillPresent ? "success" : "warning"}">${current.skillPresent ? "skill 已找到" : "skill 待確認"}</span><code>${escapeHtml(current.projectPath)}</code></div><p class="muted">Snapshot 是 Extension 讀到的檔案投影，不代表 engine 權威狀態；送出 status/next 後請回來 Refresh。</p></details>`;
+  const bootstrapRemaining = new Set([...current.bootstrap.missing, ...current.bootstrap.conflicts]).size;
+  return `<details class="details-card" ${preferences.displayMode === "advanced" ? "open" : ""}><summary>檔案來源與技術詳細資訊</summary><div class="metric-grid"><div class="metric"><span>Snapshot</span><strong>${escapeHtml(current.capturedAt)}</strong></div><div class="metric"><span>工作項目最後更新時間</span><strong>${escapeHtml(work?.updatedAt ?? "目前沒有 active work")}</strong></div><div class="metric"><span>來源</span><strong>Filesystem snapshot</strong></div><div class="metric"><span>Verification profile</span><strong>${escapeHtml(profiles)}</strong></div></div><div class="meta-line"><span class="pill ${current.hookPresent ? "success" : "warning"}">${current.hookPresent ? "hook 已找到" : "hook 待確認"}</span><span class="pill ${current.skillPresent ? "success" : "warning"}">${current.skillPresent ? "skill 已找到" : "skill 待確認"}</span><span class="pill ${current.bootstrap.complete ? "success" : "warning"}">${current.bootstrap.complete ? "bootstrap 完整" : `bootstrap 尚有 ${bootstrapRemaining} 項`}</span><code>${escapeHtml(current.projectPath)}</code></div><p class="muted">Snapshot 是 Extension 讀到的檔案投影，不代表 engine 權威狀態；送出 status/next 後請回來 Refresh。</p></details>`;
 }
 
 function renderWorkSection(): string {
@@ -406,22 +437,27 @@ function renderTrace(work: WorkItemProjection): string {
 function renderKnowledgeSection(): string {
   const knowledge = selectedWork()?.knowledge ?? snapshot?.knowledge;
   if (!knowledge) return "";
+  wikiSearch.updateDocuments(knowledge.pages ?? []);
   return `<section class="section-card section-intro"><p class="eyebrow">知識</p><h2>讓 Wiki 告訴你哪些內容需要更新</h2><p class="muted">列表來自目前 snapshot；搜尋與分類不會觸發額外 repository scan。</p></section>${renderKnowledge(knowledge)}`;
 }
 
 function renderKnowledge(knowledge: WorkspaceSnapshot["knowledge"]): string {
   const pages = knowledge.pages ?? [];
   const categories = [...new Set(pages.map((page) => page.type))].sort();
-  const query = wikiQuery.trim().toLowerCase();
-  const filtered = pages.filter((page) => {
-    const matchesType = wikiType === "all" || page.type === wikiType;
-    const haystack = `${page.title} ${page.path} ${page.bodyPreview}`.toLowerCase();
-    return matchesType && (!query || haystack.includes(query));
-  });
-  const visible = showAllWikiPages ? filtered : filtered.slice(0, 12);
   const pending = [...new Set([...knowledge.affectedPages, ...knowledge.pendingRefresh, ...knowledge.stalePages, ...knowledge.uncoveredChangedPaths])];
   const bootstrap = knowledge.bootstrap;
-  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">WIKI-FIRST KNOWLEDGE</p><h2>Knowledge 狀態</h2><p class="muted">${knowledge.health === "healthy" ? "目前沒有被投影出的問題。" : "先處理下方提醒，再把結果交由 engine 確認。"}</p></div><span class="pill ${knowledge.health === "healthy" ? "success" : "warning"}">${escapeHtml(presentStatus(knowledge.health))}</span></div>${bootstrap.recommended ? `<div class="notice warning"><span class="status-icon">!</span><div><strong>Wiki 還沒有完整就緒</strong><p>${escapeHtml(bootstrapReasons(bootstrap.reasons))}</p><button class="primary" data-action="wiki-bootstrap" ${snapshot?.mutationBlocked || busyAction ? "disabled" : ""}>準備 Wiki bootstrap prompt</button></div></div>` : `<div class="notice success"><span class="status-icon">✓</span><div><strong>核心 Wiki 頁面已找到</strong><p>Extension 只顯示檔案投影；頁面是否 current 仍由 engine 與 Knowledge Review 決定。</p></div></div>`}${pending.length ? `<div class="actionable-list"><strong>需要留意的頁面與原因</strong>${pending.map((path) => `<div class="actionable-row"><span class="status-icon">•</span><span><strong>${escapeHtml(path)}</strong><small>${knowledge.pendingRefresh.includes(path) ? "工作狀態標示待 refresh" : knowledge.stalePages.includes(path) ? "來源 fingerprint 可能過期" : knowledge.uncoveredChangedPaths.includes(path) ? "目前變更尚未被頁面覆蓋" : "列為受影響頁面"}</small></span></div>`).join("")}</div>` : `<div class="notice info"><span class="status-icon">i</span><div><strong>目前沒有待更新頁面</strong><p>若這次工作改變了可重用的 codebase knowledge，請在 verification 依 Knowledge Review 處理。</p></div></div>`}<div class="knowledge-controls"><label for="wiki-query">搜尋 Wiki</label><input id="wiki-query" data-focus-key="wiki-query" type="search" value="${escapeAttr(wikiQuery)}" placeholder="搜尋標題、路徑或摘要" aria-label="搜尋 Wiki 頁面" /><label for="wiki-type">分類</label><select id="wiki-type" data-focus-key="wiki-type" aria-label="依類型篩選 Wiki 頁面"><option value="all" ${wikiType === "all" ? "selected" : ""}>全部分類</option>${categories.map((type) => `<option value="${escapeAttr(type)}" ${wikiType === type ? "selected" : ""}>${escapeHtml(type)}</option>`).join("")}</select></div><div class="metric-grid"><div class="metric"><span>頁面</span><strong>${pages.length}</strong></div><div class="metric"><span>篩選結果</span><strong>${filtered.length}</strong></div><div class="metric"><span>Placeholder</span><strong>${knowledge.placeholderPages.length}</strong></div><div class="metric"><span>待 refresh</span><strong>${knowledge.pendingRefresh.length}</strong></div></div><div class="page-list">${visible.map((page) => `<button class="page-row" data-action="open" data-path="${escapeAttr(page.path)}"><span class="status-icon">${icon(page.status)}</span><span><strong>${escapeHtml(page.title)}</strong><small>${escapeHtml(page.path)} · ${escapeHtml(presentStatus(page.status))}${page.verifiedBy ? ` · verified ${escapeHtml(page.verifiedBy)}` : ""}${page.parseErrors.length ? " · 解析提醒" : ""}</small></span></button>`).join("") || `<p class="muted">找不到符合條件的 Wiki 頁面。</p>`}</div>${!showAllWikiPages && filtered.length > visible.length ? `<button class="secondary" data-action="show-all-wiki">顯示全部 ${filtered.length} 頁</button>` : ""}</section>`;
+  const state = wikiSearch.state;
+  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">WIKI-FIRST KNOWLEDGE</p><h2>Knowledge 狀態</h2><p class="muted">${knowledge.health === "healthy" ? "目前沒有被投影出的問題。" : "先處理下方提醒，再把結果交由 engine 確認。"}</p></div><span class="pill ${knowledge.health === "healthy" ? "success" : "warning"}">${escapeHtml(presentStatus(knowledge.health))}</span></div>${bootstrap.recommended ? `<div class="notice warning"><span class="status-icon">!</span><div><strong>Wiki 還沒有完整就緒</strong><p>${escapeHtml(bootstrapReasons(bootstrap.reasons))}</p><button class="primary" data-action="wiki-bootstrap" ${snapshot?.mutationBlocked || busyAction ? "disabled" : ""}>準備 Wiki bootstrap prompt</button></div></div>` : `<div class="notice success"><span class="status-icon">✓</span><div><strong>核心 Wiki 頁面已找到</strong><p>Extension 只顯示檔案投影；頁面是否 current 仍由 engine 與 Knowledge Review 決定。</p></div></div>`}${pending.length ? `<div class="actionable-list"><strong>需要留意的頁面與原因</strong>${pending.map((path) => `<div class="actionable-row"><span class="status-icon">•</span><span><strong>${escapeHtml(path)}</strong><small>${knowledge.pendingRefresh.includes(path) ? "工作狀態標示待 refresh" : knowledge.stalePages.includes(path) ? "來源 fingerprint 可能過期" : knowledge.uncoveredChangedPaths.includes(path) ? "目前變更尚未被頁面覆蓋" : "列為受影響頁面"}</small></span></div>`).join("")}</div>` : `<div class="notice info"><span class="status-icon">i</span><div><strong>目前沒有待更新頁面</strong><p>若這次工作改變了可重用的 codebase knowledge，請在 verification 依 Knowledge Review 處理。</p></div></div>`}<div class="knowledge-controls"><label for="wiki-query">搜尋 Wiki</label><input id="wiki-query" data-focus-key="wiki-query" type="search" value="${escapeAttr(state.draftQuery)}" placeholder="輸入後按 Enter 套用搜尋" aria-label="搜尋 Wiki 頁面" /><label for="wiki-type">分類</label><select id="wiki-type" data-focus-key="wiki-type" aria-label="依類型篩選 Wiki 頁面"><option value="all" ${state.type === "all" ? "selected" : ""}>全部分類</option>${categories.map((type) => `<option value="${escapeAttr(type)}" ${state.type === type ? "selected" : ""}>${escapeHtml(type)}</option>`).join("")}</select></div><div id="wiki-results">${renderKnowledgeResults(knowledge)}</div></section>`;
+}
+
+function renderKnowledgeResults(knowledge?: WorkspaceSnapshot["knowledge"]): string {
+  const current = knowledge ?? selectedWork()?.knowledge ?? snapshot?.knowledge;
+  if (!current) return "";
+  wikiSearch.updateDocuments(current.pages ?? []);
+  const pages = current.pages ?? [];
+  const filtered = wikiSearch.filter();
+  const visible = wikiSearch.visiblePages();
+  return `<div id="wiki-metrics" class="metric-grid"><div class="metric"><span>頁面</span><strong>${pages.length}</strong></div><div class="metric"><span>篩選結果</span><strong>${filtered.length}</strong></div><div class="metric"><span>Placeholder</span><strong>${current.placeholderPages.length}</strong></div><div class="metric"><span>待 refresh</span><strong>${current.pendingRefresh.length}</strong></div></div><div class="page-list">${visible.map((page) => { const status = page.status ?? "unknown"; const parseErrors = page.parseErrors ?? []; return `<button class="page-row" data-action="open" data-path="${escapeAttr(page.path)}"><span class="status-icon">${icon(status)}</span><span><strong>${escapeHtml(page.title)}</strong><small>${escapeHtml(page.path)} · ${escapeHtml(presentStatus(status))}${page.verifiedBy ? ` · verified ${escapeHtml(page.verifiedBy)}` : ""}${parseErrors.length ? " · 解析提醒" : ""}</small></span></button>`; }).join("") || `<p class="muted">找不到符合條件的 Wiki 頁面。</p>`}</div>${!wikiSearch.state.showAll && filtered.length > visible.length ? `<button class="secondary" data-action="show-all-wiki">顯示全部 ${filtered.length} 頁</button>` : ""}`;
 }
 
 function renderVerificationSection(): string {
@@ -565,20 +601,12 @@ function renderBootstrapResult(report: BootstrapReport): string {
   const list = (values: string[]) => values.length ? `<ul>${values.map((value) => `<li><code>${escapeHtml(value)}</code></li>`).join("")}</ul>` : `<p class="muted">沒有項目</p>`;
   const conflicts = report.conflicts.map((item) => `<li><code>${escapeHtml(item.path)}</code> · ${escapeHtml(item.reason)}</li>`).join("");
   const errors = report.errors.map((item) => `<li><code>${escapeHtml(item.path)}</code> · ${escapeHtml(item.reason)}</li>`).join("");
-  return `<section id="result-panel" class="preview" aria-labelledby="bootstrap-result-title"><div class="preview-heading"><div><p class="eyebrow">DEVWEAVE BOOTSTRAP</p><h2 id="bootstrap-result-title">${report.ok ? "初始化完成" : "初始化未完成"}</h2></div><span class="pill ${report.ok ? "success" : "danger"}">${escapeHtml(report.status)}</span></div><p>${report.ok ? "這次操作已由你確認，Extension 只套用固定 bootstrap manifest。下一步是確認 Codex hook、設定 verification commands、建立第一個 work item。" : "Extension 沒有宣稱初始化成功；先處理 conflict/error，修正後再重新整理。"}</p><h3>已建立</h3>${list(report.created)}<h3>已採用</h3>${list(report.adopted)}${conflicts ? `<h3>衝突</h3><ul>${conflicts}</ul>` : ""}${errors ? `<h3>錯誤</h3><ul>${errors}</ul>` : ""}${report.rolledBack.length ? `<h3>已回復</h3>${list(report.rolledBack)}` : ""}</section>`;
+  const missing = report.missing.length ? `<h3>尚未完整</h3>${list(report.missing)}` : "";
+  return `<section id="result-panel" class="preview" aria-labelledby="bootstrap-result-title"><div class="preview-heading"><div><p class="eyebrow">DEVWEAVE BOOTSTRAP</p><h2 id="bootstrap-result-title">${report.complete ? "初始化完成" : "初始化未完成"}</h2></div><span class="pill ${report.complete ? "success" : "danger"}">${escapeHtml(report.status)}</span></div><p>${report.complete ? "這次操作已由你確認，Extension 只套用固定 bootstrap manifest。下一步是確認 Codex hook、設定 verification commands、建立第一個 work item。" : "Extension 沒有宣稱初始化完整；先處理 conflict/error，修正後可再次執行補齊。"}</p><h3>已建立</h3>${list(report.created)}<h3>已採用</h3>${list(report.adopted)}${missing}${conflicts ? `<h3>衝突</h3><ul>${conflicts}</ul>` : ""}${errors ? `<h3>錯誤</h3><ul>${errors}</ul>` : ""}${report.rolledBack.length ? `<h3>已回復</h3>${list(report.rolledBack)}` : ""}</section>`;
 }
 
 function renderStatus(): string {
   return `<div id="copy-status" class="status-line ${statusError ? "error" : "success"}" role="${statusError ? "alert" : "status"}" aria-live="polite" aria-busy="${Boolean(busyAction)}">${busyAction ? "⏳ " : ""}${escapeHtml(statusMessage)}</div>`;
-}
-
-function renderKnowledgeOnly(): void {
-  if (selectedSection !== "knowledge" || !snapshot) return;
-  const content = document.querySelector<HTMLElement>("#section-content");
-  if (!content) return;
-  const focusKey = document.activeElement?.getAttribute("data-focus-key") ?? "wiki-query";
-  content.innerHTML = renderKnowledgeSection();
-  restoreFocus(focusKey);
 }
 
 function selectedWork(): WorkItemProjection | null {
@@ -634,7 +662,7 @@ function focusByKey(key: string): void {
 }
 
 function isDashboardSection(value: unknown): value is DashboardSection {
-  return value === "overview" || value === "work" || value === "knowledge" || value === "verification";
+  return value === "overview" || value === "work" || value === "knowledge" || value === "verification" || value === "help";
 }
 
 function isDisplayMode(value: unknown): value is DisplayMode {

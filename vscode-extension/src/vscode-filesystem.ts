@@ -11,6 +11,10 @@ export class VscodeFileSystemPort implements FileSystemPort {
     );
   }
 
+  public async readBytes(relativePath: string): Promise<Uint8Array> {
+    return vscode.workspace.fs.readFile(this.uri(relativePath));
+  }
+
   public async readText(
     relativePath: string,
     maxBytes = 1_000_000

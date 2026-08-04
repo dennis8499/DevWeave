@@ -119,6 +119,13 @@ export interface Diagnostic {
   path?: string;
 }
 
+export interface BootstrapCompletenessProjection {
+  complete: boolean;
+  expected: string[];
+  missing: string[];
+  conflicts: string[];
+}
+
 export interface WorkItemProjection {
   id: string;
   title: string;
@@ -167,6 +174,7 @@ export interface WorkspaceSnapshot {
   baselineFiles: string[];
   hookPresent: boolean;
   skillPresent: boolean;
+  bootstrap: BootstrapCompletenessProjection;
   workItems: WorkItemProjection[];
   knowledge: KnowledgeProjection;
   diagnostics: Diagnostic[];
@@ -179,7 +187,7 @@ export interface WorkspaceSnapshot {
 
 export type PublicCommandName = "new" | "feature" | "refactor" | "bug" | "next" | "status" | "revise" | "approve" | "wikiBootstrap";
 
-export type DashboardSection = "overview" | "work" | "knowledge" | "verification";
+export type DashboardSection = "overview" | "work" | "knowledge" | "verification" | "help";
 export type DisplayMode = "concise" | "advanced";
 
 export interface DashboardPreferences {

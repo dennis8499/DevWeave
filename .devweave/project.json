@@ -31,13 +31,9 @@
     },
     {
       "argv": [
-        "node.exe",
-        "--import",
-        "tsx",
-        "--test",
-        "--test-reporter=tap",
-        "test/unit/core.test.ts",
-        "test/unit/security.test.ts"
+        "npm.cmd",
+        "run",
+        "test"
       ],
       "cwd": "vscode-extension",
       "id": "extension-tests",
