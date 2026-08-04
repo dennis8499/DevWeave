@@ -17,11 +17,13 @@ Read this reference only while the work item phase is verification or acceptance
 11. Update accepted living truth under .devweave/baseline, or record why no baseline update is needed. Declare every changed baseline path through `baseline --target`; undeclared changes and declared-but-unchanged targets block G3. `new` work must make and declare an architecture baseline update.
 12. Complete acceptance.md in Traditional Chinese with the AC/TASK/EVID matrix, Knowledge Review disposition/rationale, Wiki promotion and warnings, baseline changes, waivers, residual risks, and conclusion.
 
+Treat G3 as a conformance check against the approved requirements, design, task plan, and evidence. Do not silently resolve a newly discovered product or design decision during verification; record the decision and use `revise` from the earliest affected phase, then rerun the invalidated validation and evidence.
+
 Run validate with gate acceptance. A changed product-source fingerprint makes post-implementation evidence, Knowledge Review, and plan stale; rerun affected checks. A later Wiki-only change leaves product evidence current but invalidates G3 through its separate knowledge fingerprint. Critical Wiki lint, undeclared/unchanged knowledge targets, more than five content targets, missing index/log coupling, stale affected pages, placeholder/template content, and log rewrites block G3. Out-of-scope product changes require removal, scope revision, or an explicit waiver.
 
 ## G3
 
-Present the behavior delivered, verification commands, manual evidence, baseline changes, waivers, and residual risks in Traditional Chinese. Record G3 only after explicit human approval or an explicit $devweave approve request. Then run close immediately.
+Present the behavior delivered, verification commands, manual evidence, baseline changes, waivers, residual risks, and any approved-decision conformance findings in Traditional Chinese. Record G3 only after explicit human approval or an explicit `$devweave approve` request; silence or an inferred acceptance is not approval. Then run close immediately.
 
 When acceptance is rejected, record revise from requirements, design, or implementation according to the reason and continue from that phase.
 

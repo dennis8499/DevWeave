@@ -2,18 +2,18 @@
 title: Knowledge Engine
 type: module
 sources: [.agents/skills/devweave/assets/wiki/templates, .agents/skills/devweave/scripts, tests, vscode-extension]
-last_updated: 2026-08-03
+last_updated: 2026-08-04
 tags: [module]
 status: active
-source_fingerprint: "sha256:c23474109c03e2b312dd51d5be702deed2f6b9b2c730a9a48c81e01a1018493d"
-verified_by: 20260803-215202-feature-devweave-control-center-ux
+source_fingerprint: "sha256:917b432e9eb384b44d0ba0e00eef0894137bb1ab787b2221a9b1839c77b2ae4c"
+verified_by: 20260804-085630-feature-g1-g2
 ---
 
 # Knowledge Engine
 
 ## Responsibility
 
-Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`knowledge_core.py` 提供純 Wiki/source 運算與安全檔案操作；`devweave_core.py` 將這些能力綁定 Work Item phase、gate、review、plan、event 與 acceptance policy；`devweave.py` 暴露穩定 JSON machine commands。
+Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`knowledge_core.py` 提供純 Wiki/source 運算與安全檔案操作；`devweave_core.py` 將這些能力綁定 Work Item phase、gate、review、plan、event 與 acceptance policy；`devweave.py` 暴露穩定 JSON machine commands。Engine 是 machine lifecycle 與 knowledge state 的權威；G1/G2 的逐題問答則由唯一 router 與 phase guidance 驅動，回答寫入既有 artifacts，不在 Engine 內維護 pending-question state。
 
 ## Public Surface
 
@@ -24,6 +24,8 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 - `knowledge plan`：replace 一至五個 content targets，自動 coupling index/log。
 - `knowledge scaffold`：只對 planned new upsert，以九種 canonical template 進行 exclusive create。
 - `knowledge seal`：只接受 planned upserts/coupled pages，拒絕 placeholder、template token、invalid source 與 critical lint。
+
+互動式決策不是新的 public machine command：G1 由 `grill-me`/`grilling` 協助確認 material requirements，G2 由 `codebase-design` 協助確認 material design；每次只處理一題並等待使用者回答。Gate 在 `validate` 後再做 Double Check，若答案或決策改變，沿既有 `revise` 使 Gate 與 artifacts 回到正確階段。
 
 ## Dependencies
 
@@ -36,9 +38,15 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 
 - Bootstrap readiness 要求無 critical lint，且 overview、architecture、module 皆 active、sourced、current 並有 `verified_by`；既有 Wiki 超過五頁仍可視為完成。
 - `affected_pages` 依 Work Item 起始 Wiki source overlap 計算；既有 affected page 在 G3 必須 refresh/seal 或 delete。Coverage 將 current active pages 的 source overlap 投影成 covered/uncovered，供 durable-value review 判斷。
+- Knowledge Engine 不替 agent 判斷哪些 repository facts 應詢問使用者；可由 Wiki/source/artifacts 查出的事實由流程自動整理，只有會改變目標、範圍、介面、風險、相容性或驗收的 material decision 進入對話。這是 router policy，不是 engine 自動決策。
 - 新式 state 以 `knowledge_review_required: true` 啟用完整 contract；缺少 marker 的 schema-v1 Work Item 維持 legacy compatibility，不追溯阻擋。
 - Scaffold 採 no-overwrite create；seal 先完成所有候選 preflight，再以 per-file atomic replace 寫 provenance。多檔 I/O 仍是逐檔 atomic，最終完整性由 G3 reconciliation 保證。
 - Engine 不自動判斷每個 uncovered path 是否值得長期保存，也不強迫一檔一頁；這是刻意保留給 agent review 與人工 G3 的語意責任。
+- Engine 不判定沉默、模糊同意或 agent 推斷為 approval；explicit human approval 仍是 gate event 的必要條件。G3 只檢查實作對已批准內容的符合性，新需求必須經 `revise`，不能在驗證時默默補入。
+
+## Lifecycle boundary
+
+DevWeave 仍是唯一 router；Companion Skills 是階段內方法，不建立第二套 work-item lifecycle、artifact set 或 approval protocol。`diagnosing-bugs` 仍限於既有診斷階段，`tdd` 仍只能在 current G2 approval 後的 implementation 使用。此互動規則不新增 CLI、JSON schema、ledger 欄位或 VS Code UI。
 
 ## Extension integration boundary
 

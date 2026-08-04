@@ -32,6 +32,13 @@ DevWeave remains the sole SDLC router. The only approved project-local companion
 
 DevWeave instructions take precedence whenever a companion skill conflicts with repository policy:
 
+Interactive decision contract:
+
+- Facts that can be discovered from Wiki, source, tests, or approved artifacts are resolved by inspection; they are not delegated back to the user as questions.
+- During G1, `grill-me`/`grilling` asks only material requirements decisions; during G2, `codebase-design` asks only material design decisions. Each question is asked one at a time with a recommendation and trade-off, and the agent waits for the answer.
+- User answers return to the current DevWeave artifacts. An unanswered material decision, silence, or ambiguous agreement never permits the agent to invent a decision or approve a Gate.
+- G1/G2 summaries are Double Checks after validation. New requirements, design, scope, or task decisions use `$devweave revise` from the earliest affected phase; G3 verifies approved intent rather than silently redefining it.
+
 1. Resolve the work item, request session binding, and follow the current `devweave instructions` response before invoking a companion skill for a managed change.
 2. Use `grill-me`/`grilling` during requirements, `codebase-design` during G2 design, `diagnosing-bugs` for bug discovery and post-G2 diagnosis, and `tdd` only during implementation with a current G2 approval.
 3. Use the Wiki context and approved DevWeave artifacts already loaded for the work item. Do not independently create or update `CONTEXT.md`, ADRs, `docs/agents/`, specs, tickets, or alternate planning documents.

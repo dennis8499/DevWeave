@@ -115,6 +115,11 @@ G1 確認問題、使用者、成功條件、非目標、risk、scope 與 featur
 item 還必須完成 Wiki-first context：先讀 `wiki/index.md`，再讀最多五個相關頁面；只有
 placeholder、stale、缺漏或矛盾被記錄為 gap 後，才回溯 raw source。
 
+G1 的聊天流程是：先由 Codex 查證 repository facts，再使用 `grill-me`／`grilling` 逐題確認
+會影響目標、範圍、風險、相容性或驗收的 material decisions。每題提供目前證據、推薦選項與
+主要取捨，等待使用者回答後才回流 `brief.md`／`requirements.md`；可由 repository 查出的
+facts 不重複詢問。
+
 G1 artifacts：
 
 - `brief.md`
@@ -127,6 +132,10 @@ G1 artifacts：
 
 G2 確認設計選擇、介面、資料流、失敗模式、回復方式與 immutable task plan。G2 通過前，Codex
 不能修改 scope 內的產品文件或程式；只能修改該 work item 的 Markdown artifacts。
+
+G2 使用 `codebase-design` 逐題確認會影響 module、interface、seam、data flow、failure mode、
+rollback、compatibility、observability 或 verification 的設計決策。G2 approval 前不會自行
+補上未決選擇，也不會開始 implementation 或 TDD。
 
 G2 artifacts：
 
@@ -149,6 +158,10 @@ AC/TASK 覆蓋、scope、baseline 與 current Knowledge Review。不同 work kin
 | `high` risk | 上述 evidence + current independent review |
 
 G3 通過且取得人工核准後，才能關閉 work item。
+
+每道 Gate 都是 validation 後的 Double Check：摘要已回答的 decisions、assumptions、scope、
+驗收與 residual risk，等待明確的人類 approval。沉默、模糊同意或 agent 自己的判斷不算核准；
+若 Gate 發現新需求或設計決策，必須使用 `revise` 回到最早受影響階段。
 
 ## 核心安全規則
 
@@ -211,8 +224,8 @@ docs/使用手冊.md                詳細繁體中文操作手冊
 
 本 repository 的 project-local companions 是：
 
-- `grill-me`／`grilling`：G1 requirements interview。
-- `codebase-design`：G2 module、interface、seam 與 adapter 設計。
+- `grill-me`／`grilling`：G1 material requirements interview，一次一題並等待使用者回答。
+- `codebase-design`：G2 module、interface、seam 與 adapter 設計，一次一題確認 material trade-off。
 - `diagnosing-bugs`：bug discovery 與可重現 feedback loop。
 - `tdd`：G2 後 implementation 的 red → green slice。
 

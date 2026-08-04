@@ -1,0 +1,29 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004"
+  ],
+  "created_at": "2026-08-04T01:20:00+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "20f72940b8bc1a00a6cb21e511fbbc80be8578e5",
+  "id": "EVID-007",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "2eacac76afb96b89e70570d54097027a36c3e6b3a89f374b1609461e1f661108",
+  "stale": false,
+  "status": "passed",
+  "summary": "Manual acceptance review passed: G1 facts are resolved from repository evidence and material decisions route through grill-me/grilling one question at a time; G2 design trade-offs route through codebase-design and remain blocked before approval; answers return to existing artifacts; Gate summaries require validation and explicit approval; new decisions use revise; G3 is documented as conformance verification. Limitation: this evidence reviews the policy and artifacts; actual future agent dialogue still requires operational observation.",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-004"
+  ]
+}

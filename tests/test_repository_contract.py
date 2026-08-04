@@ -94,6 +94,97 @@ class RepositoryContractTests(unittest.TestCase):
         for fragment in required_fragments:
             self.assertIn(fragment, agents)
 
+    def test_interactive_decision_policy_is_explicit(self) -> None:
+        agents = (REPOSITORY_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        router = (
+            REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        requirements = (
+            REPOSITORY_ROOT
+            / ".agents"
+            / "skills"
+            / "devweave"
+            / "references"
+            / "requirements-phase.md"
+        ).read_text(encoding="utf-8")
+        design = (
+            REPOSITORY_ROOT
+            / ".agents"
+            / "skills"
+            / "devweave"
+            / "references"
+            / "design-phase.md"
+        ).read_text(encoding="utf-8")
+        verification = (
+            REPOSITORY_ROOT
+            / ".agents"
+            / "skills"
+            / "devweave"
+            / "references"
+            / "verification-phase.md"
+        ).read_text(encoding="utf-8")
+        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+        manual = (
+            REPOSITORY_ROOT / "docs" / "使用手冊.md"
+        ).read_text(encoding="utf-8")
+
+        for fragment in (
+            "Interactive decision contract:",
+            "Facts that can be discovered from Wiki, source, tests, or approved artifacts",
+            "Each question is asked one at a time with a recommendation and trade-off",
+            "never permits the agent to invent a decision or approve a Gate",
+            "New requirements, design, scope, or task decisions use `$devweave revise`",
+        ):
+            self.assertIn(fragment, agents)
+
+        for fragment in (
+            "## Interactive decision protocol",
+            "During G1, use `grill-me`/`grilling`; during G2, use `codebase-design`.",
+            "Ask one material decision at a time.",
+            "Do not silently choose an unresolved material decision",
+            "Before G1 approval, present the answered material decisions",
+            "Before G2 approval, present the answered design decisions",
+            "Gate summaries are Double Checks against the current artifacts",
+        ):
+            self.assertIn(fragment, router)
+
+        for fragment in (
+            "Invoke `grill-me`/`grilling` for material requirements decisions.",
+            "wait for the user's answer before recording the next decision",
+            "Stop at the Gate if approval is absent",
+        ):
+            self.assertIn(fragment, requirements)
+
+        for fragment in (
+            "using `codebase-design` vocabulary",
+            "For each material design choice, ask one question at a time",
+            "Stop before product-code or tracked-test changes",
+        ):
+            self.assertIn(fragment, design)
+
+        for fragment in (
+            "Treat G3 as a conformance check against the approved",
+            "Do not silently resolve a newly discovered product or design decision",
+            "silence or an inferred acceptance is not approval",
+        ):
+            self.assertIn(fragment, verification)
+
+        for fragment in (
+            "G1 的聊天流程是",
+            "G2 使用 `codebase-design` 逐題確認",
+            "每道 Gate 都是 validation 後的 Double Check",
+            "若 Gate 發現新需求或設計決策，必須使用 `revise`",
+        ):
+            self.assertIn(fragment, readme)
+
+        for fragment in (
+            "使用 `grill-me`／`grilling` 逐題確認 material requirements",
+            "使用 `codebase-design` 逐題確認 material design trade-off",
+            "G1/G2 Gate 是對目前 artifacts 的 Double Check",
+            "必須使用 `revise` 回到最早受影響 phase",
+        ):
+            self.assertIn(fragment, manual)
+
     def test_runtime_has_no_openspec_or_third_party_imports(self) -> None:
         for path in SCRIPT_ROOT.glob("*.py"):
             source = path.read_text(encoding="utf-8")

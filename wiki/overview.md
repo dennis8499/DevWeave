@@ -2,27 +2,34 @@
 title: DevWeave Codebase Overview
 type: overview
 sources: [.agents/skills/devweave/SKILL.md, AGENTS.md, README.md, docs/使用手冊.md, vscode-extension/README.md]
-last_updated: 2026-08-03
+last_updated: 2026-08-04
 tags: [overview]
 status: active
-source_fingerprint: "sha256:58ab4cf4a9bc9e3582cf415565bbd10e80ca7f4e8181c3344fe96d5dcf85d349"
-verified_by: 20260803-215202-feature-devweave-control-center-ux
+source_fingerprint: "sha256:0c85bac04d6b1f224e24e5ae5691899d79be4a09fc855b9906e50bc9cf19791e"
+verified_by: 20260804-085630-feature-g1-g2
 ---
 
 # DevWeave Codebase Overview
 
-DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router、可追溯 Work Item、G1/G2/G3 人工關卡、source-bound evidence、living baseline 與 Codebase Wiki 管理軟體變更。
+DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router、可追溯 Work Item、G1/G2/G3 人工關卡、source-bound evidence、living baseline 與 Codebase Wiki 管理軟體變更。G1/G2 在 Gate 前採用互動式關鍵決策問答，讓需求與設計的未決事項先由使用者確認，再由 Gate 做一次可追溯的 Double Check。
 
 ## 核心流程
 
 1. `new|feature|refactor|bug` 建立一般 Work Item；`wiki bootstrap` 建立或續接 `kind: feature`、`knowledge_profile: bootstrap` 的一般生命週期。
-2. G1 先讀 `wiki/index.md`，再讀最多五個內容頁；只有先記錄 missing、placeholder、stale、矛盾或不足 gap，才回查最小必要 source。
-3. G2 核准 requirements、design 與 immutable task definitions。產品實作只在 current G2 後進行，Wiki 在 verification 前保持唯讀。
-4. G3 驗證 current evidence、scope、baseline 與 Knowledge Review。新式 Work Item 必須選擇 `promote` 或 `no-update`；promote 最多變更五個內容頁並同步 index/log/seal。
+2. G1 先讀 `wiki/index.md`，再讀最多五個內容頁；只有先記錄 missing、placeholder、stale、矛盾或不足 gap，才回查最小必要 source。可由 repository 查出的事實由 router 自動整理，不重複問使用者。
+3. G1 需求階段使用 `grill-me`/`grilling`，一次只問一個會影響目標、範圍、介面、風險、相容性或驗收的決策；回答回流 `brief.md`/`requirements.md`，完成 `validate` 後展示摘要並等待明確 G1 approval。
+4. G2 使用 `codebase-design` 逐題確認重要設計取捨；回答回流 `design.md`/`plan.md`，完成 `validate` 後展示方案、介面、失敗處理、回復方式與 task plan，等待明確 G2 approval。產品實作與 tracked tests 只在 current G2 後進行，Wiki 在 verification 前保持唯讀。
+5. G3 驗證 current evidence、scope、baseline 與 Knowledge Review，確認實作符合已批准內容。新式 Work Item 必須選擇 `promote` 或 `no-update`；promote 最多變更五個內容頁並同步 index/log/seal。
+
+## 互動式決策與 Gate
+
+Router 只把有實質影響的決策交給使用者：先提供已查證的 context、建議選項、取捨與不作決定的後果，然後等待目前問題的回答，才進入下一題或改寫 artifact。沉默、模糊同意與 agent 自己的推斷都不能當作決策或 approval；低風險命名與檔案位置等細節才可列為假設自行處理。
+
+Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-me`/`grilling` 負責 G1 問答，`codebase-design` 負責 G2 設計問答，`diagnosing-bugs` 與 `tdd` 仍受既有階段限制。Gate 是對已驗證 artifacts 的 Double Check；Gate 產生的新決策或使用者改變答案時，必須透過 `revise` 回到最早受影響階段。
 
 ## 架構
 
-- Python engine 是 workflow 與 knowledge policy 的權威來源；JSON/JSONL ledger 只能經 CLI 更新。
+- Python engine 是 workflow 與 knowledge policy 的權威來源；JSON/JSONL ledger 只能經 CLI 更新。互動式問答規則位於 router 與 phase guidance，並不新增 pending-question engine、CLI、schema 或第二套 ledger。
 - `knowledge_core.py` 負責 Wiki parser、source/content fingerprint、lint、coverage、bootstrap assessment、canonical scaffold 與 seal。
 - `devweave_core.py` 負責 Work Item state、gate currentness、review/plan invalidation、G3 reconciliation 與 evidence。
 - VS Code Extension 只讀 filesystem projection，三個 Wiki bootstrap 入口都只預覽/複製 `$devweave wiki bootstrap`，不執行 CLI、不寫 Wiki；Control Center 以總覽、工作項目、知識、驗證與稽核四區呈現，顯示偏好只存於 Extension workspaceState。

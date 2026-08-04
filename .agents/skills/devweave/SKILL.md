@@ -53,6 +53,17 @@ For every active turn:
 
 Consider a session bound only when the PreToolUse hook returns additional context confirming the work ID, or when an integration supplies a real `--session-id` and the CLI returns `status: bound`. A plain CLI response with `status: awaiting_hook` means the request was issued but the guard binding was not observable. Report that the hook may be untrusted or disabled; never claim the guardrail is active without confirmation.
 
+## Interactive decision protocol
+
+Facts and decisions have different handling:
+
+- Read Wiki, repository guidance, source, tests, and existing artifacts to answer facts that are discoverable in the environment. Do not ask the user to repeat repository facts.
+- During G1, use `grill-me`/`grilling`; during G2, use `codebase-design`. Ask only material decisions that affect user value, scope, interface, seam, risk, compatibility, acceptance, rollback, or observability.
+- Ask one material decision at a time. Include the current evidence, the recommended option, the meaningful trade-off, and the consequence of each answer. Wait for the user's answer before asking the next question or changing the artifact.
+- Do not silently choose an unresolved material decision, treat silence or ambiguous agreement as approval, or continue past a blocked question. Low-risk equivalent implementation details may be chosen by Codex only when recorded as assumptions in the current artifact and Gate summary.
+- Return user answers to the current phase artifacts: G1 to `brief.md`/`requirements.md`, G2 to `design.md`/`plan.md`. Do not create a second spec, question ledger, or conversation state.
+- If an answer changes an approved requirement, design, scope, or task, use `revise` from the earliest affected phase and wait for the invalidated Gate to be reapproved.
+
 ## Wiki-first knowledge discipline
 
 - In G1, read `wiki/index.md` first and then at most five related pages. Record the complete read set with `knowledge context`, including each page's status, content hash, and source fingerprint. Record a gap before source fallback for missing, placeholder, stale, contradictory, or insufficient knowledge, then inspect only the smallest necessary raw-source range. Current source behavior and approved DevWeave artifacts win conflicts.
@@ -71,6 +82,9 @@ When starting work, use `start --kind new|feature|refactor|bug --title <title>`.
 - G2 approves `design.md`, the immutable task definitions in `plan.md`, and high-risk analyses.
 - Implementation may start only when G2 remains current. Record task progress in `state.json` through engine commands; never check off tasks in `plan.md`.
 - G3 approves `acceptance.md`, current source-bound evidence, required command results, scope compliance, living baseline updates, and a current Knowledge Review disposition.
+- Before G1 approval, present the answered material decisions, problem, scope, non-goals, acceptance criteria, assumptions, waivers, and unresolved gaps after `validate --gate scope`; stop until the user clearly approves G1.
+- Before G2 approval, present the answered design decisions, selected and rejected options, interfaces, data flow, failure modes, rollback, verification strategy, task order, and residual risk after `validate --gate build`; stop until the user clearly approves G2.
+- Gate summaries are Double Checks against the current artifacts, not a license to invent a new requirement or design. A newly discovered decision returns through `revise`; G3 verifies conformance to approved intent.
 - G1 fingerprints the recorded knowledge context. Product verification excludes `wiki/`; G3 separately fingerprints the knowledge tree and promotion ledger.
 - Any stale fingerprint means the previous approval or evidence is no longer valid. Return to the earliest phase reported by `instructions` and do not bypass it with manual state edits.
 - Waivers must be explicit, narrow, justified, attributable, and accepted by the relevant gate. A waiver is not a generic substitute for missing validation.

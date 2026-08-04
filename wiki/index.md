@@ -2,11 +2,11 @@
 title: Wiki Index
 type: index
 sources: []
-last_updated: 2026-08-03
+last_updated: 2026-08-04
 tags: [index]
 status: active
 source_fingerprint: none
-verified_by: 20260803-215202-feature-devweave-control-center-ux
+verified_by: 20260804-085630-feature-g1-g2
 ---
 
 # Codebase Wiki — 索引
@@ -17,15 +17,15 @@ verified_by: 20260803-215202-feature-devweave-control-center-ux
 
 | 頁面 | 摘要 |
 | --- | --- |
-| [[overview]] | DevWeave workflow、Extension 四區域投影、真實來源優先序與有界探索概觀 |
+| [[overview]] | DevWeave workflow、G1/G2 逐題決策問答、Gate Double Check、Extension 投影與真實來源優先序概觀 |
 
 ## Architecture
 
-- [[devweave-knowledge-workflow]] | Bootstrap、Query、Review、Promotion 與 G1/G2/G3 閉環
+- [[devweave-knowledge-workflow]] | Bootstrap、Wiki Query/Review/Promotion、G1/G2 互動決策與 G1/G2/G3 閉環
 
 ## Modules
 
-- [[knowledge-engine]] | Wiki model、coverage、canonical scaffold、seal、lifecycle policy 與 Extension integration boundary
+- [[knowledge-engine]] | Wiki model、coverage、canonical scaffold、seal、machine lifecycle 與互動問答的 router boundary
 
 ## Entities
 
