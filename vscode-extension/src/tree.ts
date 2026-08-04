@@ -1,8 +1,11 @@
 import * as vscode from "vscode";
 import { WorkItemProjection, WorkspaceSnapshot } from "./model";
+import { presentPhase, presentRisk, presentStatus } from "./presentation";
+import { groupWorkItems } from "./work-selection";
 
 export type TreeNode =
   | { kind: "repository"; label: string }
+  | { kind: "group"; group: "active" | "closed" }
   | { kind: "work"; work: WorkItemProjection };
 
 export class WorkItemsTreeProvider implements vscode.TreeDataProvider<TreeNode> {
@@ -27,10 +30,23 @@ export class WorkItemsTreeProvider implements vscode.TreeDataProvider<TreeNode> 
       return item;
     }
 
+    if (element.kind === "group") {
+      const groups = this.snapshot ? groupWorkItems(this.snapshot) : { active: [], closed: [] };
+      const items = groups[element.group];
+      const item = new vscode.TreeItem(
+        element.group === "active" ? "進行中的工作" : "已結束的歷史",
+        element.group === "active" ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed
+      );
+      item.description = `${items.length} 個`;
+      item.contextValue = `devweave.${element.group}WorkGroup`;
+      item.iconPath = new vscode.ThemeIcon(element.group === "active" ? "pulse" : "history");
+      return item;
+    }
+
     const work = element.work;
     const item = new vscode.TreeItem(work.title, vscode.TreeItemCollapsibleState.None);
-    item.description = `${work.phase} · ${work.risk}`;
-    item.tooltip = `${work.id}\n${work.phase}\n${work.status}`;
+    item.description = `${presentPhase(work.phase)} · ${presentStatus(work.status)} · ${presentRisk(work.risk)}`;
+    item.tooltip = `${work.id}\n${presentPhase(work.phase)}\n${presentStatus(work.status)}`;
     item.iconPath = new vscode.ThemeIcon(iconForWork(work));
     item.contextValue = work.status === "closed" ? "devweave.closedWork" : "devweave.work";
     item.command = {
@@ -45,12 +61,25 @@ export class WorkItemsTreeProvider implements vscode.TreeDataProvider<TreeNode> 
     if (!this.snapshot) {
       return [];
     }
-    if (element) {
+    if (!element) {
+      const repository = this.snapshot.rootName ?? "需要選擇 repository";
+      return [{ kind: "repository", label: repository }];
+    }
+    if (element.kind === "repository") {
+      return [
+        { kind: "group", group: "active" },
+        { kind: "group", group: "closed" }
+      ];
+    }
+    if (element.kind === "group") {
+      const groups = groupWorkItems(this.snapshot);
+      return groups[element.group]
+        .map((work) => ({ kind: "work" as const, work }));
+    }
+    if (element.kind === "work") {
       return [];
     }
-    const repository = this.snapshot.rootName ?? "Repository selection required";
-    const workItems = this.snapshot.workItems.map((work) => ({ kind: "work" as const, work }));
-    return [{ kind: "repository", label: repository }, ...workItems];
+    return [];
   }
 
   public dispose(): void {

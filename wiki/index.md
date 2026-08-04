@@ -6,7 +6,7 @@ last_updated: 2026-08-03
 tags: [index]
 status: active
 source_fingerprint: none
-verified_by: 20260803-161041-feature-codebase-llm-wiki
+verified_by: 20260803-215202-feature-devweave-control-center-ux
 ---
 
 # Codebase Wiki — 索引
@@ -17,7 +17,7 @@ verified_by: 20260803-161041-feature-codebase-llm-wiki
 
 | 頁面 | 摘要 |
 | --- | --- |
-| [[overview]] | DevWeave workflow、核心元件、真實來源優先序與有界探索概觀 |
+| [[overview]] | DevWeave workflow、Extension 四區域投影、真實來源優先序與有界探索概觀 |
 
 ## Architecture
 
@@ -25,7 +25,7 @@ verified_by: 20260803-161041-feature-codebase-llm-wiki
 
 ## Modules
 
-- [[knowledge-engine]] | Wiki model、coverage、canonical scaffold、seal 與 lifecycle policy
+- [[knowledge-engine]] | Wiki model、coverage、canonical scaffold、seal、lifecycle policy 與 Extension integration boundary
 
 ## Entities
 

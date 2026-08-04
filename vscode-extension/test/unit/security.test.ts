@@ -86,11 +86,29 @@ test("Wiki bootstrap has three prompt-only entrances with one public intent", ()
   assert.match(webview, /\["wikiBootstrap", "wiki bootstrap — 建立 Codebase Wiki"\]/);
   assert.match(webview, /data-action="wiki-bootstrap"/);
   assert.match(webview, /action === "wiki-bootstrap"[\s\S]*type: "wikiBootstrap"/);
-  assert.ok(commands.some((item) => item.command === "devweave.wikiBootstrap" && item.title === "DevWeave: Bootstrap Codebase Wiki"));
+  assert.ok(commands.some((item) => item.command === "devweave.wikiBootstrap" && item.title === "DevWeave: 建立 Codebase Wiki（複製 prompt）"));
   assert.ok(palette.some((item) => item.command === "devweave.wikiBootstrap"));
   assert.ok(packageJson.activationEvents?.includes("onCommand:devweave.wikiBootstrap"));
   assert.match(extension, /registerCommand\("devweave\.wikiBootstrap"/);
   assert.match(extension, /previewWikiBootstrap[\s\S]*type: "wikiBootstrap"/);
   assert.match(extension, /showWarningMessage\([\s\S]*modal: true/);
   assert.doesNotMatch(extension, /devweave\.py|knowledge bootstrap|workspace\.fs\.writeFile/);
+});
+
+test("P2 preferences and Wiki browsing stay Extension-local and discoverable", () => {
+  const webview = readFileSync(resolve(extensionRoot, "webview/main.ts"), "utf8");
+  const extension = readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8");
+  const protocol = readFileSync(resolve(extensionRoot, "src/protocol.ts"), "utf8");
+  assert.match(webview, /set-display-mode/);
+  assert.match(webview, /show-all-wiki/);
+  assert.match(webview, /wiki-query/);
+  assert.match(webview, /wiki-type/);
+  assert.match(webview, /filtered\.slice\(0, 12\)/);
+  assert.doesNotMatch(webview, /Snapshot may be newer than engine-observed state/);
+  assert.match(extension, /workspaceState\.get/);
+  assert.match(extension, /workspaceState\.update/);
+  assert.match(extension, /已管理/);
+  assert.match(extension, /未初始化/);
+  assert.match(protocol, /case "setDisplayMode"/);
+  assert.match(protocol, /isDisplayMode/);
 });

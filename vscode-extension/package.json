@@ -1,7 +1,7 @@
 {
   "name": "devweave-control-center",
-  "displayName": "DevWeave Control Center",
-  "description": "A DevWeave readonly dashboard with confirmed workspace bootstrap and public Codex Chat command composition for VS Code.",
+  "displayName": "DevWeave Control Center｜開發流程總覽",
+  "description": "以繁體中文呈現 DevWeave 檔案快照；工作流程命令交接到 Codex Chat，初始化則需確認固定 bootstrap 寫入。",
   "version": "0.1.0",
   "publisher": "devweave",
   "license": "MIT",
@@ -41,7 +41,7 @@
       "devweave": [
         {
           "id": "devweave.workItems",
-          "name": "Work Items",
+          "name": "工作項目",
           "when": "workbenchState != empty"
         }
       ]
@@ -49,23 +49,23 @@
     "commands": [
       {
         "command": "devweave.openDashboard",
-        "title": "DevWeave: Open Control Center"
+        "title": "DevWeave: 開啟 Control Center"
       },
       {
         "command": "devweave.initialize",
-        "title": "DevWeave: Initialize Workspace"
+        "title": "DevWeave: 初始化 workspace"
       },
       {
         "command": "devweave.refresh",
-        "title": "DevWeave: Refresh Snapshot"
+        "title": "DevWeave: 重新整理檔案快照"
       },
       {
         "command": "devweave.copyNextAction",
-        "title": "DevWeave: Copy public $devweave next to Codex Chat"
+        "title": "DevWeave: 複製「詢問下一步」prompt 到 Codex Chat"
       },
       {
         "command": "devweave.wikiBootstrap",
-        "title": "DevWeave: Bootstrap Codebase Wiki"
+        "title": "DevWeave: 建立 Codebase Wiki（複製 prompt）"
       }
     ],
     "menus": {

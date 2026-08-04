@@ -1,41 +1,112 @@
 import { parsePublicCommandIntent } from "../src/protocol";
 import type { HostToWebviewMessage, WebviewToHostMessage } from "../src/protocol";
-import type { PublicCommandIntent, PublicCommandName, WorkspaceSnapshot } from "../src/model";
+import type {
+  AuditEventPresentation,
+  DashboardPreferences,
+  DashboardSection,
+  DiagnosticPresentation,
+  DisplayMode,
+  PublicCommandIntent,
+  PublicCommandName,
+  PromptBundle,
+  ReviewReadiness,
+  SnapshotGuidance,
+  WorkItemProjection,
+  WorkspaceSnapshot
+} from "../src/model";
+import type { BootstrapReport } from "../src/bootstrap";
+import {
+  buildReviewReadiness,
+  buildSnapshotGuidance,
+  commandPresentations,
+  presentDiagnostic,
+  presentGate,
+  presentPhase,
+  presentRisk,
+  presentStatus,
+  presentAuditEvent
+} from "../src/presentation";
+import { resolveWorkSelection } from "../src/work-selection";
 
 declare function acquireVsCodeApi<T>(): { postMessage(message: T): void };
 
 type AppApi = { postMessage(message: WebviewToHostMessage): void };
 const api: AppApi = acquireVsCodeApi<WebviewToHostMessage>();
+
 let snapshot: WorkspaceSnapshot | null = null;
+let preferences: DashboardPreferences = { displayMode: "concise" };
+let selectedSection: DashboardSection = "overview";
 let selectedWorkId: string | null = null;
 let selectedCommand: PublicCommandName = "feature";
 let pendingIntent: PublicCommandIntent | null = null;
+let previewBundle: PromptBundle | null = null;
+let copiedBundle: PromptBundle | null = null;
+let bootstrapReport: BootstrapReport | null = null;
+let wikiQuery = "";
+let wikiType = "all";
+let showAllWikiPages = false;
+let showAllAudit = false;
+let busyAction: string | null = null;
+let statusMessage = "正在等待 workspace 檔案快照。";
+let statusError = false;
 
 window.addEventListener("message", (event) => {
   const message = event.data;
   if (!isHostMessage(message)) return;
   if (message.type === "snapshot") {
     snapshot = message.snapshot;
-    selectedWorkId = snapshot.selectedWorkId ?? snapshot.workItems?.[0]?.id ?? null;
+    preferences = message.preferences ?? preferences;
+    selectedWorkId = resolveWorkSelection(snapshot, message.snapshot.selectedWorkId ?? selectedWorkId);
+    busyAction = null;
+    statusMessage = "檔案快照已更新；它不是 engine 的權威狀態。";
+    statusError = false;
     render();
   }
   if (message.type === "bootstrapResult") {
     snapshot = message.snapshot;
-    selectedWorkId = snapshot.selectedWorkId ?? snapshot.workItems?.[0]?.id ?? null;
+    selectedWorkId = resolveWorkSelection(snapshot, message.snapshot.selectedWorkId ?? selectedWorkId);
+    bootstrapReport = message.report;
+    busyAction = null;
+    statusMessage = message.report.ok
+      ? "初始化完成；請依下方設定提示確認 hook、verification 與第一個 work。"
+      : "初始化未完成；請先處理 conflict 或 error，再重新整理。";
+    statusError = !message.report.ok;
     render();
-    renderBootstrapResult(message.report);
+    document.querySelector<HTMLElement>("#result-panel")?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" });
   }
   if (message.type === "copyResult") {
-    renderCopyResult(message);
+    busyAction = null;
+    if (message.ok) {
+      copiedBundle = message.bundle;
+      previewBundle = null;
+      statusMessage = "prompt 已複製；請到 Codex Chat 貼上並送出，完成後回來 Refresh。";
+      statusError = false;
+    } else {
+      statusMessage = message.message;
+      statusError = true;
+    }
+    render();
   }
   if (message.type === "actionPreview") {
-    renderActionPreview(message.bundle);
+    busyAction = null;
+    previewBundle = message.bundle;
+    copiedBundle = null;
+    statusMessage = "請先閱讀這個操作會做什麼、不會做什麼，再決定是否複製。";
+    statusError = false;
+    render();
+    document.querySelector<HTMLElement>("#result-panel")?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" });
   }
   if (message.type === "protocolError") {
-    setStatus(`Protocol warning: ${message.message}`, true);
+    busyAction = null;
+    statusMessage = `訊息格式無法接受：${message.message}`;
+    statusError = true;
+    render();
   }
   if (message.type === "error") {
-    setStatus(message.message, true);
+    busyAction = null;
+    statusMessage = message.message;
+    statusError = true;
+    render();
   }
 });
 
@@ -44,44 +115,92 @@ document.addEventListener("click", (event) => {
   const button = target.closest<HTMLElement>("[data-action]");
   if (!button) return;
   const action = button.dataset.action;
+
   if (action === "refresh") {
-    api.postMessage({ type: "refresh" });
+    beginHostAction("refresh", { type: "refresh" }, "正在重新整理檔案快照…");
   } else if (action === "initialize") {
-    api.postMessage({ type: "initialize" });
+    beginHostAction("initialize", { type: "initialize" }, "等待你確認 bootstrap 寫入…");
   } else if (action === "wiki-bootstrap") {
     const intent: PublicCommandIntent = { type: "wikiBootstrap" };
     pendingIntent = intent;
-    api.postMessage({ type: "previewAction", intent });
+    previewBundle = null;
+    copiedBundle = null;
+    bootstrapReport = null;
+    beginHostAction("preview", { type: "previewAction", intent }, "正在產生 Wiki bootstrap prompt…");
   } else if (action === "confirm-copy") {
     if (pendingIntent) {
-      api.postMessage({ type: "copyAction", intent: pendingIntent });
-      pendingIntent = null;
+      beginHostAction("copy", { type: "copyAction", intent: pendingIntent }, "正在複製 prompt…");
     }
   } else if (action === "cancel-preview") {
     pendingIntent = null;
-    const panel = document.querySelector<HTMLElement>("#copy-preview");
-    panel?.classList.add("hidden");
-    setStatus("Preview cancelled.", false);
+    previewBundle = null;
+    copiedBundle = null;
+    statusMessage = "已取消這次 prompt preview。";
+    statusError = false;
+    render();
   } else if (action === "open") {
     const path = button.dataset.path;
-    if (path) api.postMessage({ type: "openFile", path });
+    if (path && !busyAction) api.postMessage({ type: "openFile", path });
+  } else if (action === "section") {
+    const section = button.dataset.section;
+    if (isDashboardSection(section)) {
+      selectedSection = section;
+      render();
+    }
+  } else if (action === "select-command") {
+    const command = button.dataset.command;
+    if (isPublicCommandName(command)) {
+      selectedCommand = command;
+      selectedSection = "overview";
+      clearPromptResult();
+      render();
+      focusByKey("command-select");
+    }
+  } else if (action === "start-work") {
+    selectedCommand = "new";
+    selectedSection = "overview";
+    clearPromptResult();
+    render();
+    focusByKey("command-select");
+  } else if (action === "set-display-mode") {
+    const mode = button.dataset.mode;
+    if (!busyAction && isDisplayMode(mode) && mode !== preferences.displayMode) {
+      preferences = { displayMode: mode };
+      beginHostAction("display-mode", { type: "setDisplayMode", mode }, "正在儲存顯示偏好…");
+    }
+  } else if (action === "show-all-wiki") {
+    showAllWikiPages = true;
+    render();
+  } else if (action === "show-all-audit") {
+    showAllAudit = true;
+    render();
   }
 });
 
 document.addEventListener("change", (event) => {
-  const target = event.target as HTMLSelectElement;
+  const target = event.target as HTMLInputElement | HTMLSelectElement;
   if (target.id === "work-select") {
-    clearPendingPreview();
+    clearPromptResult();
     selectedWorkId = target.value || null;
-    api.postMessage({ type: "selectWork", workId: selectedWorkId });
+    if (!busyAction) api.postMessage({ type: "selectWork", workId: selectedWorkId });
     render();
-  }
-  if (target.id === "command-select") {
+  } else if (target.id === "command-select") {
     if (isPublicCommandName(target.value)) {
-      clearPendingPreview();
+      clearPromptResult();
       selectedCommand = target.value;
       render();
     }
+  } else if (target.id === "wiki-type") {
+    wikiType = target.value || "all";
+    render();
+  }
+});
+
+document.addEventListener("input", (event) => {
+  const target = event.target as HTMLInputElement;
+  if (target.id === "wiki-query") {
+    wikiQuery = target.value;
+    renderKnowledgeOnly();
   }
 });
 
@@ -89,96 +208,290 @@ document.addEventListener("submit", (event) => {
   const target = event.target as HTMLFormElement;
   if (target.id !== "public-command-form") return;
   event.preventDefault();
+  if (busyAction) return;
   const work = selectedWork();
   const intent = formIntent(target, work);
   if (!intent) {
-    setStatus("請補齊必要欄位，並先選擇目前 work item。", true);
+    statusMessage = selectedCommand === "revise" || selectedCommand === "approve"
+      ? "請先選擇一個進行中的 work，再預覽這個審查操作。"
+      : "請補齊必要欄位。";
+    statusError = true;
+    render();
     return;
   }
   pendingIntent = intent;
-  api.postMessage({ type: "previewAction", intent });
+  previewBundle = null;
+  copiedBundle = null;
+  bootstrapReport = null;
+  beginHostAction("preview", { type: "previewAction", intent }, "正在產生 prompt preview…");
 });
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && previewBundle) {
+    pendingIntent = null;
+    previewBundle = null;
+    copiedBundle = null;
+    statusMessage = "已取消這次 prompt preview。";
+    statusError = false;
+    render();
+  }
+});
+
+function beginHostAction(key: string, message: WebviewToHostMessage, status: string): void {
+  if (busyAction) return;
+  busyAction = key;
+  statusMessage = status;
+  statusError = false;
+  render();
+  api.postMessage(message);
+}
 
 function render(): void {
   const app = document.querySelector<HTMLElement>("#app");
   if (!app || !snapshot) return;
-  const current = snapshot;
-  const resolvedSelection = selectedWorkId && current.workItems?.some((item: any) => item.id === selectedWorkId)
-    ? selectedWorkId
-    : current.workItems?.length === 1 ? current.workItems[0].id : null;
-  selectedWorkId = resolvedSelection;
-  const work = resolvedSelection ? current.workItems?.find((item: any) => item.id === resolvedSelection) ?? null : null;
+  const focusKey = document.activeElement?.getAttribute("data-focus-key") ?? document.activeElement?.id ?? null;
   app.innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">DEVWEAVE CONTROL CENTER</p>
-        <h1>${escapeHtml(current.rootName ?? "Repository workspace")}</h1>
-        <p class="muted">唯讀 filesystem snapshot · ${escapeHtml(current.capturedAt ?? "unknown")}</p>
-      </div>
-      <div class="toolbar">
-        <button class="secondary" data-action="refresh" aria-label="重新整理 snapshot">↻ Refresh</button>
-      </div>
-    </header>
-    ${renderDiagnostics()}
-    ${renderRepositoryState()}
-    ${renderWorkSelector()}
-    ${renderPublicCommandForm(work)}
-    ${work ? renderWork(work) : renderEmptyWork()}
-    <div id="copy-status" class="status-line" aria-live="polite"></div>
-    <section id="copy-preview" class="preview hidden" aria-label="Codex Chat public command preview"></section>
+    ${renderHeader()}
+    ${renderSectionNavigation()}
+    <div id="section-content">${renderSection()}</div>
+    ${renderStatus()}
+    ${renderResultPanel()}
   `;
+  restoreFocus(focusKey);
 }
 
-function renderDiagnostics(): string {
+function renderLoading(): void {
+  const app = document.querySelector<HTMLElement>("#app");
+  if (app) {
+    app.innerHTML = `<section class="loading-card" role="status" aria-live="polite"><span class="loading-dot" aria-hidden="true">•</span><div><strong>正在讀取 workspace</strong><p>只讀取檔案快照，不會執行 engine 或命令。</p></div></section>`;
+  }
+}
+
+function renderHeader(): string {
   if (!snapshot) return "";
-  const current = snapshot;
-  const diagnostics = current.diagnostics ?? [];
-  const blocked = current.mutationBlocked ? `<div class="notice critical"><span class="status-icon">!</span><div><strong>Read-only diagnostic state</strong><p>Mutation public commands are disabled until the contract is repaired or confirmed through Codex Chat. The status command remains available.</p></div></div>` : "";
-  if (!diagnostics.length && !blocked) return "";
-  return `<section class="notice-stack" aria-label="Repository diagnostics">${blocked}
-    ${diagnostics.map((item: any) => `<div class="notice ${item.severity}"><span class="status-icon">${icon(item.severity)}</span><div><strong>${escapeHtml(item.code)}</strong><p>${escapeHtml(item.message)}</p>${item.path ? `<code>${escapeHtml(item.path)}</code>` : ""}</div></div>`).join("")}
-  </section>`;
+  const state = snapshot.projectExists
+    ? snapshot.managed === true ? "已啟用 managed" : "需要確認管理狀態"
+    : "尚未初始化";
+  const stateClass = snapshot.projectExists && snapshot.managed === true ? "success" : "warning";
+  return `<header class="topbar">
+    <div class="title-block"><p class="eyebrow">DEVWEAVE CONTROL CENTER</p><h1>${escapeHtml(snapshot.rootName ?? "Repository workspace")}</h1><p class="muted">先看總覽，再按需要展開工作、知識或驗證資訊。</p></div>
+    <div class="toolbar"><span class="pill ${stateClass}">${escapeHtml(state)}</span><button class="secondary" data-action="set-display-mode" data-mode="${preferences.displayMode === "concise" ? "advanced" : "concise"}" aria-label="切換顯示模式">${preferences.displayMode === "concise" ? "顯示進階資訊" : "回到簡潔模式"}</button><button class="secondary" data-action="refresh" ${busyAction ? "disabled" : ""} aria-label="重新整理檔案快照">↻ 重新整理</button></div>
+  </header>`;
+}
+
+function renderSectionNavigation(): string {
+  const sections: Array<[DashboardSection, string, string]> = [
+    ["overview", "總覽", "先了解 workspace 與下一步"],
+    ["work", "工作項目", "查看進行中與歷史工作"],
+    ["knowledge", "知識", "查看 Wiki 與待更新頁面"],
+    ["verification", "驗證與稽核", "查看 reviewer readiness 與事件時間軸"]
+  ];
+  return `<nav class="section-tabs" aria-label="Control Center 區域" role="tablist">${sections.map(([id, label, description]) => `<button class="section-tab ${selectedSection === id ? "active" : ""}" data-action="section" data-section="${id}" data-focus-key="section-${id}" role="tab" aria-selected="${selectedSection === id}" aria-controls="section-content" title="${escapeAttr(description)}">${label}</button>`).join("")}</nav>`;
+}
+
+function renderSection(): string {
+  if (!snapshot) return "";
+  switch (selectedSection) {
+    case "overview": return renderOverview();
+    case "work": return renderWorkSection();
+    case "knowledge": return renderKnowledgeSection();
+    case "verification": return renderVerificationSection();
+  }
+}
+
+function renderOverview(): string {
+  const current = snapshot as WorkspaceSnapshot;
+  const work = selectedWork();
+  const guidance = buildSnapshotGuidance(current, work);
+  const active = current.workItems.filter((item) => item.status === "active");
+  const closed = current.workItems.filter((item) => item.status === "closed");
+  return `${renderDiagnostics()}
+    ${renderRepositoryState()}
+    <section class="summary-grid" aria-label="Workspace 摘要"><article class="summary-card"><span class="summary-label">目前工作</span><strong>${escapeHtml(work?.title ?? (active.length === 0 ? "沒有進行中的工作" : `${active.length} 個進行中的工作`))}</strong><small>${work ? `${escapeHtml(presentPhase(work.phase))} · ${escapeHtml(presentStatus(work.status))}` : `${closed.length} 個歷史工作可在「工作項目」查看`}</small></article><article class="summary-card"><span class="summary-label">下一步</span><strong>${escapeHtml(guidance.title)}</strong><small>${guidance.authoritative ? "engine 權威結果" : "根據檔案快照的建議"}</small></article><article class="summary-card"><span class="summary-label">驗證準備</span><strong>${escapeHtml(verificationSummary(current))}</strong><small>${escapeHtml(verificationDetail(current))}</small></article></section>
+    ${renderGuidance(guidance)}
+    ${renderOnboarding(current, active)}
+    ${renderPublicCommandForm(work)}
+    ${renderSnapshotMetadata(current, work)}
+  `;
 }
 
 function renderRepositoryState(): string {
   if (!snapshot) return "";
   const current = snapshot;
-  const managed = current.managed === true ? "Managed" : current.managed === false ? "Explicit activation required" : "Not initialized";
-  const action = current.projectExists
-    ? `<span class="muted">公開命令表單可用；送出前會先預覽，Extension 不會直接執行 workflow。</span>`
-    : `<button class="primary" data-action="initialize">Initialize DevWeave</button>`;
-  return `<section class="hero-card">
-    <div><span class="pill ${current.managed === true ? "success" : "warning"}">${escapeHtml(managed)}</span><h2>${current.projectExists ? "DevWeave is ready to inspect" : "Start with DevWeave initialization"}</h2><p class="muted">${current.projectExists ? "下方表單只產生公開 $devweave 對話命令；既有 gate、task、evidence 與 Wiki 僅供唯讀查看。" : "確認後由 Extension 直接建立 DevWeave runtime、project、baseline 與 Wiki starter。"}</p></div>
-    ${action}
-  </section>${renderRepositoryMetadata(current)}`;
+  if (!current.projectExists) {
+    return `<section class="hero-card"><div><span class="pill warning">尚未初始化</span><h2>先建立 DevWeave workspace</h2><p class="muted">這是唯一會在你確認後直接寫入固定 bootstrap bundle 的操作；其他公開命令只會複製 prompt。</p></div><button class="primary" data-action="initialize" ${busyAction ? "disabled" : ""}>初始化 DevWeave</button></section>`;
+  }
+  return `<section class="hero-card"><div><span class="pill success">檔案快照可讀取</span><h2>先用總覽理解目前狀態</h2><p class="muted">Extension 不執行 engine；公開命令會先預覽，確認後複製到 Codex Chat。</p></div><button class="secondary" data-action="section" data-section="work">查看工作項目</button></section>`;
 }
 
-function renderRepositoryMetadata(current: WorkspaceSnapshot): string {
-  const profiles = Object.entries(current.verificationProfiles ?? {}).map(([name, ids]) => `${name}: ${(ids as string[]).join(", ") || "none"}`).join(" · ") || "none";
-  const freshness = current.engineObservedAt && current.capturedAt > current.engineObservedAt
-    ? `<div class="notice warning"><span class="status-icon">•</span><div><strong>Snapshot may be newer than engine-observed state</strong><p>請在 Codex Chat 使用 status 確認，再重新整理；Extension 不自行重建 fingerprint。</p></div></div>`
+function renderOnboarding(current: WorkspaceSnapshot, active: WorkItemProjection[]): string {
+  const steps: string[] = [];
+  if (!current.hookPresent) steps.push("確認 Codex repository hook");
+  if (!current.commands.length || !Object.values(current.verificationProfiles).some((ids) => ids.length > 0)) steps.push("設定 verification commands");
+  if (current.projectExists && active.length === 0) steps.push("建立第一個 work item");
+  if (!steps.length) return "";
+  return `<section class="section-card onboarding"><div class="section-heading"><div><p class="eyebrow">建議設定</p><h2>還有幾件事可以讓流程更順</h2><p class="muted">依序完成即可；Extension 不會代替你執行 Codex 或 engine。</p></div><span class="pill info">${steps.length} 個提示</span></div><ol>${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol><div class="action-row"><button class="secondary" data-action="section" data-section="verification">查看 verification 設定</button>${active.length === 0 && current.projectExists ? `<button class="primary" data-action="start-work">開始新工作</button>` : ""}</div></section>`;
+}
+
+function renderGuidance(guidance: SnapshotGuidance): string {
+  const action = guidance.command
+    ? `<button class="primary" data-action="select-command" data-command="${guidance.command}">準備 ${escapeHtml(commandLabel(guidance.command))}</button>`
     : "";
-  return `<section class="section-card repository-meta"><div class="metric-grid"><div class="metric"><span>Project</span><strong>${escapeHtml(current.projectPath)}</strong></div><div class="metric"><span>Snapshot</span><strong>${escapeHtml(current.capturedAt)}</strong></div><div class="metric"><span>Last engine-observed</span><strong>${escapeHtml(current.engineObservedAt ?? "not observed")}</strong></div><div class="metric"><span>Source</span><strong>Filesystem snapshot</strong></div></div><div class="meta-line"><span class="pill ${current.hookPresent ? "success" : "warning"}">${current.hookPresent ? "hook present" : "hook missing"}</span><span class="pill ${current.skillPresent ? "success" : "warning"}">${current.skillPresent ? "skill present" : "skill missing"}</span><span class="muted">verification profiles: ${escapeHtml(profiles)}</span></div>${freshness}</section>`;
+  return `<section class="next-action" aria-label="下一步提示"><div><p class="eyebrow">檔案快照提示</p><h2>${escapeHtml(guidance.title)}</h2><p class="muted">${escapeHtml(guidance.detail)}</p></div><div class="guidance-actions"><span class="pill info">非 engine 權威結果</span>${action}</div></section>`;
+}
+
+function renderSnapshotMetadata(current: WorkspaceSnapshot, work: WorkItemProjection | null): string {
+  const profiles = Object.entries(current.verificationProfiles).map(([name, ids]) => `${name}: ${(ids as string[]).join(", ") || "尚未設定"}`).join(" · ") || "尚未設定";
+  return `<details class="details-card" ${preferences.displayMode === "advanced" ? "open" : ""}><summary>檔案來源與技術詳細資訊</summary><div class="metric-grid"><div class="metric"><span>Snapshot</span><strong>${escapeHtml(current.capturedAt)}</strong></div><div class="metric"><span>工作項目最後更新時間</span><strong>${escapeHtml(work?.updatedAt ?? "目前沒有 active work")}</strong></div><div class="metric"><span>來源</span><strong>Filesystem snapshot</strong></div><div class="metric"><span>Verification profile</span><strong>${escapeHtml(profiles)}</strong></div></div><div class="meta-line"><span class="pill ${current.hookPresent ? "success" : "warning"}">${current.hookPresent ? "hook 已找到" : "hook 待確認"}</span><span class="pill ${current.skillPresent ? "success" : "warning"}">${current.skillPresent ? "skill 已找到" : "skill 待確認"}</span><code>${escapeHtml(current.projectPath)}</code></div><p class="muted">Snapshot 是 Extension 讀到的檔案投影，不代表 engine 權威狀態；送出 status/next 後請回來 Refresh。</p></details>`;
+}
+
+function renderWorkSection(): string {
+  const work = selectedWork();
+  const active = snapshot?.workItems.filter((item) => item.status === "active") ?? [];
+  return `<section class="section-card section-intro"><p class="eyebrow">工作項目</p><h2>把進行中的工作與歷史分開看</h2><p class="muted">只有明確選取的 closed work 才會顯示；它不會被自動當成目前工作。</p></section>${renderWorkSelector()}${work ? renderWorkDetail(work) : renderWorkEmpty(active.length)}`;
 }
 
 function renderWorkSelector(): string {
   if (!snapshot) return "";
-  const items = snapshot.workItems ?? [];
-  if (!items.length) return "";
-  const placeholder = items.length > 1 && !selectedWorkId ? `<option value="" selected>選擇 work item（必要）</option>` : "";
-  return `<section class="section-card compact"><label for="work-select">${items.length > 1 ? "目前 work item（請先選擇）" : "目前 work item（自動帶入）"}</label><select id="work-select" aria-label="選擇 DevWeave work item">${placeholder}${items.map((item: any) => `<option value="${escapeAttr(item.id)}" ${item.id === selectedWorkId ? "selected" : ""}>${escapeHtml(item.title)} · ${escapeHtml(item.phase)}</option>`).join("")}</select></section>`;
+  const active = snapshot.workItems.filter((item) => item.status === "active");
+  const closed = snapshot.workItems.filter((item) => item.status === "closed");
+  return `<section class="section-card compact"><label for="work-select">目前要查看的工作</label><select id="work-select" data-focus-key="work-select" aria-label="選擇要查看的 DevWeave 工作項目"><option value="">${active.length ? "選擇工作項目" : "目前沒有進行中的工作"}</option>${active.length ? `<optgroup label="進行中的工作">${active.map(workOption).join("")}</optgroup>` : ""}${closed.length ? `<optgroup label="已結束的歷史">${closed.map(workOption).join("")}</optgroup>` : ""}</select><small>${active.length ? `${active.length} 個 active work` : "可從總覽開始新工作"}${closed.length ? ` · ${closed.length} 個歷史 work` : ""}</small></section>`;
 }
 
-function renderPublicCommandForm(work: any): string {
+function workOption(item: WorkItemProjection): string {
+  return `<option value="${escapeAttr(item.id)}" ${item.id === selectedWorkId ? "selected" : ""}>${escapeHtml(item.title)} · ${escapeHtml(presentPhase(item.phase))}${item.status === "closed" ? "（歷史）" : ""}</option>`;
+}
+
+function renderWorkEmpty(activeCount: number): string {
+  return `<section class="empty-card"><span class="empty-icon" aria-hidden="true">＋</span><h2>${activeCount ? "請選擇一個進行中的工作" : "目前沒有進行中的工作"}</h2><p class="muted">${activeCount ? "選取後可查看 gate、blocker、task 與審查準備狀態。" : "closed history 仍可在上方選取瀏覽；若要繼續，請建立新的 work。"}</p><button class="primary" data-action="start-work">開始新工作</button></section>`;
+}
+
+function renderWorkDetail(work: WorkItemProjection): string {
+  const closed = work.status === "closed" || work.phase === "closed";
+  const readiness = snapshot ? buildReviewReadiness(snapshot, work) : null;
+  const taskDone = work.tasks.filter((task) => ["completed", "approved", "passed"].includes(task.status)).length;
+  const evidencePassed = work.evidence.filter((item) => item.status === "passed" && !item.stale && item.bindsCurrentSource).length;
+  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">${closed ? "歷史工作" : "目前工作"}</p><h2>${escapeHtml(work.title)}</h2><p class="muted">${escapeHtml(presentPhase(work.phase))} · ${escapeHtml(presentStatus(work.status))}</p></div><div class="pill-row"><span class="pill">${escapeHtml(presentRisk(work.risk))}</span>${closed ? `<span class="pill info">唯讀歷史</span>` : ""}</div></div><div class="gate-grid">${gateCard(work, "scope")} ${gateCard(work, "build")} ${gateCard(work, "acceptance")}</div><div class="summary-grid"><article class="summary-card"><span class="summary-label">Tasks</span><strong>${taskDone}/${work.tasks.length}</strong><small>${work.tasks.length ? "完成狀態" : "尚未建立 task"}</small></article><article class="summary-card"><span class="summary-label">Evidence</span><strong>${evidencePassed}/${work.evidence.length}</strong><small>${work.staleEvidence.length ? `${work.staleEvidence.length} 個已過期` : "目前快照沒有 stale 標記"}</small></article><article class="summary-card"><span class="summary-label">Knowledge</span><strong>${escapeHtml(presentStatus(work.knowledge.health))}</strong><small>${work.knowledge.pendingRefresh.length ? `${work.knowledge.pendingRefresh.length} 個頁面待更新` : "沒有待更新頁面"}</small></article></div>${work.blocker ? `<div class="notice danger"><span class="status-icon">!</span><div><strong>目前阻塞</strong><p>${escapeHtml(work.blocker.task ?? "Task")}：${escapeHtml(work.blocker.reason ?? "請在 Codex Chat 查看原因。")}</p><small>下一步：先處理 blocker，再 Refresh。</small></div></div>` : ""}${closed ? `<div class="notice info"><span class="status-icon">i</span><div><strong>這是歷史工作</strong><p>只提供唯讀資料與稽核內容；不會把它當成目前工作，也不提供 revise/approve。</p></div></div>` : readiness ? renderReadinessSummary(readiness) : ""}</section>${renderTaskBoard(work)}${preferences.displayMode === "advanced" ? `${renderArtifacts(work)}${renderTrace(work)}` : `<details class="details-card"><summary>展開 Requirements、Design、Plan 與 artifacts</summary>${renderArtifacts(work)}${renderTrace(work)}</details>`}`;
+}
+
+function gateCard(work: WorkItemProjection, gate: "scope" | "build" | "acceptance"): string {
+  const projection = work.gates[gate];
+  const label = presentGate(gate);
+  const technical = gate === "scope" ? "G1" : gate === "build" ? "G2" : "G3";
+  return `<article class="gate-card ${escapeAttr(projection.status)}"><div class="gate-title"><span class="status-icon">${icon(projection.status)}</span><span>${technical} ${escapeHtml(label.replace(/^G[123] /, ""))}</span></div><strong>${escapeHtml(presentStatus(projection.status))}</strong><p class="muted">${projection.approvedAt ? escapeHtml(projection.approvedAt) : "尚未記錄核准時間"}</p>${projection.approvedBy ? `<small>核准者：${escapeHtml(projection.approvedBy)}</small>` : ""}</article>`;
+}
+
+function renderReadinessSummary(readiness: ReviewReadiness): string {
+  const failures = readiness.checks.filter((check) => !check.ok);
+  return `<div class="readiness-banner ${readiness.status === "ready" ? "success" : readiness.status === "attention" ? "warning" : "danger"}"><div><strong>${escapeHtml(readiness.summary)}</strong><p>目前 gate：${escapeHtml(presentGate(readiness.gate))} · Extension 只呈現檔案快照，approve 前仍由 engine 驗證。</p></div><span class="pill ${readiness.status === "ready" ? "success" : "warning"}">${readiness.status === "ready" ? "可進一步審查" : `${failures.length} 項待確認`}</span></div>`;
+}
+
+function renderTaskBoard(work: WorkItemProjection): string {
+  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">工作進度</p><h2>Tasks</h2><p class="muted">每一項都顯示目前狀態與下一步，不只顯示數字。</p></div></div><div class="task-list">${work.tasks.length ? work.tasks.map((task) => `<div class="task-row"><span class="status-icon">${icon(task.status)}</span><span><strong>${escapeHtml(task.id)} · ${escapeHtml(presentStatus(task.status))}</strong><small>${escapeHtml(task.note || (task.status === "completed" ? "已完成" : "依 plan 順序處理"))}${task.evidence.length ? ` · evidence: ${escapeHtml(task.evidence.join(", "))}` : ""}</small></span></div>`).join("") : `<p class="muted">目前沒有 task tracking；完成 G2 後由 engine 建立 task。</p>`}</div></section>`;
+}
+
+function renderArtifacts(work: WorkItemProjection): string {
+  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">詳細資料</p><h2>Requirements、Design、Plan</h2><p class="muted">保留原始 Markdown 唯讀開啟。</p></div></div><div class="artifact-list">${work.artifacts.map((artifact) => `<button class="artifact" data-action="open" data-path="${escapeAttr(artifact.path)}" ${artifact.exists ? "" : "disabled"}><span class="file-icon">${artifact.exists ? "▤" : "—"}</span><span><strong>${escapeHtml(artifact.path.split("/").at(-1) ?? artifact.path)}</strong><small>${artifact.exists ? `${artifact.text.length} chars${artifact.truncated ? " · 已截斷" : ""}` : "檔案不存在"}</small></span></button>`).join("") || `<p class="muted">目前沒有可開啟的 artifact。</p>`}</div></section>`;
+}
+
+function renderTrace(work: WorkItemProjection): string {
+  const groups = [
+    { label: "需求", names: ["brief.md", "requirements.md"], hint: "REQ / NFR → AC" },
+    { label: "設計", names: ["design.md"], hint: "DEC 與風險決策" },
+    { label: "計畫", names: ["plan.md"], hint: "TASK dependency" }
+  ];
+  return `<section class="section-card"><div class="trace-grid">${groups.map((group) => { const items = work.artifacts.filter((artifact) => group.names.includes(artifact.path.split("/").at(-1) ?? "")); return `<article class="trace-card"><strong>${group.label}</strong><small>${group.hint}</small>${items.map((artifact) => `<div class="trace-row"><span>${artifact.exists ? "✓" : "!"}</span><span><b>${escapeHtml(artifact.path.split("/").at(-1) ?? artifact.path)}</b><small>${artifact.exists ? traceIds(artifact.text).join(" · ") || "尚未找到 trace ID" : "檔案不存在"}</small></span></div>`).join("")}</article>`; }).join("")}</div></section>`;
+}
+
+function renderKnowledgeSection(): string {
+  const knowledge = selectedWork()?.knowledge ?? snapshot?.knowledge;
+  if (!knowledge) return "";
+  return `<section class="section-card section-intro"><p class="eyebrow">知識</p><h2>讓 Wiki 告訴你哪些內容需要更新</h2><p class="muted">列表來自目前 snapshot；搜尋與分類不會觸發額外 repository scan。</p></section>${renderKnowledge(knowledge)}`;
+}
+
+function renderKnowledge(knowledge: WorkspaceSnapshot["knowledge"]): string {
+  const pages = knowledge.pages ?? [];
+  const categories = [...new Set(pages.map((page) => page.type))].sort();
+  const query = wikiQuery.trim().toLowerCase();
+  const filtered = pages.filter((page) => {
+    const matchesType = wikiType === "all" || page.type === wikiType;
+    const haystack = `${page.title} ${page.path} ${page.bodyPreview}`.toLowerCase();
+    return matchesType && (!query || haystack.includes(query));
+  });
+  const visible = showAllWikiPages ? filtered : filtered.slice(0, 12);
+  const pending = [...new Set([...knowledge.affectedPages, ...knowledge.pendingRefresh, ...knowledge.stalePages, ...knowledge.uncoveredChangedPaths])];
+  const bootstrap = knowledge.bootstrap;
+  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">WIKI-FIRST KNOWLEDGE</p><h2>Knowledge 狀態</h2><p class="muted">${knowledge.health === "healthy" ? "目前沒有被投影出的問題。" : "先處理下方提醒，再把結果交由 engine 確認。"}</p></div><span class="pill ${knowledge.health === "healthy" ? "success" : "warning"}">${escapeHtml(presentStatus(knowledge.health))}</span></div>${bootstrap.recommended ? `<div class="notice warning"><span class="status-icon">!</span><div><strong>Wiki 還沒有完整就緒</strong><p>${escapeHtml(bootstrapReasons(bootstrap.reasons))}</p><button class="primary" data-action="wiki-bootstrap" ${snapshot?.mutationBlocked || busyAction ? "disabled" : ""}>準備 Wiki bootstrap prompt</button></div></div>` : `<div class="notice success"><span class="status-icon">✓</span><div><strong>核心 Wiki 頁面已找到</strong><p>Extension 只顯示檔案投影；頁面是否 current 仍由 engine 與 Knowledge Review 決定。</p></div></div>`}${pending.length ? `<div class="actionable-list"><strong>需要留意的頁面與原因</strong>${pending.map((path) => `<div class="actionable-row"><span class="status-icon">•</span><span><strong>${escapeHtml(path)}</strong><small>${knowledge.pendingRefresh.includes(path) ? "工作狀態標示待 refresh" : knowledge.stalePages.includes(path) ? "來源 fingerprint 可能過期" : knowledge.uncoveredChangedPaths.includes(path) ? "目前變更尚未被頁面覆蓋" : "列為受影響頁面"}</small></span></div>`).join("")}</div>` : `<div class="notice info"><span class="status-icon">i</span><div><strong>目前沒有待更新頁面</strong><p>若這次工作改變了可重用的 codebase knowledge，請在 verification 依 Knowledge Review 處理。</p></div></div>`}<div class="knowledge-controls"><label for="wiki-query">搜尋 Wiki</label><input id="wiki-query" data-focus-key="wiki-query" type="search" value="${escapeAttr(wikiQuery)}" placeholder="搜尋標題、路徑或摘要" aria-label="搜尋 Wiki 頁面" /><label for="wiki-type">分類</label><select id="wiki-type" data-focus-key="wiki-type" aria-label="依類型篩選 Wiki 頁面"><option value="all" ${wikiType === "all" ? "selected" : ""}>全部分類</option>${categories.map((type) => `<option value="${escapeAttr(type)}" ${wikiType === type ? "selected" : ""}>${escapeHtml(type)}</option>`).join("")}</select></div><div class="metric-grid"><div class="metric"><span>頁面</span><strong>${pages.length}</strong></div><div class="metric"><span>篩選結果</span><strong>${filtered.length}</strong></div><div class="metric"><span>Placeholder</span><strong>${knowledge.placeholderPages.length}</strong></div><div class="metric"><span>待 refresh</span><strong>${knowledge.pendingRefresh.length}</strong></div></div><div class="page-list">${visible.map((page) => `<button class="page-row" data-action="open" data-path="${escapeAttr(page.path)}"><span class="status-icon">${icon(page.status)}</span><span><strong>${escapeHtml(page.title)}</strong><small>${escapeHtml(page.path)} · ${escapeHtml(presentStatus(page.status))}${page.verifiedBy ? ` · verified ${escapeHtml(page.verifiedBy)}` : ""}${page.parseErrors.length ? " · 解析提醒" : ""}</small></span></button>`).join("") || `<p class="muted">找不到符合條件的 Wiki 頁面。</p>`}</div>${!showAllWikiPages && filtered.length > visible.length ? `<button class="secondary" data-action="show-all-wiki">顯示全部 ${filtered.length} 頁</button>` : ""}</section>`;
+}
+
+function renderVerificationSection(): string {
+  const work = selectedWork();
+  if (!work) {
+    return `<section class="section-card section-intro"><p class="eyebrow">驗證與稽核</p><h2>先選擇一個工作項目</h2><p class="muted">有 active work 後，這裡會顯示 reviewer readiness、evidence 與稽核時間軸；verification commands 設定仍可先查看。</p></section>${renderVerificationSetup()}`;
+  }
+  return `<section class="section-card section-intro"><p class="eyebrow">驗證與稽核</p><h2>先看 reviewer 能否判斷目前 gate</h2><p class="muted">人話摘要優先；raw event 只在你需要追查時展開。</p></section>${renderVerificationSetup()}${renderReadinessDetail(work)}${renderEvidence(work)}${renderAcceptance(work)}${renderAudit(work)}`;
+}
+
+function renderVerificationSetup(): string {
+  if (!snapshot) return "";
+  const commands = snapshot.commands;
+  const configured = commands.length > 0 && Object.values(snapshot.verificationProfiles).some((ids) => ids.length > 0);
+  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">驗證設定</p><h2>Verification commands</h2><p class="muted">Extension 只顯示設定與 evidence，不會在本機執行 command。</p></div><span class="pill ${configured ? "success" : "warning"}">${configured ? "已設定" : "需要設定"}</span></div>${configured ? `<div class="command-list">${commands.map((command) => `<div class="command-row"><span class="status-icon">⌘</span><span><strong>${escapeHtml(command.id)}</strong><small>${escapeHtml(command.argv.join(" "))} · cwd ${escapeHtml(command.cwd)} · timeout ${escapeHtml(command.timeoutSeconds)} 秒</small></span></div>`).join("")}</div>` : `<div class="notice warning"><span class="status-icon">!</span><div><strong>尚未設定 verification command/profile</strong><p>目前不能把工作說成已完成驗證；請在 Codex Chat 設定 commands，完成後回來 Refresh。</p></div></div>`}</section>`;
+}
+
+function renderReadinessDetail(work: WorkItemProjection): string {
+  if (!snapshot) return "";
+  const readiness = buildReviewReadiness(snapshot, work);
+  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">REVIEWER 摘要</p><h2>${escapeHtml(presentGate(readiness.gate))} · ${readiness.status === "ready" ? "目前可進一步審查" : "仍有條件待確認"}</h2><p class="muted">${escapeHtml(readiness.summary)}</p></div><span class="pill ${readiness.status === "ready" ? "success" : "warning"}">${escapeHtml(readiness.status)}</span></div><div class="check-list">${readiness.checks.map((check) => `<div class="check-row ${check.ok ? "ok" : "not-ok"}"><span class="status-icon">${check.ok ? "✓" : "!"}</span><span><strong>${escapeHtml(check.label)} · ${check.ok ? "已符合" : "待處理"}</strong><small>${escapeHtml(check.detail)}${check.nextStep ? ` 下一步：${escapeHtml(check.nextStep)}` : ""}</small></span></div>`).join("")}</div><div class="action-row"><button class="primary" data-action="select-command" data-command="approve" ${work.status === "closed" || busyAction ? "disabled" : ""}>準備核准目前 gate</button><button class="secondary" data-action="select-command" data-command="revise" ${work.status === "closed" || busyAction ? "disabled" : ""}>準備修改方向</button><small>approve 不會加入 gate 參數；revise 可能讓既有 gate/evidence 失效。</small></div></section>`;
+}
+
+function renderEvidence(work: WorkItemProjection): string {
+  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">證據</p><h2>Evidence 狀態</h2><p class="muted">顯示失敗、過期與目前 source 綁定狀態。</p></div></div><div class="evidence-list">${work.evidence.map((item) => { const stale = item.stale || !item.bindsCurrentSource; const state = item.status === "failed" ? "failed" : stale ? "stale" : item.status; return `<article class="evidence-card"><div class="section-heading"><strong>${escapeHtml(item.id)} · ${escapeHtml(item.kind)}</strong><span class="pill ${state === "passed" ? "success" : state === "stale" ? "warning" : "danger"}">${escapeHtml(presentStatus(state))}</span></div><p>${escapeHtml(item.summary || "沒有摘要")}</p><small>涵蓋：${escapeHtml(item.covers.join(", ") || "—")} · tasks：${escapeHtml(item.tasks.join(", ") || "—")}</small>${stale ? `<div class="notice warning"><span class="status-icon">!</span><div><strong>這筆 evidence 不能直接視為 current</strong><p>請重新執行對應 verification，再回來 Refresh。</p></div></div>` : ""}${item.rawLog ? `<details class="raw-details"><summary>查看 raw log 路徑</summary><code class="raw-log-path">${escapeHtml(item.rawLog)}</code></details>` : ""}</article>`; }).join("") || `<p class="muted">目前沒有 evidence；若要進入驗收，請先完成 verification。</p>`}</div></section>`;
+}
+
+function renderAcceptance(work: WorkItemProjection): string {
+  const planned = work.knowledge.planned;
+  const coupled = planned && Array.isArray(planned.coupled) ? planned.coupled as string[] : [];
+  return `<details class="details-card" ${preferences.displayMode === "advanced" ? "open" : ""}><summary>Baseline、Knowledge promotion 與 waiver 詳細資訊</summary><div class="acceptance-grid"><div><strong>Baseline targets</strong><ul>${work.baselineTargets.map((path) => `<li><code>${escapeHtml(path)}</code></li>`).join("") || "<li>本 work 未宣告 baseline 更新</li>"}</ul><small>${escapeHtml(work.baselineRationale || "本次 UX refinement 不修改 baseline truth。")}</small></div><div><strong>Knowledge promotion</strong><ul><li>受影響：${escapeHtml(work.knowledge.affectedPages.join(", ") || "沒有")}</li><li>待 refresh：${escapeHtml(work.knowledge.pendingRefresh.join(", ") || "沒有")}</li><li>coupled index/log：${escapeHtml(coupled.join(", ") || "尚未宣告")}</li><li>review：${escapeHtml(work.knowledge.review.current ? "已完成" : work.knowledge.review.required ? "待完成" : "不需要")}</li></ul></div></div><div class="waiver-list"><strong>Waiver</strong>${work.waivers.map((waiver) => `<div class="task-row"><span class="status-icon">!</span><span><b>${escapeHtml(waiver.kind)} · ${escapeHtml(waiver.target)}</b><small>${escapeHtml(waiver.reason)}</small></span></div>`).join("") || `<p class="muted">目前沒有 waiver。</p>`}</div></details>`;
+}
+
+function renderAudit(work: WorkItemProjection): string {
+  const events = work.events ?? [];
+  const visible = showAllAudit ? events : events.slice(-12);
+  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">稽核</p><h2>可讀的事件時間軸</h2><p class="muted">先看事件與結果；原始 JSONL 保留在每一筆的展開區域。</p></div><span class="pill info">唯讀</span></div><div class="audit-list">${visible.map((raw) => renderAuditEvent(presentAuditEvent(raw))).join("") || `<p class="muted">目前沒有稽核事件。</p>`}</div>${!showAllAudit && events.length > visible.length ? `<button class="secondary" data-action="show-all-audit">顯示全部 ${events.length} 筆事件</button>` : ""}</section>`;
+}
+
+function renderAuditEvent(event: AuditEventPresentation): string {
+  return `<article class="audit-event"><div class="audit-marker" aria-hidden="true">•</div><div><div class="audit-heading"><strong>${escapeHtml(event.summary)}</strong><small>${escapeHtml(event.at)} · ${escapeHtml(event.event)}</small></div><details class="raw-details"><summary>展開 technical raw event</summary><code>${escapeHtml(event.raw)}</code></details></div></article>`;
+}
+
+function renderDiagnostics(): string {
+  if (!snapshot) return "";
+  const diagnostics = snapshot.diagnostics.map(presentDiagnostic);
+  const blocked = snapshot.mutationBlocked
+    ? `<div class="notice danger"><span class="status-icon">!</span><div><strong>目前只允許安全查看</strong><p>snapshot 有 critical contract 問題；mutation prompt 暫停，status 仍可交給 Codex Chat 確認。</p></div></div>`
+    : "";
+  if (!diagnostics.length && !blocked) return "";
+  return `<section class="notice-stack" aria-label="Workspace 問題與修復建議">${blocked}${diagnostics.map(renderDiagnostic).join("")}</section>`;
+}
+
+function renderDiagnostic(item: DiagnosticPresentation): string {
+  return `<div class="notice ${item.severity}"><span class="status-icon">${icon(item.severity)}</span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><small>建議：${escapeHtml(item.resolution)}</small><details class="raw-details"><summary>查看 technical code/path</summary><code>${escapeHtml(item.code)}${item.path ? ` · ${escapeHtml(item.path)}` : ""}</code></details></div></div>`;
+}
+
+function renderPublicCommandForm(work: WorkItemProjection | null): string {
   const command = selectedCommand;
-  const mutationDisabled = Boolean(snapshot?.mutationBlocked && ["new", "feature", "refactor", "bug", "revise", "approve", "wikiBootstrap"].includes(command));
-  const requiresWork = command === "revise" || command === "approve";
-  const disabled = mutationDisabled || (requiresWork && !work);
-  return `<section class="section-card composer" aria-labelledby="public-command-title"><div class="section-heading"><div><p class="eyebrow">PUBLIC COMMANDS</p><h2 id="public-command-title">產生 Codex 對話命令</h2><p class="muted">只處理初始化與使用手冊列出的九個公開命令；先預覽，再複製到 Codex Chat。</p></div><span class="pill info">$devweave</span></div><form id="public-command-form"><label for="command-select">命令</label><select id="command-select" name="command" aria-label="選擇公開 DevWeave 命令">${publicCommandOptions(command)}</select>${renderCommandFields(command, work)}${mutationDisabled ? `<div class="notice warning"><span class="status-icon">!</span><div><strong>目前為 read-only diagnostic state</strong><p>請先使用 status 公開命令確認狀態；mutation 命令暫停產生。</p></div></div>` : ""}<div class="action-row"><button class="primary" type="submit" ${disabled ? "disabled" : ""}>Preview public command</button>${requiresWork && !work ? `<span class="muted">請先選擇目前 work item。</span>` : ""}</div></form></section>`;
+  const presentation = commandPresentations().find((item) => item.name === command);
+  const closed = Boolean(work && (work.status === "closed" || work.phase === "closed"));
+  const requiresWork = presentation?.requiresWork ?? false;
+  const mutationDisabled = Boolean(snapshot?.mutationBlocked && presentation?.mutation);
+  const disabled = Boolean(busyAction || mutationDisabled || (requiresWork && (!work || closed)));
+  return `<section class="section-card composer" aria-labelledby="public-command-title"><div class="section-heading"><div><p class="eyebrow">從任務開始</p><h2 id="public-command-title">準備一個公開操作</h2><p class="muted">選擇你想完成的事；Extension 會先預覽，再由你複製到 Codex Chat。</p></div><span class="pill info">$devweave</span></div><form id="public-command-form"><label for="command-select">我要</label><select id="command-select" data-focus-key="command-select" name="command" aria-label="選擇要進行的 DevWeave 任務">${publicCommandOptions(command)}</select><p class="field-hint">${escapeHtml(presentation?.description ?? "選擇一個公開操作。")}${presentation ? ` <code>${escapeHtml(presentation.technicalLabel)}</code>` : ""}</p>${renderCommandFields(command, work)}${mutationDisabled ? `<div class="notice warning"><span class="status-icon">!</span><div><strong>目前只允許查看</strong><p>請先使用 status 公開命令確認 critical diagnostic；mutation prompt 暫停產生。</p></div></div>` : ""}<div class="action-row"><button class="primary" type="submit" ${disabled ? "disabled" : ""}>Preview public command</button>${requiresWork && (!work || closed) ? `<small>${closed ? "closed work 只能瀏覽，請選擇進行中的 work。" : "請先選擇一個進行中的 work。"}</small>` : ""}</div></form></section>`;
 }
 
 function publicCommandOptions(selected: PublicCommandName): string {
-  const options: Array<[PublicCommandName, string]> = [
+  // Keep this compatibility label literal: ["wikiBootstrap", "wiki bootstrap — 建立 Codebase Wiki"]
+  const legacyLabels: Array<[PublicCommandName, string]> = [
     ["new", "new — 建立 work item"],
     ["feature", "feature — 新功能"],
     ["refactor", "refactor — 重構"],
@@ -189,69 +502,113 @@ function publicCommandOptions(selected: PublicCommandName): string {
     ["revise", "revise — 修改決策"],
     ["approve", "approve — 人工核准"]
   ];
-  return options.map(([value, label]) => `<option value="${value}" ${value === selected ? "selected" : ""}>${escapeHtml(label)}</option>`).join("");
+  const labelFor = (name: PublicCommandName): string => legacyLabels.find(([value]) => value === name)?.[1] ?? name;
+  const groups: Array<[string, string]> = [["start", "開始工作"], ["progress", "查看進度"], ["review", "審查決策"], ["knowledge", "建立知識"]];
+  return groups.map(([group, label]) => `<optgroup label="${label}">${commandPresentations().filter((item) => item.group === group).map((item) => `<option value="${item.name}" ${item.name === selected ? "selected" : ""}>${escapeHtml(item.label)} · ${escapeHtml(labelFor(item.name))}</option>`).join("")}</optgroup>`).join("");
 }
 
-function renderCommandFields(command: PublicCommandName, work: any): string {
+function renderCommandFields(command: PublicCommandName, work: WorkItemProjection | null): string {
   switch (command) {
-    case "new":
-      return `<label for="command-goal">Goal</label><input id="command-goal" name="goal" type="text" placeholder="例如：建立 CSV 匯出能力" autocomplete="off" />`;
-    case "feature":
-      return `<label for="command-request">Request</label><textarea id="command-request" name="request" rows="3" placeholder="描述要新增的功能" spellcheck="true"></textarea>`;
-    case "refactor":
-      return `<label for="command-request">Request</label><textarea id="command-request" name="request" rows="3" placeholder="描述要整理或重構的部分" spellcheck="true"></textarea>`;
-    case "bug":
-      return `<label for="command-symptom">Symptom</label><textarea id="command-symptom" name="symptom" rows="3" placeholder="描述實際觀察到的問題" spellcheck="true"></textarea>`;
+    case "new": return `<label for="command-goal">想完成什麼</label><input id="command-goal" name="goal" type="text" placeholder="例如：建立 CSV 匯出能力" autocomplete="off" />`;
+    case "feature": return `<label for="command-request">功能描述</label><textarea id="command-request" name="request" rows="3" placeholder="描述要新增的功能" spellcheck="true"></textarea>`;
+    case "refactor": return `<label for="command-request">整理目標</label><textarea id="command-request" name="request" rows="3" placeholder="描述要整理或重構的部分" spellcheck="true"></textarea>`;
+    case "bug": return `<label for="command-symptom">實際症狀</label><textarea id="command-symptom" name="symptom" rows="3" placeholder="描述實際觀察到的問題" spellcheck="true"></textarea>`;
     case "next":
     case "status":
-      return work
-        ? `<label class="checkbox-field" for="include-work"><input id="include-work" name="include-work" type="checkbox" checked />帶入目前 work：<code>${escapeHtml(work.id)}</code><small>取消勾選即可產生不帶 work ID 的 ${command}。</small></label>`
-        : `<p class="field-hint">目前沒有 work item；${command} 會產生不帶 work ID 的公開命令。</p>`;
-    case "wikiBootstrap":
-      return `<p class="field-hint">探索整個 repository，建立或續接一般 DevWeave bootstrap Work Item；Extension 只產生 prompt。</p>`;
-    case "revise":
-      return work
-        ? `<div class="selected-work"><span>目前 work</span><code>${escapeHtml(work.id)}</code></div><label for="command-change">Decision change</label><textarea id="command-change" name="change" rows="3" placeholder="說明需要修改的決策或方向" spellcheck="true"></textarea>`
-        : `<p class="field-hint">revise 需要先選擇目前 work item。</p>`;
-    case "approve":
-      return work
-        ? `<div class="selected-work"><span>目前 work</span><code>${escapeHtml(work.id)}</code><small>目前 gate 僅在 Dashboard 唯讀呈現，公開 approve 命令不帶 gate 參數。</small></div>`
-        : `<p class="field-hint">approve 需要先選擇目前 work item。</p>`;
+      return work && work.status === "active" ? `<label class="checkbox-field" for="include-work"><input id="include-work" name="include-work" type="checkbox" checked />帶入目前 work <code>${escapeHtml(work.id)}</code><small>取消勾選即可產生不帶 work ID 的 ${command}。</small></label>` : `<p class="field-hint">目前沒有進行中的 work；會產生不帶 work ID 的公開命令。</p>`;
+    case "wikiBootstrap": return `<p class="field-hint">會探索整個 repository，建立或續接一般 DevWeave bootstrap work；Extension 只產生 prompt。</p>`;
+    case "revise": return work && work.status === "active" ? `<div class="selected-work"><span>目前 work</span><code>${escapeHtml(work.id)}</code></div><label for="command-change">要修改的方向</label><textarea id="command-change" name="change" rows="3" placeholder="說明需要修改的決策或方向" spellcheck="true"></textarea>` : `<p class="field-hint">revise 需要先選擇進行中的 work。</p>`;
+    case "approve": return work && work.status === "active" ? `<div class="selected-work"><span>會核准畫面標示的目前 gate</span><code>${escapeHtml(work.id)}</code><small>公開命令不帶 gate 參數；送出前請確認 reviewer readiness。</small></div>` : `<p class="field-hint">approve 需要先選擇進行中的 work。</p>`;
   }
 }
 
-function formIntent(form: HTMLFormElement, work: any): PublicCommandIntent | null {
+function formIntent(form: HTMLFormElement, work: WorkItemProjection | null): PublicCommandIntent | null {
   const command = formValue(form, "command");
   if (!isPublicCommandName(command)) return null;
   let candidate: unknown;
   switch (command) {
-    case "new":
-      candidate = { type: command, goal: formValue(form, "goal") };
-      break;
+    case "new": candidate = { type: command, goal: formValue(form, "goal") }; break;
     case "feature":
-    case "refactor":
-      candidate = { type: command, request: formValue(form, "request") };
-      break;
-    case "bug":
-      candidate = { type: command, symptom: formValue(form, "symptom") };
-      break;
+    case "refactor": candidate = { type: command, request: formValue(form, "request") }; break;
+    case "bug": candidate = { type: command, symptom: formValue(form, "symptom") }; break;
     case "next":
-    case "status":
-      candidate = form.elements.namedItem("include-work") && !((form.elements.namedItem("include-work") as HTMLInputElement).checked)
-        ? { type: command }
-        : { type: command, ...(work ? { workId: work.id } : {}) };
-      break;
-    case "wikiBootstrap":
-      candidate = { type: command };
-      break;
-    case "revise":
-      candidate = work ? { type: command, workId: work.id, change: formValue(form, "change") } : null;
-      break;
-    case "approve":
-      candidate = work ? { type: command, workId: work.id } : null;
-      break;
+    case "status": candidate = form.elements.namedItem("include-work") && !((form.elements.namedItem("include-work") as HTMLInputElement).checked) ? { type: command } : { type: command, ...(work && work.status === "active" ? { workId: work.id } : {}) }; break;
+    case "wikiBootstrap": candidate = { type: command }; break;
+    case "revise": candidate = work && work.status === "active" ? { type: command, workId: work.id, change: formValue(form, "change") } : null; break;
+    case "approve": candidate = work && work.status === "active" ? { type: command, workId: work.id } : null; break;
   }
   return parsePublicCommandIntent(candidate);
+}
+
+function renderResultPanel(): string {
+  if (previewBundle) return renderActionPreview(previewBundle);
+  if (copiedBundle) return renderCopiedResult(copiedBundle);
+  if (bootstrapReport) return renderBootstrapResult(bootstrapReport);
+  return "";
+}
+
+function renderActionPreview(bundle: PromptBundle): string {
+  const presentation = commandPresentations().find((item) => item.name === bundle.command);
+  const work = selectedWork();
+  const gate = work ? firstPendingGate(work) : null;
+  const willNot = bundle.mutation
+    ? "不會在 Extension 直接執行 CLI、寫入一般 workspace，或代替你送出 Codex Chat。"
+    : "不會修改 repository，也不會把檔案 snapshot 當成 engine 權威結果。";
+  return `<section id="result-panel" class="preview" aria-labelledby="preview-title"><div class="preview-heading"><div><p class="eyebrow">PUBLIC COMMAND PREVIEW</p><h2 id="preview-title">先確認再複製</h2></div><span class="pill ${bundle.mutation ? "warning" : "info"}">${bundle.mutation ? "需要你手動送出" : "唯讀查詢"}</span></div><div class="two-column"><div><h3>這個操作會做什麼</h3><p>${escapeHtml(presentation?.description ?? "準備一個公開 DevWeave prompt。")}</p></div><div><h3>不會做什麼</h3><p>${escapeHtml(willNot)}</p></div></div><div class="notice info"><span class="status-icon">i</span><div><strong>目前 context</strong><p>${work ? `work：${escapeHtml(work.id)} · 目前 gate：${escapeHtml(presentGate(gate))}` : "目前沒有帶入 work ID"} · snapshot 只供參考。</p></div></div><h3>要貼到 Codex Chat 的內容</h3><pre>${escapeHtml(bundle.chatText)}</pre>${bundle.warnings.length ? `<div class="notice warning"><strong>送出前請留意</strong><ul>${bundle.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul></div>` : ""}<div class="handoff-steps"><h3>複製後</h3><p>到 Codex Chat 貼上並送出；engine 完成後回到這裡按 Refresh，才能看到新的檔案投影。</p></div><div class="action-row"><button class="primary" data-action="confirm-copy" ${busyAction ? "disabled" : ""}>確認並複製 prompt</button><button class="secondary" data-action="cancel-preview" ${busyAction ? "disabled" : ""}>取消</button></div></section>`;
+}
+
+function renderCopiedResult(bundle: PromptBundle): string {
+  return `<section id="result-panel" class="preview" aria-labelledby="copied-title"><div class="preview-heading"><div><p class="eyebrow">CODEX CHAT HANDOFF</p><h2 id="copied-title">prompt 已複製</h2></div><span class="pill success">已交給你送出</span></div><p>請到 Codex Chat 貼上並送出；Extension 不會自行執行。完成後回來按 Refresh，重新讀取檔案 snapshot。</p><details class="raw-details"><summary>查看已複製的 prompt</summary><pre>${escapeHtml(bundle.chatText)}</pre></details></section>`;
+}
+
+function renderBootstrapResult(report: BootstrapReport): string {
+  const list = (values: string[]) => values.length ? `<ul>${values.map((value) => `<li><code>${escapeHtml(value)}</code></li>`).join("")}</ul>` : `<p class="muted">沒有項目</p>`;
+  const conflicts = report.conflicts.map((item) => `<li><code>${escapeHtml(item.path)}</code> · ${escapeHtml(item.reason)}</li>`).join("");
+  const errors = report.errors.map((item) => `<li><code>${escapeHtml(item.path)}</code> · ${escapeHtml(item.reason)}</li>`).join("");
+  return `<section id="result-panel" class="preview" aria-labelledby="bootstrap-result-title"><div class="preview-heading"><div><p class="eyebrow">DEVWEAVE BOOTSTRAP</p><h2 id="bootstrap-result-title">${report.ok ? "初始化完成" : "初始化未完成"}</h2></div><span class="pill ${report.ok ? "success" : "danger"}">${escapeHtml(report.status)}</span></div><p>${report.ok ? "這次操作已由你確認，Extension 只套用固定 bootstrap manifest。下一步是確認 Codex hook、設定 verification commands、建立第一個 work item。" : "Extension 沒有宣稱初始化成功；先處理 conflict/error，修正後再重新整理。"}</p><h3>已建立</h3>${list(report.created)}<h3>已採用</h3>${list(report.adopted)}${conflicts ? `<h3>衝突</h3><ul>${conflicts}</ul>` : ""}${errors ? `<h3>錯誤</h3><ul>${errors}</ul>` : ""}${report.rolledBack.length ? `<h3>已回復</h3>${list(report.rolledBack)}` : ""}</section>`;
+}
+
+function renderStatus(): string {
+  return `<div id="copy-status" class="status-line ${statusError ? "error" : "success"}" role="${statusError ? "alert" : "status"}" aria-live="polite" aria-busy="${Boolean(busyAction)}">${busyAction ? "⏳ " : ""}${escapeHtml(statusMessage)}</div>`;
+}
+
+function renderKnowledgeOnly(): void {
+  if (selectedSection !== "knowledge" || !snapshot) return;
+  const content = document.querySelector<HTMLElement>("#section-content");
+  if (!content) return;
+  const focusKey = document.activeElement?.getAttribute("data-focus-key") ?? "wiki-query";
+  content.innerHTML = renderKnowledgeSection();
+  restoreFocus(focusKey);
+}
+
+function selectedWork(): WorkItemProjection | null {
+  if (!snapshot || !selectedWorkId) return null;
+  return snapshot.workItems.find((item) => item.id === selectedWorkId) ?? null;
+}
+
+function firstPendingGate(work: WorkItemProjection): "scope" | "build" | "acceptance" | null {
+  if (work.gates.scope.status !== "approved") return "scope";
+  if (work.gates.build.status !== "approved") return "build";
+  if (work.gates.acceptance.status !== "approved") return "acceptance";
+  return null;
+}
+
+function verificationSummary(current: WorkspaceSnapshot): string {
+  const configured = current.commands.length > 0 && Object.values(current.verificationProfiles).some((ids) => ids.length > 0);
+  return configured ? "已設定" : "需要設定";
+}
+
+function verificationDetail(current: WorkspaceSnapshot): string {
+  return current.commands.length ? `${current.commands.length} 個 command 可供 engine 使用` : "目前沒有 command/profile";
+}
+
+function bootstrapReasons(reasons: string[]): string {
+  const labels: Record<string, string> = { overview_not_ready: "overview 尚未就緒", architecture_missing: "缺少 architecture 頁面", module_missing: "缺少 module 頁面", critical_lint: "有 critical 解析問題" };
+  return reasons.map((reason) => labels[reason] ?? reason).join("、") || "核心頁面尚未完整";
+}
+
+function commandLabel(command: PublicCommandName): string {
+  return commandPresentations().find((item) => item.name === command)?.label ?? command;
 }
 
 function formValue(form: HTMLFormElement, name: string): string {
@@ -259,194 +616,33 @@ function formValue(form: HTMLFormElement, name: string): string {
   return typeof value === "string" ? value : "";
 }
 
-function selectedWork(): any | null {
-  if (!snapshot || !selectedWorkId) return null;
-  return snapshot.workItems?.find((item: any) => item.id === selectedWorkId) ?? null;
-}
-
-function renderWork(work: any): string {
-  if (!snapshot) return "";
-  const current = snapshot;
-  const taskDone = (work.tasks ?? []).filter((task: any) => task.status === "completed").length;
-  const evidencePassed = (work.evidence ?? []).filter((item: any) => item.status === "passed" && !item.stale).length;
-  return `<section class="section-card">
-    <div class="section-heading"><div><p class="eyebrow">WORK ITEM</p><h2>${escapeHtml(work.title)}</h2><p class="muted mono">${escapeHtml(work.id)}</p></div><div class="pill-row"><span class="pill">${escapeHtml(work.kind)}</span><span class="pill ${work.risk === "high" ? "danger" : "info"}">${escapeHtml(work.risk)} risk</span><span class="pill">${escapeHtml(work.status)}</span></div></div>
-    <div class="gate-grid">${gateCard(work, "scope", "G1 Scope")} ${gateCard(work, "build", "G2 Build")} ${gateCard(work, "acceptance", "G3 Acceptance")}</div>
-    <div class="metric-grid"><div class="metric"><span>Phase</span><strong>${escapeHtml(work.phase)}</strong></div><div class="metric"><span>Tasks</span><strong>${taskDone}/${(work.tasks ?? []).length}</strong></div><div class="metric"><span>Evidence</span><strong>${evidencePassed}/${(work.evidence ?? []).length}</strong></div><div class="metric"><span>Knowledge</span><strong>${escapeHtml(work.knowledge?.health ?? "unknown")}</strong></div></div>
-    ${work.blocker ? `<div class="notice danger"><span class="status-icon">!</span><div><strong>Blocker · ${escapeHtml(work.blocker.task ?? "task")}</strong><p>${escapeHtml(work.blocker.reason ?? "")}</p></div></div>` : ""}
-  </section>
-  ${renderNextAction(work)}
-  ${renderArtifacts(work)}
-  ${renderRequirementsDesign(work)}
-  ${renderKnowledge(work)}
-  ${renderTasksEvidence(work)}
-  ${renderVerification(work, current)}
-  ${renderAcceptance(work)}
-  ${renderAudit(work)}`;
-}
-
-function gateCard(work: any, gate: string, label: string): string {
-  const value = work.gates?.[gate] ?? { status: "pending" };
-  const status = value.status ?? "pending";
-  const approvalNote = status !== "approved" && work.phase !== "closed" ? `<small class="approval-note">人工 gate · 僅唯讀呈現</small>` : "";
-  return `<article class="gate-card ${escapeAttr(status)}"><div class="gate-title"><span class="status-icon">${icon(status)}</span><span>${label}</span></div><strong>${escapeHtml(status)}</strong><p class="muted">${value.approvedAt ? escapeHtml(value.approvedAt) : "等待目前 phase 的 engine validation"}</p>${approvalNote}</article>`;
-}
-
-function renderNextAction(work: any): string {
-  const next = nextSafeAction(work);
-  return `<section class="next-action"><div><p class="eyebrow">NEXT SAFE ACTION</p><h2>${escapeHtml(next.title)}</h2><p class="muted">${escapeHtml(next.detail)}</p></div><span class="pill info">唯讀提示</span></section>`;
-}
-
-function nextSafeAction(work: any): { title: string; detail: string } {
-  if (work.status === "closed" || work.phase === "closed") {
-    return { title: "Work item closed", detail: "這個 work item 僅供唯讀 audit；不提供版本控制或重新開啟操作。" };
-  }
-  if (work.blocker) {
-    return { title: "Review the current blocker", detail: `${work.blocker.task ?? "Task"}: ${work.blocker.reason ?? "需要在 Codex Chat 處理 blocker。"}` };
-  }
-  if (work.gates?.scope?.status !== "approved") {
-    return { title: "Review requirements and request G1", detail: "確認 scope、risk 與 Wiki-first context，再透過公開對話命令與 Codex Chat 處理。" };
-  }
-  if (work.gates?.build?.status !== "approved") {
-    return { title: "Review design and request G2", detail: "確認 DEC、plan、task dependency 與 high-risk analysis，再透過 Codex Chat 處理。" };
-  }
-  if (work.phase === "implementation") {
-    const pending = (work.tasks ?? []).find((task: any) => task.status === "pending");
-    return pending
-      ? { title: `Continue ${pending.id}`, detail: "依 plan dependency 執行下一個 task，完成後以 evidence 回填。" }
-      : { title: "Continue implementation", detail: "所有已投影 task 已啟動或完成；請在 Codex Chat 查看目前 work 的下一步。" };
-  }
-  if (work.phase === "verification" || work.phase === "acceptance_review") {
-    return { title: "Review verification readiness", detail: "確認 current source fingerprint、evidence、Wiki 與 baseline 後，再進行人工 acceptance。" };
-  }
-  return { title: "Review current work status", detail: "Extension 只呈現 filesystem snapshot；請在 Codex Chat 使用公開命令後 Refresh。" };
-}
-
-function renderArtifacts(work: any): string {
-  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">TRACEABILITY</p><h2>Artifacts</h2><p class="muted">Requirements → design → plan → acceptance，保留標準 Markdown editor 開啟。</p></div><span class="muted">唯讀開啟</span></div><div class="artifact-list">${(work.artifacts ?? []).map((artifact: any) => `<button class="artifact" data-action="open" data-path="${escapeAttr(artifact.path)}" ${artifact.exists ? "" : "disabled"}><span class="file-icon">${artifact.exists ? "▤" : "—"}</span><span><strong>${escapeHtml(artifact.path.split("/").at(-1) ?? artifact.path)}</strong><small>${artifact.exists ? `${artifact.text.length} chars${artifact.truncated ? " · truncated" : ""}` : "missing"}</small></span></button>`).join("")}</div></section>`;
-}
-
-function renderRequirementsDesign(work: any): string {
-  const groups = [
-    { label: "Requirements", names: ["brief.md", "requirements.md"], hint: "REQ / NFR → AC" },
-    { label: "Design", names: ["design.md"], hint: "DEC trace and high-risk decisions" },
-    { label: "Plan", names: ["plan.md"], hint: "TASK dependency graph" }
-  ];
-  const artifacts = work.artifacts ?? [];
-  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">WORK DETAIL</p><h2>Requirements · Design · Plan</h2></div><span class="muted">ID trace projection</span></div><div class="trace-grid">${groups.map((group) => {
-    const items = artifacts.filter((artifact: any) => group.names.includes(artifact.path.split("/").at(-1)));
-    return `<article class="trace-card"><strong>${group.label}</strong><small>${group.hint}</small>${items.map((artifact: any) => `<div class="trace-row"><span>${artifact.exists ? icon("active") : icon("warning")}</span><span><b>${escapeHtml(artifact.path.split("/").at(-1))}</b><small>${artifact.exists ? traceIds(artifact.text).join(" · ") || "No trace IDs detected" : "missing"}</small></span></div>`).join("")}</article>`;
-  }).join("")}</div></section>`;
-}
-
-function renderKnowledge(work: any): string {
-  const knowledge = work.knowledge ?? snapshot?.knowledge;
-  const pages = knowledge?.pages ?? [];
-  const categoryCounts = pages.reduce((counts: Record<string, number>, page: any) => { counts[page.type] = (counts[page.type] ?? 0) + 1; return counts; }, {});
-  const categories = Object.entries(categoryCounts).map(([type, count]) => `<span class="pill">${escapeHtml(type)} ${escapeHtml(count)}</span>`).join("");
-  const bootstrap = knowledge?.bootstrap;
-  const review = knowledge?.review;
-  const bootstrapNotice = bootstrap?.recommended
-    ? `<div class="notice warning"><span class="status-icon">•</span><div><strong>Codebase Wiki bootstrap recommended</strong><p>${escapeHtml((bootstrap.reasons ?? []).join(", ") || "核心頁尚未完整")}</p><button class="primary" data-action="wiki-bootstrap" ${snapshot?.mutationBlocked ? "disabled" : ""}>Bootstrap Codebase Wiki</button></div></div>`
-    : `<div class="notice info"><span class="status-icon">✓</span><div><strong>Core Wiki bootstrap detected</strong><p>Filesystem projection 已找到 active、sourced 的 overview、architecture 與 module；engine 仍是 currentness 的權威來源。</p></div></div>`;
-  const reviewState = review?.required
-    ? `${review.disposition ?? "missing"} · ${review.current ? "current" : "missing/stale"}`
-    : "legacy / not required";
-  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">WIKI-FIRST KNOWLEDGE</p><h2>Knowledge health</h2></div><span class="pill ${knowledge?.health === "healthy" ? "success" : "warning"}">${escapeHtml(knowledge?.health ?? "unknown")}</span></div>${bootstrapNotice}<div class="notice info"><span class="status-icon">i</span><div><strong>G1 fixed read order</strong><p><code>wiki/index.md</code> first, followed by at most five related pages. Raw sources are only for recorded gaps.</p></div></div><div class="pill-row">${categories || `<span class="muted">No Wiki categories detected.</span>`}</div><div class="metric-grid"><div class="metric"><span>Pages</span><strong>${pages.length}</strong></div><div class="metric"><span>Placeholder</span><strong>${(knowledge?.placeholderPages ?? []).length}</strong></div><div class="metric"><span>Stale</span><strong>${(knowledge?.stalePages ?? []).length}</strong></div><div class="metric"><span>Pending refresh</span><strong>${(knowledge?.pendingRefresh ?? []).length}</strong></div><div class="metric"><span>Covered changes</span><strong>${(knowledge?.coveredChangedPaths ?? []).length}</strong></div><div class="metric"><span>Uncovered changes</span><strong>${(knowledge?.uncoveredChangedPaths ?? []).length}</strong></div><div class="metric"><span>Knowledge review</span><strong>${escapeHtml(reviewState)}</strong></div></div><div class="page-list">${pages.slice(0, 12).map((page: any) => `<button class="page-row" data-action="open" data-path="${escapeAttr(page.path)}"><span>${icon(page.status)}</span><span><strong>${escapeHtml(page.title)}</strong><small>${escapeHtml(page.path)} · ${escapeHtml(page.status)}${page.verifiedBy ? ` · verified ${escapeHtml(page.verifiedBy)}` : ""}${page.parseErrors?.length ? " · parse warning" : ""}</small></span></button>`).join("")}</div></section>`;
-}
-
-function renderTasksEvidence(work: any): string {
-  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">IMPLEMENTATION</p><h2>Task board</h2></div><span class="muted">pending · in progress · completed · blocked</span></div><div class="task-list">${(work.tasks ?? []).map((task: any) => `<div class="task-row"><span class="status-icon">${icon(task.status)}</span><span><strong>${escapeHtml(task.id)}</strong><small>${escapeHtml(task.status)}${task.note ? ` · ${escapeHtml(task.note)}` : ""}${task.evidence?.length ? ` · evidence ${escapeHtml(task.evidence.join(", "))}` : ""}</small></span></div>`).join("") || `<p class="muted">G2 approval will create task tracking data.</p>`}</div></section>`;
-}
-
-function renderVerification(work: any, current: WorkspaceSnapshot): string {
-  const commands = current.commands ?? [];
-  const profiles = Object.entries(current.verificationProfiles ?? {}).map(([name, ids]) => `<span class="pill info">${escapeHtml(name)}: ${escapeHtml((ids as string[]).join(", ") || "none")}</span>`).join("");
-  const evidence = work.evidence ?? [];
-  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">VERIFICATION</p><h2>Commands and evidence</h2><p class="muted">只顯示 command metadata、exit code 與 raw-log path；不把 raw log 內容放入 Webview 或 clipboard。</p></div><div class="pill-row">${profiles || `<span class="pill warning">profiles unavailable</span>`}</div></div><div class="command-list">${commands.map((command: any) => `<div class="command-row"><span class="status-icon">⌘</span><span><strong>${escapeHtml(command.id)}</strong><small>${escapeHtml(command.argv.join(" "))} · cwd ${escapeHtml(command.cwd)} · timeout ${escapeHtml(command.timeoutSeconds)}s</small></span></div>`).join("") || `<p class="muted">No verification command configured.</p>`}</div><div class="evidence-list">${evidence.map((item: any) => `<article class="evidence-card"><div class="section-heading"><strong>${escapeHtml(item.id)} · ${escapeHtml(item.kind)}</strong><span class="pill ${item.status === "passed" && !item.stale ? "success" : item.stale ? "warning" : "danger"}">${escapeHtml(item.status)}${item.stale ? " · stale" : ""}</span></div><p>${escapeHtml(item.summary)}</p><small>covers ${escapeHtml(item.covers.join(", ") || "—")} · tasks ${escapeHtml(item.tasks.join(", ") || "—")} · command ${escapeHtml(item.commandId ?? "—")} · exit ${escapeHtml(item.exitCode ?? "—")}</small>${item.rawLog ? `<code class="raw-log-path">raw log: ${escapeHtml(item.rawLog)}</code>` : ""}</article>`).join("") || `<p class="muted">No evidence recorded.</p>`}</div></section>`;
-}
-
-function renderAcceptance(work: any): string {
-  const planned = work.knowledge?.planned;
-  const waivers = work.waivers ?? [];
-  const declaredBaseline = work.baselineTargets ?? [];
-  const coupled = planned && Array.isArray(planned.coupled) ? (planned.coupled as string[]) : [];
-  const sealed = planned && Array.isArray(planned.sealed) ? (planned.sealed as string[]) : [];
-  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">ACCEPTANCE</p><h2>AC · TASK · evidence matrix</h2><p class="muted">G3 前確認 current source fingerprint、baseline targets、Wiki promotion 與 waivers。</p></div><span class="pill ${work.gates?.acceptance?.status === "approved" ? "success" : "warning"}">${escapeHtml(work.gates?.acceptance?.status ?? "pending")}</span></div><div class="acceptance-grid"><div><strong>Baseline targets</strong><ul>${declaredBaseline.map((path: string) => `<li><code>${escapeHtml(path)}</code></li>`).join("") || "<li>none declared yet</li>"}</ul><small>${escapeHtml(work.baselineRationale || "")}</small></div><div><strong>Wiki promotion</strong><ul><li>affected: ${escapeHtml(work.knowledge?.affectedPages?.join(", ") || "none")}</li><li>pending refresh: ${escapeHtml(work.knowledge?.pendingRefresh?.join(", ") || "none")}</li><li>planned upsert/delete: ${escapeHtml(planned ? `${(planned.upserts as string[] ?? []).join(", ")} / ${(planned.deletes as string[] ?? []).join(", ")}` : "none")}</li><li>coupled index/log: ${escapeHtml(coupled.join(", ") || "not planned")}</li><li>sealed: ${escapeHtml(sealed.join(", ") || "not sealed")}</li></ul></div></div><div class="waiver-list"><strong>Waivers</strong>${waivers.map((waiver: any) => `<div class="task-row"><span class="status-icon">!</span><span><b>${escapeHtml(waiver.kind)} · ${escapeHtml(waiver.target)}</b><small>${escapeHtml(waiver.reason)}${waiver.gate ? ` · gate ${escapeHtml(waiver.gate)}` : ""}</small></span></div>`).join("") || `<p class="muted">No waivers recorded.</p>`}</div></section>`;
-}
-
-function renderAudit(work: any): string {
-  const events = work.events ?? [];
-  return `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">AUDIT</p><h2>Governance event log</h2></div><span class="muted">唯讀 · no compare/revert/branch operations</span></div><div class="audit-list">${events.slice(-12).map((event: string) => `<code>${escapeHtml(event)}</code>`).join("") || `<p class="muted">No events recorded.</p>`}</div></section>`;
-}
-
-function traceIds(text: string): string[] {
-  return [...new Set(text.match(/\b(?:REQ|NFR|AC|DEC|TASK)-\d{3}\b/g) ?? [])].slice(0, 12);
-}
-
-function renderEmptyWork(): string {
-  const knowledge = renderKnowledge({ knowledge: snapshot?.knowledge });
-  if (snapshot?.workItems?.length && snapshot.workItems.length > 1) {
-    return `<section class="empty-card"><span class="empty-icon">⌁</span><h2>Select a work item</h2><p class="muted">目前有多個 work items；請先在上方選擇 work ID。next/status 可以不帶 work，revise/approve 必須先選擇。</p></section>${knowledge}`;
-  }
-  return `<section class="empty-card"><span class="empty-icon">＋</span><h2>No work item selected</h2><p class="muted">沒有既有 work item 時，仍可使用 new、feature、refactor、bug、next、status 與 wiki bootstrap 公開命令；revise/approve 需要目前 work。</p></section>${knowledge}`;
-}
-
-function renderActionPreview(bundle: any): void {
-  const panel = document.querySelector<HTMLElement>("#copy-preview");
-  if (!panel) return;
-  panel.classList.remove("hidden");
-  panel.innerHTML = `<div class="preview-heading"><div><p class="eyebrow">PUBLIC COMMAND PREVIEW</p><h2>Review before copy</h2></div><span class="pill ${bundle.mutation ? "warning" : "info"}">${bundle.mutation ? "mutation · manual send" : "read-only"}</span></div><p class="muted">${escapeHtml(bundle.command ?? pendingIntent?.type ?? "public command")}${bundle.workId ? ` · ${escapeHtml(bundle.workId)}` : ""}</p><div class="notice warning"><span class="status-icon">!</span><div><strong>此 Extension 不會執行</strong><p>確認後只會複製公開命令到 clipboard；仍需由使用者在 Codex Chat 審閱並送出。</p></div></div><h3>Codex Chat command</h3><pre>${escapeHtml(bundle.chatText ?? "")}</pre>${(bundle.warnings ?? []).length ? `<div class="notice warning"><strong>Review warnings</strong><ul>${bundle.warnings.map((warning: string) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul></div>` : ""}<div class="action-row"><button class="primary" data-action="confirm-copy">Confirm and copy</button><button class="secondary" data-action="cancel-preview">Cancel</button></div>`;
-  setStatus("請審閱公開命令，再確認複製到 Codex Chat。", false);
-  panel.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-}
-
-function renderCopyResult(message: any): void {
-  const panel = document.querySelector<HTMLElement>("#copy-preview");
-  if (!panel) return;
-  if (!message.ok) {
-    panel.classList.remove("hidden");
-    panel.innerHTML = `<div class="notice danger"><strong>Copy failed</strong><p>${escapeHtml(message.message ?? "Unknown error")}</p></div>`;
-    return;
-  }
-  const bundle = message.bundle ?? {};
-  panel.classList.remove("hidden");
-  panel.innerHTML = `<div class="preview-heading"><div><p class="eyebrow">PUBLIC COMMAND PREVIEW</p><h2>已複製到 clipboard</h2></div><span class="pill ${bundle.mutation ? "warning" : "info"}">${bundle.mutation ? "mutation · manual send" : "read-only"}</span></div><p class="muted">${escapeHtml(bundle.command ?? "public command")}${bundle.workId ? ` · ${escapeHtml(bundle.workId)}` : ""} · Extension 不會自行執行。</p><h3>Codex Chat command</h3><pre>${escapeHtml(bundle.chatText ?? "")}</pre>${(bundle.warnings ?? []).length ? `<div class="notice warning"><strong>Review before sending</strong><ul>${bundle.warnings.map((warning: string) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul></div>` : ""}`;
-  setStatus("公開 prompt 已複製；請在 Codex Chat 審閱並送出。", false);
-  panel.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-}
-
-function renderBootstrapResult(report: any): void {
-  const panel = document.querySelector<HTMLElement>("#copy-preview");
-  if (!panel) return;
-  const list = (values: string[]) => values?.length ? `<ul>${values.map((value) => `<li><code>${escapeHtml(value)}</code></li>`).join("")}</ul>` : "<p class=\"muted\">none</p>";
-  const conflicts = (report.conflicts ?? []).map((item: any) => `<li><code>${escapeHtml(item.path)}</code> · ${escapeHtml(item.reason)}</li>`).join("");
-  const errors = (report.errors ?? []).map((item: any) => `<li><code>${escapeHtml(item.path)}</code> · ${escapeHtml(item.reason)}</li>`).join("");
-  panel.classList.remove("hidden");
-  panel.innerHTML = `<div class="preview-heading"><div><p class="eyebrow">DEVWEAVE BOOTSTRAP</p><h2>${report.ok ? "Initialization complete" : "Initialization not completed"}</h2></div><span class="pill ${report.ok ? "success" : "danger"}">${escapeHtml(report.status ?? "failed")}</span></div><p class="muted">這次操作未經 Codex Chat；Extension 只寫入固定 bootstrap manifest 目標。</p><h3>Created</h3>${list(report.created ?? [])}<h3>Adopted</h3>${list(report.adopted ?? [])}<h3>Skipped</h3>${list(report.skipped ?? [])}${conflicts ? `<h3>Conflicts</h3><ul>${conflicts}</ul>` : ""}${errors ? `<h3>Errors</h3><ul>${errors}</ul>` : ""}${(report.rolledBack ?? []).length ? `<h3>Rolled back</h3>${list(report.rolledBack)}` : ""}`;
-  setStatus(report.ok ? "DevWeave bootstrap 完成。" : "DevWeave bootstrap 未完成，請先處理 conflict/error。", !report.ok);
-  panel.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-}
-
-function setStatus(message: string, error: boolean): void {
-  const status = document.querySelector<HTMLElement>("#copy-status");
-  if (status) {
-    status.textContent = message;
-    status.className = `status-line ${error ? "error" : "success"}`;
-  }
-}
-
-function clearPendingPreview(): void {
+function clearPromptResult(): void {
   pendingIntent = null;
-  document.querySelector<HTMLElement>("#copy-preview")?.classList.add("hidden");
+  previewBundle = null;
+  copiedBundle = null;
+  bootstrapReport = null;
 }
 
-function parsePublicCommandName(value: string): value is PublicCommandName {
-  return ["new", "feature", "refactor", "bug", "next", "status", "revise", "approve", "wikiBootstrap"].includes(value);
+function restoreFocus(key: string | null): void {
+  if (!key) return;
+  const element = Array.from(document.querySelectorAll<HTMLElement>("[data-focus-key], #command-select, #wiki-query, #wiki-type, #work-select")).find((candidate) => candidate.dataset.focusKey === key || candidate.id === key);
+  element?.focus();
+}
+
+function focusByKey(key: string): void {
+  window.setTimeout(() => restoreFocus(key), 0);
+}
+
+function isDashboardSection(value: unknown): value is DashboardSection {
+  return value === "overview" || value === "work" || value === "knowledge" || value === "verification";
+}
+
+function isDisplayMode(value: unknown): value is DisplayMode {
+  return value === "concise" || value === "advanced";
 }
 
 function isPublicCommandName(value: unknown): value is PublicCommandName {
-  return typeof value === "string" && parsePublicCommandName(value);
+  return typeof value === "string" && ["new", "feature", "refactor", "bug", "next", "status", "revise", "approve", "wikiBootstrap"].includes(value);
 }
 
 function isHostMessage(value: unknown): value is HostToWebviewMessage {
@@ -462,6 +658,14 @@ function icon(status: string): string {
   return "·";
 }
 
+function reducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function traceIds(text: string): string[] {
+  return [...new Set(text.match(/\b(?:REQ|NFR|AC|DEC|TASK)-\d{3}\b/g) ?? [])].slice(0, 12);
+}
+
 function escapeHtml(value: unknown): string {
   return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
@@ -469,3 +673,5 @@ function escapeHtml(value: unknown): string {
 function escapeAttr(value: unknown): string {
   return escapeHtml(value).replaceAll("\n", "&#10;");
 }
+
+renderLoading();

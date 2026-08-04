@@ -179,6 +179,69 @@ export interface WorkspaceSnapshot {
 
 export type PublicCommandName = "new" | "feature" | "refactor" | "bug" | "next" | "status" | "revise" | "approve" | "wikiBootstrap";
 
+export type DashboardSection = "overview" | "work" | "knowledge" | "verification";
+export type DisplayMode = "concise" | "advanced";
+
+export interface DashboardPreferences {
+  displayMode: DisplayMode;
+}
+
+export type CommandGroup = "start" | "progress" | "review" | "knowledge";
+
+export interface CommandPresentation {
+  name: PublicCommandName;
+  group: CommandGroup;
+  label: string;
+  technicalLabel: string;
+  description: string;
+  requiresWork: boolean;
+  mutation: boolean;
+}
+
+export type SnapshotGuidanceKind = "initialize" | "setup" | "start" | "select" | "next" | "blocker" | "review" | "closed";
+
+export interface SnapshotGuidance {
+  kind: SnapshotGuidanceKind;
+  title: string;
+  detail: string;
+  command?: PublicCommandName;
+  workId?: string;
+  authoritative: false;
+}
+
+export interface ReviewCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+  nextStep?: string;
+}
+
+export type ReviewReadinessStatus = "ready" | "attention" | "not_ready" | "closed";
+
+export interface ReviewReadiness {
+  gate: GateName | null;
+  status: ReviewReadinessStatus;
+  summary: string;
+  checks: ReviewCheck[];
+}
+
+export interface DiagnosticPresentation {
+  severity: Diagnostic["severity"];
+  title: string;
+  detail: string;
+  resolution: string;
+  code: string;
+  path?: string;
+}
+
+export interface AuditEventPresentation {
+  at: string;
+  event: string;
+  summary: string;
+  raw: string;
+}
+
 export type PublicCommandIntent =
   | { type: "new"; goal: string }
   | { type: "feature"; request: string }

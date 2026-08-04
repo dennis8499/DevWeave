@@ -1,16 +1,17 @@
-import type { PublicCommandIntent, PromptBundle, WorkspaceSnapshot } from "./model";
+import type { DashboardPreferences, DisplayMode, PublicCommandIntent, PromptBundle, WorkspaceSnapshot } from "./model";
 import type { BootstrapReport } from "./bootstrap";
 
 export type WebviewToHostMessage =
   | { type: "refresh" }
   | { type: "initialize" }
   | { type: "selectWork"; workId: string | null }
+  | { type: "setDisplayMode"; mode: DisplayMode }
   | { type: "openFile"; path: string }
   | { type: "previewAction"; intent: PublicCommandIntent }
   | { type: "copyAction"; intent: PublicCommandIntent };
 
 export type HostToWebviewMessage =
-  | { type: "snapshot"; snapshot: WorkspaceSnapshot }
+  | { type: "snapshot"; snapshot: WorkspaceSnapshot; preferences?: DashboardPreferences }
   | { type: "bootstrapResult"; report: BootstrapReport; snapshot: WorkspaceSnapshot }
   | { type: "actionPreview"; bundle: PromptBundle }
   | { type: "copyResult"; ok: true; bundle: PromptBundle }
@@ -31,6 +32,10 @@ export function parseWebviewMessage(value: unknown): WebviewToHostMessage | null
     case "selectWork":
       return noExtraFields(record, ["type", "workId"]) && (record.workId === null || typeof record.workId === "string")
         ? { type: "selectWork", workId: record.workId }
+        : null;
+    case "setDisplayMode":
+      return noExtraFields(record, ["type", "mode"]) && isDisplayMode(record.mode)
+        ? { type: "setDisplayMode", mode: record.mode }
         : null;
     case "openFile":
       return noExtraFields(record, ["type", "path"]) && typeof record.path === "string"
@@ -107,6 +112,10 @@ function isNonEmptyString(value: unknown): value is string {
 
 function optionalWorkId(record: Record<string, unknown>): boolean {
   return record.workId === undefined || isNonEmptyString(record.workId);
+}
+
+function isDisplayMode(value: unknown): value is DisplayMode {
+  return value === "concise" || value === "advanced";
 }
 
 function noExtraFields(record: Record<string, unknown>, fields: string[]): boolean {

@@ -1,7 +1,8 @@
 import * as vscode from "vscode";
 import { BootstrapReport } from "./bootstrap";
-import { PromptBundle, PublicCommandIntent, WorkspaceSnapshot } from "./model";
+import { DashboardPreferences, DisplayMode, PromptBundle, PublicCommandIntent, WorkspaceSnapshot } from "./model";
 import { HostToWebviewMessage, parseWebviewMessage } from "./protocol";
+import { resolveWorkSelection } from "./work-selection";
 
 export interface DashboardCallbacks {
   refresh(): Promise<WorkspaceSnapshot>;
@@ -10,11 +11,14 @@ export interface DashboardCallbacks {
   copy(intent: PublicCommandIntent): Promise<PromptBundle>;
   openFile(relativePath: string): Promise<void>;
   selectWork(workId: string | null): void;
+  getPreferences?(): DashboardPreferences;
+  setDisplayMode?(mode: DisplayMode): Promise<void> | void;
   protocolError(message: string): void;
 }
 
 export class DashboardPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
+  private lastSnapshot: WorkspaceSnapshot | undefined;
 
   public constructor(
     private readonly context: vscode.ExtensionContext,
@@ -22,7 +26,7 @@ export class DashboardPanel implements vscode.Disposable {
   ) {}
 
   public async show(snapshot: WorkspaceSnapshot, selectedWorkId?: string): Promise<void> {
-    const selected = resolveSelection(snapshot, selectedWorkId ?? snapshot.selectedWorkId);
+    const selected = resolveWorkSelection(snapshot, selectedWorkId ?? snapshot.selectedWorkId);
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.One);
       await this.sendSnapshot({ ...snapshot, selectedWorkId: selected });
@@ -52,7 +56,7 @@ export class DashboardPanel implements vscode.Disposable {
       return;
     }
     const next = snapshot ?? await this.callbacks.refresh();
-    await this.sendSnapshot({ ...next, selectedWorkId: resolveSelection(next, next.selectedWorkId) });
+    await this.sendSnapshot({ ...next, selectedWorkId: resolveWorkSelection(next, next.selectedWorkId) });
   }
 
   public dispose(): void {
@@ -61,7 +65,12 @@ export class DashboardPanel implements vscode.Disposable {
   }
 
   private async sendSnapshot(snapshot: WorkspaceSnapshot): Promise<void> {
-    await this.sendMessage({ type: "snapshot", snapshot });
+    this.lastSnapshot = snapshot;
+    await this.sendMessage({
+      type: "snapshot",
+      snapshot,
+      preferences: this.callbacks.getPreferences?.() ?? { displayMode: "concise" }
+    });
   }
 
   private async handleMessage(message: unknown): Promise<void> {
@@ -85,6 +94,12 @@ export class DashboardPanel implements vscode.Disposable {
         }
         case "selectWork":
           this.callbacks.selectWork(parsed.workId);
+          return;
+        case "setDisplayMode":
+          await this.callbacks.setDisplayMode?.(parsed.mode);
+          if (this.lastSnapshot) {
+            await this.sendSnapshot(this.lastSnapshot);
+          }
           return;
         case "openFile":
           await this.callbacks.openFile(parsed.path);
@@ -129,11 +144,4 @@ export class DashboardPanel implements vscode.Disposable {
   </body>
 </html>`;
   }
-}
-
-function resolveSelection(snapshot: WorkspaceSnapshot, selectedWorkId: string | null | undefined): string | null {
-  if (selectedWorkId && snapshot.workItems.some((item) => item.id === selectedWorkId)) {
-    return selectedWorkId;
-  }
-  return snapshot.workItems.length === 1 ? snapshot.workItems[0].id : null;
 }

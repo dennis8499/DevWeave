@@ -1,0 +1,26 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-016",
+    "AC-017",
+    "AC-019"
+  ],
+  "created_at": "2026-08-03T14:43:20+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "40ae1c59d6b38d2a0b30a7040b76baf213cb4b05",
+  "id": "EVID-003",
+  "kind": "regression",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "7fa9cf005809326eaa299931f21eb41db791f1b02bea8495b6721de1835882db",
+  "stale": false,
+  "status": "passed",
+  "summary": "Python full repository regression passed: 83 tests.",
+  "tasks": [
+    "TASK-007"
+  ]
+}

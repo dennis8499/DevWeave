@@ -5,8 +5,8 @@ sources: [.agents/skills/devweave/assets/wiki/templates, .agents/skills/devweave
 last_updated: 2026-08-03
 tags: [module]
 status: active
-source_fingerprint: "sha256:a8a11ad90d62c16373d876002e9b811eef859cde17fc6f790d69f410ef6e4543"
-verified_by: 20260803-161041-feature-codebase-llm-wiki
+source_fingerprint: "sha256:c23474109c03e2b312dd51d5be702deed2f6b9b2c730a9a48c81e01a1018493d"
+verified_by: 20260803-215202-feature-devweave-control-center-ux
 ---
 
 # Knowledge Engine
@@ -39,3 +39,10 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 - 新式 state 以 `knowledge_review_required: true` 啟用完整 contract；缺少 marker 的 schema-v1 Work Item 維持 legacy compatibility，不追溯阻擋。
 - Scaffold 採 no-overwrite create；seal 先完成所有候選 preflight，再以 per-file atomic replace 寫 provenance。多檔 I/O 仍是逐檔 atomic，最終完整性由 G3 reconciliation 保證。
 - Engine 不自動判斷每個 uncovered path 是否值得長期保存，也不強迫一檔一頁；這是刻意保留給 agent review 與人工 G3 的語意責任。
+
+## Extension integration boundary
+
+- `vscode-extension/src/snapshot.ts` 只把 project、work、gate、task、evidence、Wiki 與 diagnostics 投影成 filesystem snapshot；它不執行 Python engine、shell、Git、network 或 Codex API。
+- `vscode-extension/src/presentation.ts` 是 Extension-local 的 presentation seam，集中 public command 任務語言、非權威 snapshot guidance、review readiness、diagnostic copy 與 audit event mapping；它不改變 Python schema 或 `$devweave` prompt contract。
+- Control Center Webview 以總覽、工作項目、知識、驗證與稽核分區；active work 與 closed history 分組，Knowledge 列表以 snapshot 內資料提供搜尋、分類與 bounded initial list，使用者可明確顯示全部。
+- `setDisplayMode` 只更新 Extension `workspaceState`。初始化仍是使用者確認後的固定 bootstrap write；其他命令只預覽／複製 prompt 到 Codex Chat，送出後由使用者 Refresh 取得新的檔案投影。

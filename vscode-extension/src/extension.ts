@@ -3,12 +3,13 @@ import { BootstrapBundle, BootstrapInstaller, BootstrapReport } from "./bootstra
 import { ClipboardAdapter, VscodeClipboardAdapter } from "./clipboard";
 import { DashboardPanel } from "./dashboard";
 import { FileSystemPort } from "./filesystem";
-import { Diagnostic, PromptBundle, PublicCommandIntent, WorkspaceSnapshot } from "./model";
+import { DashboardPreferences, Diagnostic, DisplayMode, PromptBundle, PublicCommandIntent, WorkspaceSnapshot } from "./model";
 import { DevWeavePromptComposer } from "./prompt";
 import { WorkspaceSnapshotReader } from "./snapshot";
 import { WorkItemsTreeProvider } from "./tree";
 import { readBootstrapBundle, VscodeBootstrapResourceReader, VscodeBootstrapWorkspace } from "./vscode-bootstrap";
 import { VscodeFileSystemPort } from "./vscode-filesystem";
+import { resolveWorkSelection } from "./work-selection";
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("DevWeave Control Center");
@@ -21,6 +22,8 @@ export function activate(context: vscode.ExtensionContext): void {
     copy: (intent) => controller.copy(intent),
     openFile: (path) => controller.openFile(path),
     selectWork: (workId) => controller.selectWork(workId),
+    getPreferences: () => controller.getPreferences(),
+    setDisplayMode: (mode) => controller.setDisplayMode(mode),
     protocolError: (message) => output.appendLine(`[protocol] ${message}`)
   });
   controller.attach(tree, dashboard);
@@ -54,6 +57,7 @@ class ExtensionController {
   private reader: WorkspaceSnapshotReader | undefined;
   private readonly composer = new DevWeavePromptComposer();
   private readonly bootstrapInstaller = new BootstrapInstaller();
+  private readonly preferencesKey = "devweave.controlCenter.preferences";
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   public constructor(
@@ -95,7 +99,8 @@ class ExtensionController {
         rootPath: root.toString()
       });
       this.snapshot = await this.reader.readWorkspace();
-      this.snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
+      this.snapshot = { ...this.snapshot, selectedWorkId: resolveWorkSelection(this.snapshot, this.selectedWorkId) };
+      this.selectedWorkId = this.snapshot.selectedWorkId;
     }
     this.tree?.update(this.snapshot);
     await this.dashboard?.refresh(this.snapshot);
@@ -116,8 +121,8 @@ class ExtensionController {
   }
 
   public selectWork(workId: string | null): void {
-    this.selectedWorkId = workId;
-    this.snapshot = { ...this.snapshot, selectedWorkId: workId };
+    this.selectedWorkId = resolveWorkSelection(this.snapshot, workId);
+    this.snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
     this.tree?.update(this.snapshot);
   }
 
@@ -130,6 +135,15 @@ class ExtensionController {
   public async preview(intent: PublicCommandIntent): Promise<PromptBundle> {
     const snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
     return this.composer.compose(intent, snapshot);
+  }
+
+  public getPreferences(): DashboardPreferences {
+    const stored = this.context.workspaceState.get<Partial<DashboardPreferences>>(this.preferencesKey);
+    return { displayMode: stored?.displayMode === "advanced" ? "advanced" : "concise" };
+  }
+
+  public async setDisplayMode(mode: DisplayMode): Promise<void> {
+    await this.context.workspaceState.update(this.preferencesKey, { displayMode: mode });
   }
 
   public async initialize(): Promise<{ report: BootstrapReport; snapshot: WorkspaceSnapshot }> {
@@ -242,7 +256,8 @@ class ExtensionController {
     if (this.selectedWorkId) {
       return this.snapshot.workItems.find((work) => work.id === this.selectedWorkId);
     }
-    return this.snapshot.workItems.length === 1 ? this.snapshot.workItems[0] : undefined;
+    const active = this.snapshot.workItems.filter((work) => work.status === "active");
+    return active.length === 1 ? active[0] : undefined;
   }
 
   private async copyBundle(bundle: PromptBundle): Promise<void> {
@@ -271,29 +286,48 @@ class ExtensionController {
     if (folders.length === 1) {
       return folders[0].uri;
     }
-    const managed = [];
-    for (const folder of folders) {
-      if (await vscode.workspace.fs.stat(vscode.Uri.joinPath(folder.uri, ".devweave", "project.json")).then(() => true, () => false)) {
-        managed.push(folder);
-      }
-    }
-    if (managed.length === 1) {
-      return managed[0].uri;
-    }
     if (!promptForChoice) {
       return undefined;
     }
-    const picked = await vscode.window.showQuickPick(
-      folders.map((folder) => ({ label: folder.name, description: folder.uri.toString(), uri: folder.uri })),
-      { placeHolder: "選擇要開啟的 DevWeave repository" }
-    );
+    const choices = await Promise.all(folders.map(async (folder) => {
+      const state = await this.readRootState(folder.uri);
+      return {
+        label: folder.name,
+        description: `${state.label} · ${folder.uri.fsPath}`,
+        detail: state.detail,
+        uri: folder.uri
+      };
+    }));
+    const picked = await vscode.window.showQuickPick(choices, {
+      placeHolder: "選擇要開啟的 DevWeave repository（顯示 managed 狀態）"
+    });
     return picked?.uri;
+  }
+
+  private async readRootState(uri: vscode.Uri): Promise<{ label: string; detail: string }> {
+    const projectUri = vscode.Uri.joinPath(uri, ".devweave", "project.json");
+    try {
+      const bytes = await vscode.workspace.fs.readFile(projectUri);
+      const project: unknown = JSON.parse(new TextDecoder().decode(bytes));
+      const managed = isRecord(project) && typeof project.managed === "boolean" ? project.managed : null;
+      return managed === true
+        ? { label: "已管理", detail: "DevWeave managed workspace；可讀取 workflow snapshot。" }
+        : managed === false
+          ? { label: "未啟用 managed", detail: "已有 DevWeave 設定，但需要明確啟用。" }
+          : { label: "設定不完整", detail: "project.json 存在，但 managed 欄位無法確認。" };
+    } catch {
+      return { label: "未初始化", detail: "找不到 .devweave/project.json；可選此 repository 進行初始化。" };
+    }
   }
 
   private multipleRootMessage(): string {
     const count = vscode.workspace.workspaceFolders?.length ?? 0;
     return count > 1 ? "請先在 DevWeave Control Center 選擇一個 repository。" : "目前沒有可讀取的 VS Code workspace。";
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function unavailableSnapshot(message: string): WorkspaceSnapshot {

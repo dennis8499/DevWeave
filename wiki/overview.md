@@ -5,8 +5,8 @@ sources: [.agents/skills/devweave/SKILL.md, AGENTS.md, README.md, docs/使用手
 last_updated: 2026-08-03
 tags: [overview]
 status: active
-source_fingerprint: "sha256:c79bf807d6c7f67945bfff4b4db8efbde6884441ab029c1311d8b99b4d887478"
-verified_by: 20260803-161041-feature-codebase-llm-wiki
+source_fingerprint: "sha256:58ab4cf4a9bc9e3582cf415565bbd10e80ca7f4e8181c3344fe96d5dcf85d349"
+verified_by: 20260803-215202-feature-devweave-control-center-ux
 ---
 
 # DevWeave Codebase Overview
@@ -25,7 +25,8 @@ DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router�
 - Python engine 是 workflow 與 knowledge policy 的權威來源；JSON/JSONL ledger 只能經 CLI 更新。
 - `knowledge_core.py` 負責 Wiki parser、source/content fingerprint、lint、coverage、bootstrap assessment、canonical scaffold 與 seal。
 - `devweave_core.py` 負責 Work Item state、gate currentness、review/plan invalidation、G3 reconciliation 與 evidence。
-- VS Code Extension 只讀 filesystem projection，三個 Wiki bootstrap 入口都只預覽/複製 `$devweave wiki bootstrap`，不執行 CLI、不寫 Wiki。
+- VS Code Extension 只讀 filesystem projection，三個 Wiki bootstrap 入口都只預覽/複製 `$devweave wiki bootstrap`，不執行 CLI、不寫 Wiki；Control Center 以總覽、工作項目、知識、驗證與稽核四區呈現，顯示偏好只存於 Extension workspaceState。
+- Extension 的 public command UI 以任務語言分組，所有 workflow decision 仍透過 prompt handoff 回到 Codex Chat；active work 與 closed history 分離，Wiki 頁面瀏覽提供有界搜尋、分類與顯示全部入口。
 
 ## 關鍵模組
 
