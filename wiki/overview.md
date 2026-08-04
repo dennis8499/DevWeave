@@ -5,8 +5,8 @@ sources: [.agents/skills/devweave/SKILL.md, AGENTS.md, README.md, docs/使用手
 last_updated: 2026-08-04
 tags: [overview]
 status: active
-source_fingerprint: "sha256:cd34d3ceb382e6f4f3aaa56a53ec0bb162715e48eb1e554951e169abee73252b"
-verified_by: 20260804-102428-feature-vs-code-extension-wiki
+source_fingerprint: "sha256:f83d8aafed006b403fe3c70b915e3b12dca1dfe266a2ef877c4f0fd5d424a4ac"
+verified_by: 20260804-122803-feature-g3-review-agent
 ---
 
 # DevWeave Codebase Overview
@@ -20,6 +20,7 @@ DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router�
 3. G1 需求階段使用 `grill-me`/`grilling`，一次只問一個會影響目標、範圍、介面、風險、相容性或驗收的決策；回答回流 `brief.md`/`requirements.md`，完成 `validate` 後展示摘要並等待明確 G1 approval。
 4. G2 使用 `codebase-design` 逐題確認重要設計取捨；回答回流 `design.md`/`plan.md`，完成 `validate` 後展示方案、介面、失敗處理、回復方式與 task plan，等待明確 G2 approval。產品實作與 tracked tests 只在 current G2 後進行，Wiki 在 verification 前保持唯讀。
 5. G3 驗證 current evidence、scope、baseline 與 Knowledge Review，確認實作符合已批准內容。新式 Work Item 必須選擇 `promote` 或 `no-update`；promote 最多變更五個內容頁並同步 index/log/seal。
+6. High-risk Work Item 在 final artifacts 穩定後由唯一 DevWeave router 啟動一個 isolated、read-only Independent Review Agent。Python engine 只接收 machine-only `review record`，保存 source-bound `kind: review` evidence、redacted report hash 與 provenance；standard/low risk 不啟動此 reviewer。
 
 ## 互動式決策與 Gate
 
@@ -32,6 +33,7 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 - Python engine 是 workflow 與 knowledge policy 的權威來源；JSON/JSONL ledger 只能經 CLI 更新。互動式問答規則位於 router 與 phase guidance，並不新增 pending-question engine、CLI、schema 或第二套 ledger。
 - `knowledge_core.py` 負責 Wiki parser、source/content fingerprint、lint、coverage、bootstrap assessment、canonical scaffold 與 seal。
 - `devweave_core.py` 負責 Work Item state、gate currentness、review/plan invalidation、G3 reconciliation 與 evidence。
+- High-risk G3 的 review result 分為 `passed`、`unavailable`、`critical`：unavailable/timeout/malformed fallback 與 advisory 是 warning，具名 critical security/data-loss/irreversible/scope finding 會阻擋 G3，只有 exact narrow `review-critical` waiver 可解除；human approval 仍是最後關卡。
 - VS Code Extension 只讀 filesystem projection，三個 Wiki bootstrap 入口都只預覽/複製 `$devweave wiki bootstrap`，不執行 CLI、不寫 Wiki；Control Center 以總覽、工作項目、知識、驗證、稽核與說明六區呈現，顯示偏好只存於 Extension workspaceState。
 - Extension 的 public command UI 以任務語言分組，所有 workflow decision 仍透過 prompt handoff 回到 Codex Chat；active work 與 closed history 分離，Wiki 頁面瀏覽提供有界搜尋、分類與顯示全部入口。
 - Extension 的 Wiki 搜尋以 Enter 套用大小寫不敏感的 title/path/body-preview 包含式查詢；輸入期間保留同一個 input DOM，結果區使用局部 render。Watcher 由 debounce 與 single-flight refresh coordinator 合併，snapshot 的獨立讀取平行化後仍依固定順序輸出。

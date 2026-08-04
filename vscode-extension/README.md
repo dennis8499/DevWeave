@@ -35,7 +35,7 @@ Dashboard 用任務語言分組，旁邊仍保留技術命令名稱：
 - Knowledge 面板的 bootstrap CTA
 - Command Palette 的 `DevWeave: 建立 Codebase Wiki（複製 prompt）`；舊版 technical label `DevWeave: Bootstrap Codebase Wiki` 對應同一個 command ID，方便既有文件辨識。
 
-「驗證與稽核」區域會先顯示目前 gate、reviewer readiness、blocker、未完成 task、failed/stale evidence 與 Knowledge 待處理項目，再提供 command metadata、evidence、baseline/Wiki 詳細資料與可展開的 raw event。沒有 verification command/profile 時，介面會明確標示需要設定，不會宣稱已完成驗證。
+「驗證與稽核」區域會先顯示目前 gate、reviewer readiness、blocker、未完成 task、failed/stale evidence 與 Knowledge 待處理項目，再提供 command metadata、evidence、baseline/Wiki 詳細資料與可展開的 raw event。High-risk G3 另顯示 `Independent Review` readiness：missing、unavailable 或 advisory 是 attention，critical finding 是 not-ready；passed 且綁定目前 source 才會顯示 ready。Extension 只投影 snapshot、raw report path/hash 與 findings，不會啟動 Agent、執行 engine 或自行判定／核准 gate。沒有 verification command/profile 時，介面會明確標示需要設定，不會宣稱已完成驗證。
 
 ## 顯示與操作
 

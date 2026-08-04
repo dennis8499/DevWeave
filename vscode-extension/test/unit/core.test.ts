@@ -157,6 +157,40 @@ test("snapshot reader projects array commands, placeholder Wiki, work state, and
   assert.equal(snapshot.diagnostics.some((item) => item.code === "project_invalid"), false);
 });
 
+test("snapshot reader projects nested independent review evidence and keeps legacy evidence compatible", async () => {
+  const entries = managedEntries();
+  entries[".devweave/work-items/demo/evidence/review.json"] = JSON.stringify({
+    id: "EVID-002",
+    kind: "review",
+    status: "passed",
+    summary: "Independent review passed.",
+    covers: ["AC-001"],
+    tasks: ["TASK-001"],
+    stale: false,
+    binds_current_source: true,
+    source_fingerprint: "source-1",
+    review: {
+      result: "passed",
+      severity: "none",
+      reviewer_id: "opaque-agent",
+      context_mode: "isolated_read_only",
+      report_sha256: "hash",
+      findings: [],
+      covers: ["AC-001"],
+      tasks: ["TASK-001"]
+    }
+  });
+  const snapshot = await new WorkspaceSnapshotReader(new MemoryFileSystem(entries), {
+    rootName: "review-evidence",
+    rootPath: "file:///review-evidence"
+  }).readWorkspace();
+
+  const review = snapshot.workItems[0]?.evidence.find((item) => item.kind === "review");
+  assert.equal(review?.review?.result, "passed");
+  assert.equal(review?.review?.contextMode, "isolated_read_only");
+  assert.equal(snapshot.workItems[0]?.evidence.find((item) => item.id === "evidence-1")?.review, undefined);
+});
+
 test("snapshot reader reports an uninitialized workspace without invoking an engine", async () => {
   const reader = new WorkspaceSnapshotReader(new MemoryFileSystem({ "wiki/index.md": "placeholder" }), {
     rootName: "empty",

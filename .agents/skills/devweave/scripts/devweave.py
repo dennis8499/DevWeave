@@ -32,6 +32,7 @@ from devweave_core import (
     load_project,
     normalize_relpath,
     project_path,
+    record_review,
     resolve_work,
     revise_work,
     run_verification,
@@ -327,6 +328,19 @@ def command_evidence(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
     return {"ok": True, "work": state["id"], "evidence": evidence}
 
 
+def command_review(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
+    state = resolve_work(repo, args.work)
+    if args.review_action != "record":
+        raise ValidationError("Unknown review action.", {"action": args.review_action})
+    evidence = record_review(
+        repo,
+        state["id"],
+        reviewer_id=args.reviewer_id,
+        report_file=args.report_file,
+    )
+    return {"ok": True, "work": state["id"], "evidence": evidence}
+
+
 def command_verify(args: argparse.Namespace, repo: Path) -> tuple[dict[str, Any], int]:
     state = resolve_work(repo, args.work)
     evidence = run_verification(
@@ -600,6 +614,19 @@ def build_parser() -> argparse.ArgumentParser:
         dest="binds_current_source",
     )
     evidence_parser.set_defaults(handler=command_evidence, binds_current_source=None)
+
+    review_parser = subparsers.add_parser(
+        "review",
+        help="Machine-only independent review evidence interface.",
+    )
+    review_subparsers = review_parser.add_subparsers(
+        dest="review_action", required=True
+    )
+    review_record_parser = review_subparsers.add_parser("record")
+    review_record_parser.add_argument("--work")
+    review_record_parser.add_argument("--reviewer-id", required=True)
+    review_record_parser.add_argument("--report-file", required=True)
+    review_record_parser.set_defaults(handler=command_review)
 
     verify_parser = subparsers.add_parser("verify")
     verify_parser.add_argument("--work")

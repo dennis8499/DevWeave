@@ -5,8 +5,8 @@ sources: [.agents/skills/devweave/assets/wiki/templates, .agents/skills/devweave
 last_updated: 2026-08-04
 tags: [module]
 status: active
-source_fingerprint: "sha256:a26c4baa6c2dce5df743314a0240c272aa47d4d77144ba0aa96bfe92047162a8"
-verified_by: 20260804-102428-feature-vs-code-extension-wiki
+source_fingerprint: "sha256:13d1a90a6f4e4b8c758c60eb52c36e8f25c1ca40ed7c892948c878e48fa07551"
+verified_by: 20260804-122803-feature-g3-review-agent
 ---
 
 # Knowledge Engine
@@ -24,6 +24,7 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 - `knowledge plan`：replace 一至五個 content targets，自動 coupling index/log。
 - `knowledge scaffold`：只對 planned new upsert，以九種 canonical template 進行 exclusive create。
 - `knowledge seal`：只接受 planned upserts/coupled pages，拒絕 placeholder、template token、invalid source 與 critical lint。
+- machine-only `review record`：由既有 router 傳入固定 reviewer JSON report 與 opaque reviewer ID；只接受 high-risk G3 的 isolated/read-only review，產生 source-bound `kind: review` evidence 與 redacted report provenance，不是新的 public chat verb。
 
 互動式決策不是新的 public machine command：G1 由 `grill-me`/`grilling` 協助確認 material requirements，G2 由 `codebase-design` 協助確認 material design；每次只處理一題並等待使用者回答。Gate 在 `validate` 後再做 Double Check，若答案或決策改變，沿既有 `revise` 使 Gate 與 artifacts 回到正確階段。
 
@@ -32,6 +33,7 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 - Runtime 僅使用 Python standard library 與 Git CLI；沒有向量資料庫、全文檢索服務或 Token instrumentation。
 - Source/page path 必須 normalize 為 repository-relative；Wiki、`.devweave` 與 `.git` 不得成為 page source。
 - Source fingerprint 納入 tracked 與非 ignored untracked content、dirty bytes、rename/delete 與 branch identity；Wiki 與 framework ledger 不污染 product evidence fingerprint。
+- Review report 只可來自 `.devweave/cache/incoming/<work-id>/` containment，受 project raw-log size limit、固定 envelope、UTF-8、AC/TASK ID、secret redaction 與 SHA-256 hash 保護；engine 寫入 `.devweave/cache/logs/<work-id>/` 前會逐層驗證 final path containment 並拒絕 symlink escape，Agent 不可直接寫 evidence JSON/JSONL。
 - Canonical templates 位於 `.agents/skills/devweave/assets/wiki/templates/`，是 engine-owned inputs；live knowledge 固定在根 `wiki/`。
 
 ## Behavior and Gaps
@@ -43,6 +45,7 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 - Scaffold 採 no-overwrite create；seal 先完成所有候選 preflight，再以 per-file atomic replace 寫 provenance。多檔 I/O 仍是逐檔 atomic，最終完整性由 G3 reconciliation 保證。
 - Engine 不自動判斷每個 uncovered path 是否值得長期保存，也不強迫一檔一頁；這是刻意保留給 agent review 與人工 G3 的語意責任。
 - Engine 不判定沉默、模糊同意或 agent 推斷為 approval；explicit human approval 仍是 gate event 的必要條件。G3 只檢查實作對已批准內容的符合性，新需求必須經 `revise`，不能在驗證時默默補入。
+- G3 review validator 對 current `passed` 放行、對 unavailable/advisory 發 warning，對 critical finding 要求每個具名 `F-###` 有 acceptance-gate `review-critical` waiver；source fingerprint 改變會讓 review stale，legacy evidence 仍可讀但不能冒充 current independent review。
 
 ## Lifecycle boundary
 
@@ -52,6 +55,7 @@ DevWeave 仍是唯一 router；Companion Skills 是階段內方法，不建立�
 
 - `vscode-extension/src/snapshot.ts` 只把 project、work、gate、task、evidence、Wiki 與 diagnostics 投影成 filesystem snapshot；它不執行 Python engine、shell、Git、network 或 Codex API。
 - `vscode-extension/src/presentation.ts` 是 Extension-local 的 presentation seam，集中 public command 任務語言、非權威 snapshot guidance、review readiness、diagnostic copy 與 audit event mapping；它不改變 Python schema 或 `$devweave` prompt contract。
+- `vscode-extension/src/snapshot.ts` 以 optional nested review projection 讀取 result/severity/findings/hash；`presentation.ts` 在 high-risk acceptance 增加 Independent Review check，missing/unavailable/advisory 顯示 attention、critical 顯示 not-ready，Extension 不啟動 Agent 或修改 lifecycle。
 - Control Center Webview 以總覽、工作項目、知識、驗證與稽核分區；active work 與 closed history 分組，Knowledge 列表以 snapshot 內資料提供搜尋、分類與 bounded initial list，使用者可明確顯示全部。
 - `setDisplayMode` 只更新 Extension `workspaceState`。初始化仍是使用者確認後的固定 bootstrap write；其他命令只預覽／複製 prompt 到 Codex Chat，送出後由使用者 Refresh 取得新的檔案投影。
 

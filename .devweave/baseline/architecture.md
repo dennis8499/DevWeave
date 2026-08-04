@@ -15,6 +15,7 @@ Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；`devweave.p
 - Product source、baseline 與 knowledge 各自具有 fingerprint。Wiki-only 變更不使 product evidence stale，但會使 G3 stale。
 - Knowledge sources 固定為 1–5 個 repo-relative product paths；directory 以單次 Git listing 展開 tracked 與 non-ignored untracked files，再依排序後 current content hash。
 - `knowledge bootstrap/review/context/plan/scaffold/seal` 都是唯一 router 下的 machine namespace；bootstrap 仍是 `kind: feature` 並沿用 G1/G2/G3/session binding，沒有第二個 Wiki state machine。
+- High-risk G3 reviewer 由既有 DevWeave router 啟動 exactly once；Python engine 不 spawn Agent，只透過 machine-only `review record` 驗證固定 JSON、建立 additive `kind: review` evidence、report hash、current source/Git provenance 與 bounded raw log。不存在第二個 lifecycle、router、orchestrator 或平行 ledger。
 - VS Code Extension 的 bootstrap recommendation 是 filesystem-only、non-authoritative projection；三個入口只經 `PromptComposer` 預覽/複製，engine output 才決定 create/resume/already-complete 與 gate currentness。
 
 ## Accepted Decisions
@@ -36,6 +37,7 @@ Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；`devweave.p
 - `VscodeBootstrapWorkspace` 僅透過 VS Code `workspace.fs` 寫入固定 manifest destinations；`ExtensionController` 只負責 workspace root、native modal confirmation、installer invocation、snapshot refresh 與 result reporting。既有合法 `project.json` 或 critical diagnostic 不會觸發自動重建。
 - `esbuild.mjs` 從 repository 的 DevWeave skill、hook 與 starter templates 產生 VSIX 內 `dist/bootstrap/manifest.json`；每個 source 都有 byte length/SHA-256，runtime 不下載、不執行 source，也不依賴 Codex Chat、Python、shell、Git 或 network 完成 bootstrap。
 - `PromptComposer` 是唯一 action seam，將 `ActionIntent` 轉成 deterministic、repo-relative、sanitized `PromptBundle`；Webview 只能經 `previewAction` 顯示預覽，再由使用者確認 `copyAction` 到 Codex Chat。Extension 不直接執行 mutation。
+- Control Center 對 high-risk acceptance 投影 `Independent Review` readiness：missing/unavailable/advisory 為 attention，critical 為 not-ready，passed 且 source current 才為 ready；Extension 不啟動 Agent、engine、shell、Git、network 或 lifecycle mutation。
 - Activity Bar TreeView 提供 repository/work-item navigation；Dashboard/Webview 提供 welcome、doctor、phase/gate、task/evidence、Wiki-first、acceptance 與唯讀 audit projection。多 work item 必須明確選取，不以第一筆資料默選。
 - UI 使用 VS Code theme tokens、Codicons、CSP、ARIA/focus、high-contrast、reduced-motion 與非色彩單獨狀態表達；主要內容保持不透明，僅在控制項使用輕微透明效果。
 - `extension-typecheck`、`extension-tests`、`extension-package` 與 `extension-smoke` 透過 DevWeave command profiles 管理；Extension 不提供 branch、commit、push、PR、release、版本比較或還原。
@@ -49,3 +51,5 @@ Control Center provenance: `20260803-090218-feature-devweave-control-center-vs-c
 Bootstrap provenance: `20260803-112312-feature-vs-code-devweave`（待 G3 核准）。
 
 Codebase LLM Wiki provenance: `20260803-161041-feature-codebase-llm-wiki`（待 G3 核准）。
+
+Independent Review provenance: `20260804-122803-feature-g3-review-agent`（待 G3 核准）。

@@ -203,6 +203,79 @@ test("review readiness can be ready for a pending gate without pretending the ga
   assert.ok(readiness.checks.find((check) => check.key === "gate")?.detail.includes("等待 reviewer"));
 });
 
+test("high-risk acceptance readiness projects independent review states", () => {
+  const base = work({
+    risk: "high",
+    phase: "acceptance_review",
+    tasks: [{ id: "TASK-001", status: "completed", evidence: ["EVID-001"], note: "done" }],
+    evidence: [{
+      id: "EVID-001",
+      kind: "acceptance",
+      status: "passed",
+      summary: "acceptance",
+      covers: ["AC-001"],
+      tasks: ["TASK-001"],
+      stale: false,
+      bindsCurrentSource: true
+    }]
+  });
+  const missing = buildReviewReadiness(snapshot([base]), base);
+  assert.equal(missing.status, "attention");
+  assert.equal(missing.checks.find((check) => check.key === "independent-review")?.level, "warning");
+
+  const passed = {
+    ...base,
+    evidence: [...base.evidence, {
+      id: "EVID-002",
+      kind: "review",
+      status: "passed",
+      summary: "review passed",
+      covers: ["AC-001"],
+      tasks: ["TASK-001"],
+      stale: false,
+      bindsCurrentSource: true,
+      review: {
+        result: "passed" as const,
+        severity: "none" as const,
+        reviewerId: "opaque-agent",
+        contextMode: "isolated_read_only",
+        reportSha256: "hash",
+        findings: [],
+        covers: ["AC-001"],
+        tasks: ["TASK-001"]
+      }
+    }]
+  };
+  const passedReadiness = buildReviewReadiness(snapshot([passed]), passed);
+  assert.equal(passedReadiness.status, "ready");
+  assert.equal(passedReadiness.checks.find((check) => check.key === "independent-review")?.ok, true);
+
+  for (const severity of ["advisory", "unavailable"] as const) {
+    const attention = {
+      ...passed,
+      evidence: passed.evidence.map((item) => item.kind === "review" ? {
+        ...item,
+        review: { ...item.review!, result: severity === "advisory" ? "passed" as const : "unavailable" as const, severity: severity === "advisory" ? "advisory" as const : "none" as const }
+      } : item)
+    };
+    const readiness = buildReviewReadiness(snapshot([attention]), attention);
+    assert.equal(readiness.status, "attention");
+    assert.equal(readiness.checks.find((check) => check.key === "independent-review")?.level, "warning");
+  }
+
+  const critical = {
+    ...passed,
+    evidence: passed.evidence.map((item) => item.kind === "review" ? {
+      ...item,
+      status: "failed",
+      review: { ...item.review!, result: "critical" as const, severity: "critical" as const, findings: [{ id: "F-001", severity: "critical" as const, title: "risk", evidence: "data loss", recommendation: "fix" }] }
+    } : item)
+  };
+  const criticalReadiness = buildReviewReadiness(snapshot([critical]), critical);
+  assert.equal(criticalReadiness.status, "not_ready");
+  assert.equal(criticalReadiness.checks.find((check) => check.key === "independent-review")?.level, "critical");
+});
+
 test("closed work is explicitly not reviewable", () => {
   const current = work({ status: "closed", phase: "closed" });
   const readiness = buildReviewReadiness(snapshot([current]), current);

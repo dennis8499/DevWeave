@@ -39,6 +39,7 @@ WAIVER_GATES = {
     "unreproducible": "scope",
     "missing-command": "acceptance",
     "out-of-scope": "acceptance",
+    "review-critical": "acceptance",
 }
 PHASE_REFERENCES = {
     "requirements": "references/requirements-phase.md",
@@ -64,6 +65,11 @@ FRAMEWORK_PREFIXES = (
     ".codex/",
 )
 MAX_RAW_LOG_BYTES = 5_000_000
+REVIEW_RESULTS = ("passed", "unavailable", "critical")
+REVIEW_SEVERITIES = ("none", "advisory", "critical")
+REVIEW_CONTEXT_MODE = "isolated_read_only"
+REVIEW_MAX_TEXT_CHARS = 20_000
+REVIEW_MAX_FINDINGS = 100
 ID_PATTERN = re.compile(r"\b(REQ|NFR|AC|DEC|TASK|EVID)-\d{3}\b")
 WORK_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 HEADING_PATTERN = re.compile(
@@ -1430,10 +1436,16 @@ def _validate_headings(
             errors.append(f"{artifact} is missing required heading: {heading}")
 
 
-def _waiver_exists(state: dict[str, Any], kind: str, target: str | None = None) -> bool:
+def _waiver_exists(
+    state: dict[str, Any],
+    kind: str,
+    target: str | None = None,
+    gate: str | None = None,
+) -> bool:
     return any(
         waiver.get("kind") == kind
         and (target is None or waiver.get("target") == target)
+        and (gate is None or waiver.get("gate") == gate)
         and waiver.get("reason", "").strip()
         for waiver in state.get("waivers", [])
     )
@@ -1915,6 +1927,13 @@ def validate_work(
             "acceptance.md",
             errors,
         )
+        if state["risk"]["level"] == "high":
+            _validate_headings(
+                acceptance,
+                ("## 獨立 Review",),
+                "acceptance.md",
+                errors,
+            )
         for acceptance_id in acceptance_ids:
             if acceptance_id not in acceptance:
                 errors.append(f"acceptance.md does not account for {acceptance_id}.")
@@ -1959,14 +1978,94 @@ def validate_work(
             "refactor": {"equivalence", "regression"},
             "bug": {"regression"},
         }[state["kind"]]
-        if state["risk"]["level"] == "high":
-            required_kinds.add("review")
         observed_kinds = {item.get("kind") for item in source_bound_evidence}
         missing_kinds = sorted(required_kinds - observed_kinds)
         if missing_kinds:
             errors.append(
                 f"Missing required passing evidence kinds: {', '.join(missing_kinds)}"
             )
+        if state["risk"]["level"] == "high":
+            current_reviews = [
+                item
+                for item in state.get("evidence", {}).values()
+                if item.get("kind") == "review"
+                and item.get("binds_current_source")
+                and not item.get("stale")
+                and item.get("source_fingerprint") == current_source["fingerprint"]
+            ]
+            if not current_reviews:
+                warnings.append(
+                    "High-risk independent review is missing or unavailable; human G3 approval may continue with attention."
+                )
+            else:
+                current_review = sorted(
+                    current_reviews, key=lambda item: item.get("id", "")
+                )[-1]
+                review_metadata = current_review.get("review")
+                review_id = current_review.get("id", "<unknown>")
+                if not isinstance(review_metadata, dict):
+                    errors.append(f"{review_id} has invalid independent review metadata.")
+                else:
+                    review_result = review_metadata.get("result")
+                    review_severity = review_metadata.get("severity")
+                    findings = review_metadata.get("findings", [])
+                    if review_result not in REVIEW_RESULTS or review_severity not in REVIEW_SEVERITIES:
+                        errors.append(f"{review_id} has invalid independent review result metadata.")
+                    elif not isinstance(findings, list) or not all(
+                        isinstance(item, dict) for item in findings
+                    ):
+                        errors.append(f"{review_id} has invalid independent review findings.")
+                    else:
+                        if review_id not in acceptance:
+                            errors.append(f"acceptance.md does not account for {review_id}.")
+                        for finding in findings:
+                            finding_id = finding.get("id")
+                            if not isinstance(finding_id, str):
+                                errors.append(f"{review_id} contains a finding without a named ID.")
+                            elif finding_id not in acceptance:
+                                errors.append(
+                                    f"acceptance.md does not account for review finding {finding_id}."
+                                )
+                        if review_result == "unavailable":
+                            warnings.append(
+                                f"Independent review {review_id} is unavailable; human G3 approval may continue."
+                            )
+                        elif review_result == "passed":
+                            if review_severity == "advisory" or any(
+                                item.get("severity") == "advisory" for item in findings
+                            ):
+                                warnings.append(
+                                    f"Independent review {review_id} passed with advisory findings."
+                                )
+                        elif review_result == "critical":
+                            critical_findings = [
+                                item
+                                for item in findings
+                                if item.get("severity") == "critical"
+                            ]
+                            if not critical_findings:
+                                errors.append(
+                                    f"Independent review {review_id} is critical without a critical finding."
+                                )
+                            for finding in critical_findings:
+                                finding_id = finding.get("id")
+                                if not isinstance(finding_id, str) or not _waiver_exists(
+                                    state,
+                                    "review-critical",
+                                    finding_id,
+                                    gate="acceptance",
+                                ):
+                                    errors.append(
+                                        f"Critical independent review finding requires a named review-critical waiver: {finding_id}"
+                                    )
+                                else:
+                                    if finding_id not in acceptance:
+                                        errors.append(
+                                            f"acceptance.md must name the waiver target {finding_id}."
+                                        )
+                                    warnings.append(
+                                        f"Critical independent review finding {finding_id} is covered by a narrow waiver."
+                                    )
         known_tasks = set(task_ids)
         known_acceptance = set(acceptance_ids)
         for item in source_bound_evidence:
@@ -2797,6 +2896,16 @@ def add_waiver(
                 "Waiver gate must be explicit outside a gate-review phase.",
                 {"gate": resolved_gate, "allowed": list(GATES)},
             )
+        if kind == "review-critical":
+            if resolved_gate != "acceptance":
+                raise ValidationError(
+                    "review-critical waivers are valid only for the acceptance gate."
+                )
+            if not re.fullmatch(r"F-\d{3}", target.strip()):
+                raise ValidationError(
+                    "review-critical waivers require one named finding ID target.",
+                    {"target": target},
+                )
         waiver = {
             "schema_version": SCHEMA_VERSION,
             "id": f"WAIVER-{len(state.get('waivers', [])) + 1:03d}",
@@ -2915,6 +3024,207 @@ def _redact(text: str) -> str:
     return pattern.sub(r"\1\2[REDACTED]", text)
 
 
+def _review_report_path(repo: Path, work_id: str, report_file: str | Path) -> Path:
+    if not isinstance(report_file, (str, Path)) or not str(report_file).strip():
+        raise ValidationError("Review report file is required.")
+    relative = Path(report_file)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValidationError(
+            "Review report file must be repo-relative and cannot contain '..'.",
+            {"report_file": str(report_file)},
+        )
+    candidate = ensure_within(repo, repo / relative)
+    incoming = ensure_within(
+        repo,
+        devweave_root(repo) / "cache" / "incoming" / work_id,
+    )
+    try:
+        candidate.relative_to(incoming)
+    except ValueError as exc:
+        raise ValidationError(
+            "Review report file must stay inside the work-item incoming cache.",
+            {"report_file": normalize_relpath(report_file)},
+        ) from exc
+    if not candidate.is_file():
+        raise ValidationError(
+            "Review report file is missing or is not a file.",
+            {"report_file": normalize_relpath(report_file)},
+        )
+    return candidate
+
+
+def _review_log_path(repo: Path, work_id: str, evidence_id: str) -> Path:
+    cache_root = ensure_within(repo, devweave_root(repo) / "cache")
+    logs_root = ensure_within(cache_root, cache_root / "logs")
+    work_logs = ensure_within(logs_root, logs_root / work_id)
+    return ensure_within(work_logs, work_logs / f"{evidence_id}.log")
+
+
+def _review_text(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValidationError(f"Review report field '{field}' must be a non-empty string.")
+    normalized = value.strip()
+    if len(normalized) > REVIEW_MAX_TEXT_CHARS:
+        raise ValidationError(
+            f"Review report field '{field}' is too large.",
+            {"field": field, "max_chars": REVIEW_MAX_TEXT_CHARS},
+        )
+    return _redact(normalized)
+
+
+def _load_review_report(
+    repo: Path,
+    state: dict[str, Any],
+    report_file: str | Path,
+    source: dict[str, Any],
+) -> tuple[dict[str, Any], bytes]:
+    path = _review_report_path(repo, state["id"], report_file)
+    project = load_project(repo)
+    try:
+        limit = int(project.get("evidence", {}).get("raw_log_limit_bytes", MAX_RAW_LOG_BYTES))
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("Project evidence raw_log_limit_bytes must be an integer.") from exc
+    if limit <= 0:
+        raise ValidationError("Project evidence raw_log_limit_bytes must be greater than zero.")
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise ValidationError("Review report file could not be read.", {"path": str(path)}) from exc
+    if len(raw) > limit:
+        raise ValidationError(
+            "Review report exceeds the configured raw log limit.",
+            {"bytes": len(raw), "limit": limit},
+        )
+    try:
+        text = raw.decode("utf-8")
+        value = json.loads(text)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValidationError("Review report must be valid UTF-8 JSON.") from exc
+    if not isinstance(value, dict):
+        raise ValidationError("Review report must be a JSON object.")
+    required = {
+        "result",
+        "severity",
+        "summary",
+        "source_fingerprint",
+        "covers",
+        "tasks",
+        "findings",
+    }
+    missing = sorted(required - set(value))
+    extra = sorted(set(value) - required)
+    if missing or extra:
+        raise ValidationError(
+            "Review report fields do not match the fixed envelope.",
+            {"missing": missing, "unknown": extra},
+        )
+    result = value.get("result")
+    severity = value.get("severity")
+    if result not in REVIEW_RESULTS:
+        raise ValidationError(
+            "Review report result is invalid.",
+            {"result": result, "allowed": list(REVIEW_RESULTS)},
+        )
+    if severity not in REVIEW_SEVERITIES:
+        raise ValidationError(
+            "Review report severity is invalid.",
+            {"severity": severity, "allowed": list(REVIEW_SEVERITIES)},
+        )
+    summary = _review_text(value.get("summary"), "summary")
+    fingerprint = value.get("source_fingerprint")
+    if not isinstance(fingerprint, str) or fingerprint != source["fingerprint"]:
+        raise ValidationError(
+            "Review report source fingerprint is not current.",
+            {"reported": fingerprint, "current": source["fingerprint"]},
+        )
+    covers = value.get("covers")
+    tasks = value.get("tasks")
+    if not isinstance(covers, list) or not all(isinstance(item, str) for item in covers):
+        raise ValidationError("Review report covers must be a string array.")
+    if not isinstance(tasks, list) or not all(isinstance(item, str) for item in tasks):
+        raise ValidationError("Review report tasks must be a string array.")
+    covers = sorted(set(covers))
+    tasks = sorted(set(tasks))
+    _validate_evidence_id_syntax(covers, tasks)
+    requirement_blocks = _heading_blocks(_read_artifact(repo, state, "requirements.md"))
+    plan_blocks = _heading_blocks(_read_artifact(repo, state, "plan.md"))
+    known_acceptance = {item for item in requirement_blocks if item.startswith("AC-")}
+    known_tasks = {item for item in plan_blocks if item.startswith("TASK-")}
+    unknown_covers = sorted(set(covers) - known_acceptance)
+    unknown_tasks = sorted(set(tasks) - known_tasks)
+    if unknown_covers or unknown_tasks:
+        raise ValidationError(
+            "Review report contains unknown AC/TASK coverage.",
+            {"unknown_covers": unknown_covers, "unknown_tasks": unknown_tasks},
+        )
+
+    findings_value = value.get("findings")
+    if not isinstance(findings_value, list) or len(findings_value) > REVIEW_MAX_FINDINGS:
+        raise ValidationError(
+            "Review report findings must be a bounded array.",
+            {"max_findings": REVIEW_MAX_FINDINGS},
+        )
+    findings: list[dict[str, str]] = []
+    finding_ids: set[str] = set()
+    for finding in findings_value:
+        if not isinstance(finding, dict):
+            raise ValidationError("Each review finding must be an object.")
+        finding_keys = {"id", "severity", "title", "evidence", "recommendation"}
+        missing_finding = sorted(finding_keys - set(finding))
+        extra_finding = sorted(set(finding) - finding_keys)
+        if missing_finding or extra_finding:
+            raise ValidationError(
+                "Review finding fields do not match the fixed envelope.",
+                {"missing": missing_finding, "unknown": extra_finding},
+            )
+        finding_id = finding.get("id")
+        if not isinstance(finding_id, str) or not re.fullmatch(r"F-\d{3}", finding_id):
+            raise ValidationError("Review findings require an ID such as F-001.")
+        if finding_id in finding_ids:
+            raise ValidationError("Review finding IDs must be unique.", {"id": finding_id})
+        finding_ids.add(finding_id)
+        finding_severity = finding.get("severity")
+        if finding_severity not in ("advisory", "critical"):
+            raise ValidationError(
+                "Review finding severity must be advisory or critical.",
+                {"id": finding_id},
+            )
+        findings.append(
+            {
+                "id": finding_id,
+                "severity": finding_severity,
+                "title": _review_text(finding.get("title"), f"{finding_id}.title"),
+                "evidence": _review_text(finding.get("evidence"), f"{finding_id}.evidence"),
+                "recommendation": _review_text(
+                    finding.get("recommendation"), f"{finding_id}.recommendation"
+                ),
+            }
+        )
+    critical_findings = [item for item in findings if item["severity"] == "critical"]
+    if result == "passed" and (severity == "critical" or critical_findings):
+        raise ValidationError("A passed review cannot contain critical findings.")
+    if result == "unavailable" and (severity != "none" or findings):
+        raise ValidationError("An unavailable review must have none severity and no findings.")
+    if result == "critical" and (severity != "critical" or not critical_findings):
+        raise ValidationError("A critical review requires at least one critical finding.")
+    sanitized = {
+        "result": result,
+        "severity": severity,
+        "summary": summary,
+        "source_fingerprint": source["fingerprint"],
+        "covers": covers,
+        "tasks": tasks,
+        "findings": findings,
+    }
+    stored = canonical_json(sanitized)
+    if len(stored) > limit:
+        raise ValidationError(
+            "Redacted review report exceeds the configured raw log limit.",
+            {"bytes": len(stored), "limit": limit},
+        )
+    return sanitized, stored
+
+
 def _write_evidence_unlocked(
     repo: Path,
     state: dict[str, Any],
@@ -2929,6 +3239,87 @@ def _write_evidence_unlocked(
     append_event_unlocked(repo, state["id"], "evidence_added", evidence)
 
 
+def record_review(
+    repo: Path,
+    work_id: str,
+    *,
+    reviewer_id: str,
+    report_file: str | Path,
+) -> dict[str, Any]:
+    reviewer_id = _review_text(reviewer_id, "reviewer_id")
+    with WorkLock(repo, work_id):
+        state = load_state(repo, work_id)
+        sync_state_unlocked(repo, state)
+        if state.get("risk", {}).get("level") != "high":
+            raise ValidationError(
+                "Independent review record is available only for high-risk work."
+            )
+        if state.get("phase") not in ("verification", "acceptance_review"):
+            raise ValidationError(
+                "Independent review may be recorded only during G3 verification or acceptance review.",
+                {"phase": state.get("phase")},
+            )
+        source = git_snapshot(repo)
+        report, stored_report = _load_review_report(repo, state, report_file, source)
+        evidence_id = _next_evidence_id(state)
+        log_path = _review_log_path(repo, work_id, evidence_id)
+        atomic_write_bytes(log_path, stored_report)
+        result = report["result"]
+        evidence = {
+            "schema_version": SCHEMA_VERSION,
+            "id": evidence_id,
+            "kind": "review",
+            "status": "passed" if result == "passed" else "failed",
+            "summary": report["summary"],
+            "covers": report["covers"],
+            "tasks": report["tasks"],
+            "observed_result": (
+                "success" if result == "passed" else "failure" if result == "critical" else "neutral"
+            ),
+            "source_fingerprint": source["fingerprint"],
+            "git_head": source["head"],
+            "created_at": utc_now(),
+            "stale": False,
+            "binds_current_source": True,
+            "command_id": None,
+            "exit_code": None,
+            "expectation": None,
+            "raw_log": normalize_relpath(log_path.relative_to(repo)),
+            "log_truncated": False,
+            "review": {
+                "result": result,
+                "severity": report["severity"],
+                "reviewer_id": reviewer_id,
+                "context_mode": REVIEW_CONTEXT_MODE,
+                "report_sha256": sha256_bytes(stored_report),
+                "findings": report["findings"],
+                "covers": report["covers"],
+                "tasks": report["tasks"],
+            },
+        }
+        _write_evidence_unlocked(repo, state, evidence)
+        append_event_unlocked(
+            repo,
+            work_id,
+            "review_recorded",
+            {
+                "evidence_id": evidence_id,
+                "result": result,
+                "severity": report["severity"],
+                "reviewer_id": reviewer_id,
+                "report_sha256": evidence["review"]["report_sha256"],
+            },
+        )
+        if evidence["status"] == "passed":
+            state["last_verification"] = {
+                "evidence_id": evidence_id,
+                "source_fingerprint": source["fingerprint"],
+                "at": utc_now(),
+            }
+            save_state_unlocked(repo, state)
+        return evidence
+
+
 def add_evidence(
     repo: Path,
     work_id: str,
@@ -2941,6 +3332,10 @@ def add_evidence(
     observed_result: str = "neutral",
     binds_current_source: bool | None = None,
 ) -> dict[str, Any]:
+    if kind == "review":
+        raise ValidationError(
+            "Review evidence must be recorded through the machine-only review record interface."
+        )
     _validate_evidence_id_syntax(covers, tasks)
     if status not in ("passed", "failed", "waived"):
         raise ValidationError("Unknown evidence status.", {"status": status})
@@ -3019,6 +3414,10 @@ def run_verification(
     tasks: Sequence[str] = (),
     expectation: str = "zero",
 ) -> dict[str, Any]:
+    if kind == "review":
+        raise ValidationError(
+            "Review evidence must be recorded through the machine-only review record interface."
+        )
     _validate_evidence_id_syntax(covers, tasks)
     if expectation not in ("zero", "nonzero", "any"):
         raise ValidationError("Unknown exit expectation.", {"expectation": expectation})

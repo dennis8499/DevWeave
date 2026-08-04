@@ -272,6 +272,28 @@ class RepositoryContractTests(unittest.TestCase):
                 self.assertIn(fragment, source, f"{relative}: {fragment}")
             self.assertNotIn("八個公開", source, relative)
 
+    def test_high_risk_review_stays_on_the_single_router_and_read_only_extension(self) -> None:
+        router = (REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "SKILL.md").read_text(encoding="utf-8")
+        verification = (REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "references" / "verification-phase.md").read_text(encoding="utf-8")
+        contracts = (REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "references" / "contracts.md").read_text(encoding="utf-8")
+        agents = (REPOSITORY_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        for source in (router, verification, contracts, agents):
+            self.assertIn("isolated", source)
+            self.assertIn("read-only", source)
+            self.assertIn("review record", source)
+            self.assertIn("human", source.lower())
+        self.assertIn("There is no public `$devweave review` chat verb.", router)
+        self.assertIn("Python engine does not spawn", verification)
+        self.assertIn("VS Code Extension does not invoke", verification)
+        self.assertIn("review-critical", contracts)
+        self.assertIn("G2 `Design It Twice`", agents)
+
+        core_source = (SCRIPT_ROOT / "devweave_core.py").read_text(encoding="utf-8")
+        extension_source = (REPOSITORY_ROOT / "vscode-extension" / "src" / "presentation.ts").read_text(encoding="utf-8")
+        self.assertIn('"kind": "review"', core_source)
+        self.assertIn("independent-review", extension_source)
+        self.assertNotIn("multi_agent", core_source)
+
 
 if __name__ == "__main__":
     unittest.main()

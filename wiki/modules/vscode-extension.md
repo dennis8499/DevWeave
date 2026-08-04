@@ -5,8 +5,8 @@ sources: [vscode-extension/esbuild.mjs, vscode-extension/package.json, vscode-ex
 last_updated: 2026-08-04
 tags: [module, vscode, control-center]
 status: active
-source_fingerprint: "sha256:c56661602db690c56357aa89738a9f8405fad4115b9e41dcdc3d17dd84115d74"
-verified_by: 20260804-102428-feature-vs-code-extension-wiki
+source_fingerprint: "sha256:3d13f518485b07d8b6e6ad09bf6701a8dc1073507a45aad77ee0a978aa3f2afc"
+verified_by: 20260804-122803-feature-g3-review-agent
 ---
 
 # DevWeave VS Code Extension
@@ -21,6 +21,7 @@ verified_by: 20260804-102428-feature-vs-code-extension-wiki
 - 套用後以大小寫不敏感的 `includes` 搜尋 title、path 與 body preview；拼字錯誤不保證命中。type 是精確分類篩選，show-all 只控制可見頁數。
 - 結果與 metrics 使用 stable DOM seam，`RenderScheduler` 合併連續 local updates；搜尋不重建整個 Knowledge section，也不觸發 workspace scan。
 - Help 是 Extension-local 的 lazy section，內容包含初始化、workflow/Gate、Wiki、companion skills 與安全邊界；不寫入 target workspace，也不依賴網路。
+- Verification projection 對 high-risk acceptance 增加 `Independent Review` readiness：current passed 是 ready，missing/unavailable/advisory 是 attention，critical finding 是 not-ready；raw evidence 展開區顯示 result、severity、reviewer、report hash 與 findings。
 
 ## Refresh and snapshot
 
@@ -34,7 +35,7 @@ Production bundle `0.2.0` 使用 manifest 固定完整控制套件：`devweave`�
 
 ## Security and compatibility
 
-Runtime 維持 CSP、no process、no shell、no external network 與 preview-first public command boundary。所有 workspace write 都集中在使用者確認後的 allowlisted bootstrap installer；snapshot、搜尋、help 與 prompt composition 都是 Extension-local/read-only。0.2.0 VSIX 另行產出，既有 dirty `0.1.0.vsix` 保留不覆寫；public commands 與 legacy snapshot projection 維持相容。
+Runtime 維持 CSP、no process、no shell、no external network 與 preview-first public command boundary。所有 workspace write 都集中在使用者確認後的 allowlisted bootstrap installer；snapshot、搜尋、help、prompt composition 與 Independent Review readiness 都是 Extension-local/read-only。Extension 不啟動 Review Agent、不呼叫 Python engine、不判定或核准 gate；0.2.0 VSIX 另行產出，既有 dirty `0.1.0.vsix` 保留不覆寫；public commands 與 legacy snapshot projection 維持相容。
 
 ## Verification seams
 

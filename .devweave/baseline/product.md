@@ -9,6 +9,9 @@ DevWeave 以單一 `$devweave` router，讓 Codex 在 repository 內以可追溯
 ## Accepted Capabilities
 
 - 公開 chat surface 為 `new/feature/refactor/bug/next/status/revise/approve/wiki bootstrap`；`$devweave wiki bootstrap` 對整個 repository 冪等建立或續接一般 feature-profile Work Item，不另開生命週期。
+- High-risk G3 在 final artifacts 穩定後由既有單一 router 固定啟動 1 個 isolated、read-only Independent Review Agent；standard/low risk 不啟動。G2 `Design It Twice` 的 3+ sub-agents 仍是獨立的 optional design comparison。
+- High-risk reviewer 只能讀取核准 artifacts、完整 diff、risk/scope、baseline、Wiki context 與 evidence，不繼承主 Agent reasoning，也不得修改 source/Wiki/ledger 或執行 approve/revise/close。Human G3 approval 仍是最後關卡。
+- Review result 的 `passed` 正常通過；`unavailable`、timeout、malformed fallback 與 advisory findings 是 warning；critical security、data-loss、不可回復性或 scope finding 只有具名、窄幅 `review-critical` acceptance waiver 可解除。
 - G1 採 Wiki-first：先讀 root `wiki/index.md`，再讀最多五個相關頁面，保存每頁 status、content hash 與 stored/computed source fingerprint；只有先記錄 gap 才回查最小必要 source。
 - 每個新式 Work Item 在 G3 前必須完成 Knowledge Review：可重用知識採 `promote`，沒有 durable knowledge 時採有理由的 `no-update`，而不是強迫每次產生 Wiki diff。
 - G3 可將驗證後的 overview、architecture、module、entity、pattern、dependency、decision、guide 與 synthesis 知識提升到 root `wiki/`；affected pages、最多五個 content targets、index、append-only log 與 source provenance 由 engine 驗證。
@@ -30,3 +33,5 @@ Companion Skills provenance: `20260802-215810-feature-matt-pocock-skills`（待 
 Bootstrap provenance: `20260803-112312-feature-vs-code-devweave`（待 G3 核准）。
 
 Codebase LLM Wiki provenance: `20260803-161041-feature-codebase-llm-wiki`（待 G3 核准）。
+
+Independent Review provenance: `20260804-122803-feature-g3-review-agent`（待 G3 核准）。

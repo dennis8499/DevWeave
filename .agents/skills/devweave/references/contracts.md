@@ -11,6 +11,7 @@ Read this reference for CLI usage, artifact grammar, state recovery, or an ambig
 - Concurrency: one atomic directory lock per work item and a separate project lock.
 - Events: append-only `events.jsonl`; never use it as mutable state.
 - Raw command output: `.devweave/cache/logs/<work-id>/<EVID-id>.log`, limited by project policy and excluded from Git.
+- Independent review output: the existing router writes a bounded report under `.devweave/cache/incoming/<work-id>/`; the engine alone redacts, hashes, and persists it as `kind: review` evidence under `.devweave/cache/logs/<work-id>/`.
 
 Machine state is authoritative. Update state, tasks, approvals, evidence, scope, risk, baseline decisions, commands, and waivers only through the CLI. Codex edits the five Markdown artifacts and product files.
 
@@ -110,6 +111,7 @@ Discovery-only bug reproduction and refactor baseline evidence may predate an ap
 - `refactor`: passing pre-change baseline before G1; current equivalence and regression evidence at G3.
 - `bug`: observed failing reproduction before G1 or an explicit narrow unreproducible waiver; current regression evidence at G3.
 - `high`: all profile evidence plus current independent review evidence and applicable migration, rollback, security, compatibility, or performance analysis.
+- High-risk independent review is exactly one isolated, read-only router-owned reviewer per G3 attempt. `passed` is accepted; unavailable or advisory is a warning; named critical security/data-loss/irreversible/scope findings block until an exact `review-critical` acceptance waiver exists. Source fingerprint changes stale the review.
 
 Risk changes are fingerprinted. Any downgrade, including high to standard, records a separate rationale.
 
@@ -123,11 +125,13 @@ Risk changes are fingerprinted. Any downgrade, including high to standard, recor
 
 Waivers contain `id`, `gate`, `kind`, `target`, reason, approver, and timestamp. Adding or changing one invalidates the gate whose decision it affects.
 
+`review-critical` waivers are acceptance-gate-only and must target one named `F-###` finding. Wildcard or broad targets are invalid.
+
 ## CLI contract
 
 Run `scripts/devweave.py --repo <path> <command>`. Output is always one JSON document on stdout.
 
-Commands are `init`, `start`, `status`, `instructions`, `validate`, `bind`, `risk`, `scope`, `baseline`, `task start|complete|block`, `evidence add`, `verify`, `waiver add`, `approve`, `revise`, `close`, `doctor`, `project`, `command set|list|remove`, and the router-only `knowledge` namespace.
+Commands are `init`, `start`, `status`, `instructions`, `validate`, `bind`, `risk`, `scope`, `baseline`, `task start|complete|block`, `evidence add`, machine-only `review record`, `verify`, `waiver add`, `approve`, `revise`, `close`, `doctor`, `project`, `command set|list|remove`, and the router-only `knowledge` namespace. `review record` is not a public chat verb and does not add a lifecycle.
 
 Knowledge machine commands are:
 

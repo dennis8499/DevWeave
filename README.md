@@ -157,7 +157,9 @@ AC/TASK 覆蓋、scope、baseline 與 current Knowledge Review。不同 work kin
 | `bug` | regression；G1 前需有 failing reproduction 或窄幅 waiver |
 | `high` risk | 上述 evidence + current independent review |
 
-G3 通過且取得人工核准後，才能關閉 work item。
+High-risk G3 的 Independent Review 是既有 DevWeave router 在 final artifacts 穩定後固定啟動的 1 個 isolated、read-only reviewer；Python engine 只接收 machine-only `review record` 結果並保存 `kind: review` evidence。`passed` 正常通過，`unavailable`／advisory 只顯示 warning，critical security、data-loss、不可回復性或 scope finding 會阻擋 G3，除非有針對具名 finding ID 的窄幅 `review-critical` waiver。G2 的 `Design It Twice` 仍是條件式 3+ sub-agents 的設計比較，兩者不是同一功能。
+
+G3 通過且取得人工核准後，才能關閉 work item；人類 approval 仍是最後關卡。Reviewer 不得修改 source、Wiki、ledger 或執行 approve/revise/close，Extension 只投影 readiness，不會自行啟動 Agent。
 
 每道 Gate 都是 validation 後的 Double Check：摘要已回答的 decisions、assumptions、scope、
 驗收與 residual risk，等待明確的人類 approval。沉默、模糊同意或 agent 自己的判斷不算核准；
@@ -166,6 +168,7 @@ G3 通過且取得人工核准後，才能關閉 work item。
 ## 核心安全規則
 
 - DevWeave 是唯一 SDLC router；companion Skills 不擁有 lifecycle、artifact、evidence 或 gate。
+- High-risk G3 的 reviewer 由唯一既有 router 啟動；不新增第二套 lifecycle、router 或 orchestrator。G2 alternative-design agents 與 G3 independent reviewer 分開管理。
 - Managed repository 的寫入必須有 active work item 與 session binding。
 - G2 未核准前不能修改產品文件、程式、測試或其他 scope 外內容。
 - G2 核准後，寫入仍限於 approved scope；移動檔案也會檢查目的地。

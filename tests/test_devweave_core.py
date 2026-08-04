@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -886,22 +888,345 @@ class ValidationAndPersistenceTests(unittest.TestCase):
             report = core.validate_work(
                 harness.repo, core.load_state(harness.repo, work_id), "acceptance"
             )
-            self.assertTrue(any("review" in error for error in report.errors))
+            self.assertTrue(any("review" in warning.lower() for warning in report.warnings))
 
-            review = core.add_evidence(
+            report_path = self._write_review_report(
+                harness,
+                work_id,
+                result="passed",
+                severity="none",
+                summary="獨立 reviewer 已確認 migration、rollback、安全、相容與效能分析。",
+            )
+            review = core.record_review(
                 harness.repo,
                 work_id,
-                kind="review",
-                status="passed",
-                summary="獨立 reviewer 已確認 migration、rollback、安全、相容與效能分析。",
-                covers=["AC-001", "AC-002"],
-                tasks=["TASK-001"],
+                reviewer_id="opaque-reviewer-001",
+                report_file=report_path,
             )
             harness.fill_acceptance(work_id, [item["id"] for item in evidence] + [review["id"]])
             report = core.validate_work(
                 harness.repo, core.load_state(harness.repo, work_id), "acceptance"
             )
             self.assertTrue(report.ok, report.errors)
+
+    def _write_review_report(
+        self,
+        harness: RepositoryHarness,
+        work_id: str,
+        *,
+        result: str,
+        severity: str,
+        summary: str,
+        findings: list[dict[str, str]] | None = None,
+    ) -> str:
+        incoming = harness.repo / ".devweave" / "cache" / "incoming" / work_id
+        incoming.mkdir(parents=True, exist_ok=True)
+        path = incoming / f"{result}.json"
+        payload = {
+            "result": result,
+            "severity": severity,
+            "summary": summary,
+            "source_fingerprint": core.git_snapshot(harness.repo)["fingerprint"],
+            "covers": ["AC-001", "AC-002"],
+            "tasks": ["TASK-001"],
+            "findings": findings or [],
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        return path.relative_to(harness.repo).as_posix()
+
+
+class IndependentReviewTests(unittest.TestCase):
+    def _prepare_acceptance(self, harness: RepositoryHarness) -> tuple[str, list[dict]]:
+        state = harness.prepare_g2(risk="high")
+        work_id = state["id"]
+        harness.implement(work_id, "high-risk implementation")
+        harness.configure_command(required_for=("high",))
+        evidence = [
+            core.run_verification(
+                harness.repo,
+                work_id,
+                command_id="fixture-tests",
+                kind="acceptance",
+                covers=["AC-001", "AC-002"],
+                tasks=["TASK-001"],
+            ),
+            core.add_evidence(
+                harness.repo,
+                work_id,
+                kind="regression",
+                status="passed",
+                summary="高風險回歸通過。",
+                covers=["AC-001", "AC-002"],
+                tasks=["TASK-001"],
+            ),
+        ]
+        core.set_baseline_updates(harness.repo, work_id, [], "基線不需更新。")
+        return work_id, evidence
+
+    def _write_report(
+        self,
+        harness: RepositoryHarness,
+        work_id: str,
+        *,
+        result: str = "passed",
+        severity: str = "none",
+        summary: str = "獨立 reviewer 已完成檢查。",
+        findings: list[dict[str, str]] | None = None,
+    ) -> str:
+        incoming = harness.repo / ".devweave" / "cache" / "incoming" / work_id
+        incoming.mkdir(parents=True, exist_ok=True)
+        path = incoming / f"report-{result}-{severity}.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "result": result,
+                    "severity": severity,
+                    "summary": summary,
+                    "source_fingerprint": core.git_snapshot(harness.repo)["fingerprint"],
+                    "covers": ["AC-001", "AC-002"],
+                    "tasks": ["TASK-001"],
+                    "findings": findings or [],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        return path.relative_to(harness.repo).as_posix()
+
+    def test_record_review_creates_bounded_redacted_provenance(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2(risk="high")
+            work_id = state["id"]
+            harness.implement(work_id, "reviewable change")
+            report_file = self._write_report(
+                harness,
+                work_id,
+                summary="review token=top-secret 已完成。",
+            )
+            review = core.record_review(
+                harness.repo,
+                work_id,
+                reviewer_id="opaque-agent-42",
+                report_file=report_file,
+            )
+            self.assertEqual("review", review["kind"])
+            self.assertEqual("passed", review["review"]["result"])
+            self.assertEqual("isolated_read_only", review["review"]["context_mode"])
+            self.assertRegex(review["review"]["report_sha256"], r"^[0-9a-f]{64}$")
+            self.assertTrue((harness.repo / review["raw_log"]).is_file())
+            stored = (harness.repo / review["raw_log"]).read_text(encoding="utf-8")
+            self.assertIn("[REDACTED]", stored)
+            self.assertNotIn("top-secret", stored)
+            self.assertEqual(review["review"]["report_sha256"], core.sha256_bytes(stored.encode("utf-8")))
+
+    def test_review_record_rejects_non_high_risk_and_unsafe_or_malformed_report(self) -> None:
+        with RepositoryHarness() as harness:
+            standard = harness.prepare_g2()
+            work_id = standard["id"]
+            harness.implement(work_id, "standard change")
+            report_file = self._write_report(harness, work_id)
+            with self.assertRaises(core.ValidationError):
+                core.record_review(
+                    harness.repo,
+                    work_id,
+                    reviewer_id="opaque-agent",
+                    report_file=report_file,
+                )
+
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2(risk="high")
+            work_id = state["id"]
+            harness.implement(work_id, "unsafe report")
+            outside = harness.repo / "outside.json"
+            outside.write_text("{}", encoding="utf-8")
+            with self.assertRaises(core.ValidationError):
+                core.record_review(
+                    harness.repo,
+                    work_id,
+                    reviewer_id="opaque-agent",
+                    report_file="../outside.json",
+                )
+            malformed = harness.repo / ".devweave" / "cache" / "incoming" / work_id / "malformed.json"
+            malformed.parent.mkdir(parents=True, exist_ok=True)
+            malformed.write_text("not json", encoding="utf-8")
+            with self.assertRaises(core.ValidationError):
+                core.record_review(
+                    harness.repo,
+                    work_id,
+                    reviewer_id="opaque-agent",
+                    report_file=malformed.relative_to(harness.repo).as_posix(),
+                )
+            project = core.load_project(harness.repo)
+            project["evidence"]["raw_log_limit_bytes"] = 32
+            core.atomic_write_json(core.project_path(harness.repo), project)
+            oversized = malformed.parent / "oversized.json"
+            oversized.write_text("{" + "x" * 100 + "}", encoding="utf-8")
+            with self.assertRaises(core.ValidationError):
+                core.record_review(
+                    harness.repo,
+                    work_id,
+                    reviewer_id="opaque-agent",
+                    report_file=oversized.relative_to(harness.repo).as_posix(),
+                )
+
+    def test_review_record_rejects_symlinked_final_log_directory(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2(risk="high")
+            work_id = state["id"]
+            harness.implement(work_id, "symlinked review log")
+            report_file = self._write_report(harness, work_id)
+            logs_root = harness.repo / ".devweave" / "cache" / "logs"
+            logs_root.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix="devweave-review-outside-") as outside:
+                link = logs_root / work_id
+                try:
+                    link.symlink_to(Path(outside), target_is_directory=True)
+                except (OSError, NotImplementedError) as exc:
+                    self.skipTest(f"symlink creation is unavailable: {exc}")
+                with self.assertRaises(core.ValidationError):
+                    core.record_review(
+                        harness.repo,
+                        work_id,
+                        reviewer_id="opaque-agent",
+                        report_file=report_file,
+                    )
+
+    def test_unavailable_and_advisory_review_are_warnings(self) -> None:
+        for result, severity in (("unavailable", "none"), ("passed", "advisory")):
+            with self.subTest(result=result), RepositoryHarness() as harness:
+                work_id, evidence = self._prepare_acceptance(harness)
+                review = core.record_review(
+                    harness.repo,
+                    work_id,
+                    reviewer_id="opaque-agent",
+                    report_file=self._write_report(
+                        harness,
+                        work_id,
+                        result=result,
+                        severity=severity,
+                    ),
+                )
+                harness.fill_acceptance(work_id, [item["id"] for item in evidence] + [review["id"]])
+                report = core.validate_work(
+                    harness.repo, core.load_state(harness.repo, work_id), "acceptance"
+                )
+                self.assertTrue(report.ok, report.errors)
+                self.assertTrue(any("review" in warning.lower() for warning in report.warnings))
+
+    def test_critical_review_blocks_until_exact_finding_waiver(self) -> None:
+        with RepositoryHarness() as harness:
+            work_id, evidence = self._prepare_acceptance(harness)
+            review = core.record_review(
+                harness.repo,
+                work_id,
+                reviewer_id="opaque-agent",
+                report_file=self._write_report(
+                    harness,
+                    work_id,
+                    result="critical",
+                    severity="critical",
+                    findings=[
+                        {
+                            "id": "F-001",
+                            "severity": "critical",
+                            "title": "不可回復的資料遺失風險",
+                            "evidence": "刪除流程沒有 rollback。",
+                            "recommendation": "補上可驗證的 rollback。",
+                        }
+                    ],
+                ),
+            )
+            harness.fill_acceptance(work_id, [item["id"] for item in evidence] + [review["id"]])
+            report = core.validate_work(
+                harness.repo, core.load_state(harness.repo, work_id), "acceptance"
+            )
+            self.assertFalse(report.ok)
+            self.assertTrue(any("F-001" in error for error in report.errors))
+            core.add_waiver(
+                harness.repo,
+                work_id,
+                kind="review-critical",
+                target="F-001",
+                reason="已由具名 approver 接受窄幅 residual risk，並安排後續修正。",
+                actor="Test Approver",
+                gate="acceptance",
+            )
+            harness.fill_acceptance(work_id, [item["id"] for item in evidence] + [review["id"]])
+            report = core.validate_work(
+                harness.repo, core.load_state(harness.repo, work_id), "acceptance"
+            )
+            self.assertTrue(report.ok, report.errors)
+
+    def test_review_critical_waiver_rejects_broad_or_wrong_gate_targets(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2(risk="high")
+            work_id = state["id"]
+            with self.assertRaises(core.ValidationError):
+                core.add_waiver(
+                    harness.repo,
+                    work_id,
+                    kind="review-critical",
+                    target="*",
+                    reason="過寬的 waiver 不應被接受。",
+                    actor="Test Approver",
+                    gate="acceptance",
+                )
+            with self.assertRaises(core.ValidationError):
+                core.add_waiver(
+                    harness.repo,
+                    work_id,
+                    kind="review-critical",
+                    target="F-001",
+                    reason="review-critical 只能作用於 acceptance。",
+                    actor="Test Approver",
+                    gate="build",
+                )
+
+    def test_source_change_makes_review_stale(self) -> None:
+        with RepositoryHarness() as harness:
+            work_id, _ = self._prepare_acceptance(harness)
+            review = core.record_review(
+                harness.repo,
+                work_id,
+                reviewer_id="opaque-agent",
+                report_file=self._write_report(harness, work_id),
+            )
+            (harness.repo / "src" / "app.txt").write_text("changed after review\n", encoding="utf-8")
+            state = core.sync_state(harness.repo, work_id)
+            self.assertTrue(state["evidence"][review["id"]]["stale"])
+            self.assertIsNone(state["last_verification"])
+
+    def test_standard_and_low_risk_g3_do_not_require_independent_review(self) -> None:
+        for risk in ("standard", "low"):
+            with self.subTest(risk=risk), RepositoryHarness() as harness:
+                state = harness.prepare_g2(risk=risk)
+                work_id = state["id"]
+                harness.implement(work_id, f"{risk} implementation")
+                harness.configure_command(required_for=(risk,))
+                acceptance = core.run_verification(
+                    harness.repo,
+                    work_id,
+                    command_id="fixture-tests",
+                    kind="acceptance",
+                    covers=["AC-001", "AC-002"],
+                    tasks=["TASK-001"],
+                )
+                regression = core.add_evidence(
+                    harness.repo,
+                    work_id,
+                    kind="regression",
+                    status="passed",
+                    summary=f"{risk} regression passed.",
+                    covers=["AC-001", "AC-002"],
+                    tasks=["TASK-001"],
+                )
+                core.set_baseline_updates(harness.repo, work_id, [], "基線不需更新。")
+                harness.fill_acceptance(work_id, [acceptance["id"], regression["id"]])
+                report = core.validate_work(
+                    harness.repo, core.load_state(harness.repo, work_id), "acceptance"
+                )
+                self.assertTrue(report.ok, report.errors)
+                self.assertFalse(any("independent review" in warning.lower() for warning in report.warnings))
 
     def test_new_work_requires_architecture_baseline_update(self) -> None:
         with RepositoryHarness() as harness:

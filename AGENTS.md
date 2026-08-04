@@ -18,6 +18,13 @@ For managed changes:
 8. Do not close until G1, G2, and G3 are approved and current.
 9. Never edit DevWeave JSON state, event, or evidence ledgers directly.
 
+High-risk G3 review contract:
+
+- After final product/Wiki/baseline/diff/scope/evidence stabilization, the single DevWeave router starts exactly one isolated, read-only Independent Review Agent. Standard and low-risk G3 do not start it; G2 `Design It Twice` remains the separate conditional 3+ sub-agent design comparison.
+- The reviewer receives only approved artifacts, complete diff, risk analysis, scope, accepted baseline, Wiki context, source fingerprint, Git HEAD, and existing evidence. It must not inherit main-Agent reasoning, modify source/Wiki/ledger, delegate, or run approve/revise/close.
+- The Python engine never spawns the reviewer. The router records the fixed result through machine-only `review record`; the VS Code Extension only projects missing/unavailable/advisory/critical readiness and never starts Agent or mutates workflow.
+- `passed` is accepted; unavailable/timeout/malformed fallback and advisory findings are warnings; named critical security, data-loss, irreversible, or scope findings block G3 unless each exact `F-###` target has a narrow acceptance `review-critical` waiver. Source fingerprint changes stale the review. Human G3 approval remains required.
+
 `.devweave/baseline/` is accepted governance truth; root `wiki/` is detailed, source-bound codebase knowledge. Wiki-first controls read order, not factual priority: current source behavior and approved DevWeave artifacts win conflicts, which must be recorded as gaps.
 
 `$devweave wiki bootstrap` is the only public Codebase Wiki bootstrap entry. It routes through `knowledge bootstrap`, explores the whole repository, and uses a normal feature work item with `knowledge_profile: bootstrap` plus the existing G1/G2/G3 lifecycle. An already complete core Wiki creates no work item; a missing bootstrap is advisory and does not block ordinary work. Bootstrap may write three to five planned Wiki content pages in G3 but must not modify product source.

@@ -6,7 +6,7 @@ last_updated: 2026-08-04
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260804-102428-feature-vs-code-extension-wiki
+verified_by: 20260804-122803-feature-g3-review-agent
 ---
 
 # Activity Log
@@ -35,3 +35,9 @@ verified_by: 20260804-102428-feature-vs-code-extension-wiki
 
 - Refresh [[overview]]、[[devweave-knowledge-workflow]] 與 [[knowledge-engine]]，補充 VS Code Control Center 的 projection、Wiki-first/G3 邊界與 Extension integration。
 - 新增 [[vscode-extension]]，記錄 Enter 套用的 case-insensitive contains 搜尋、局部 render、single-flight refresh、deterministic snapshot、0.2.0 bootstrap repair、embedded help 與安全邊界。
+
+## [2026-08-04] promote | 20260804-122803-feature-g3-review-agent
+
+- Refresh [[overview]] 與 [[devweave-knowledge-workflow]]，記錄 high-risk G3 exactly-one isolated read-only Independent Review、G2 design-agent 分離、critical finding gate 與 human approval boundary。
+- Refresh [[knowledge-engine]]，記錄 machine-only `review record`、bounded/redacted report provenance、source fingerprint stale invalidation 與 named `review-critical` waiver。
+- Refresh [[vscode-extension]]，記錄 high-risk acceptance readiness、missing/unavailable/advisory attention、critical not-ready 與 raw review evidence projection；Extension 不啟動 Agent 或 mutation。

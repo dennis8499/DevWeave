@@ -26,6 +26,10 @@ The public chat surface is:
 - `$devweave approve [work-id]`
 - `$devweave wiki bootstrap`
 
+There is no public `$devweave review` chat verb. The machine-only `review record` CLI is
+used by the existing router to persist one isolated high-risk G3 reviewer result; it does
+not create a second lifecycle, router, or orchestrator.
+
 Translate those intents into engine commands. Never edit `state.json`, `events.jsonl`, evidence summaries, or project machine state directly.
 
 For an explicit `new`, `feature`, `refactor`, or `bug` request in an uninitialized repository, the startup order is an exception to the normal continuation protocol: run `init`, configure proposed commands, and run `start` before the first `status`. Do not treat the expected absence of a work item before `start` as a blocker.
@@ -81,7 +85,7 @@ When starting work, use `start --kind new|feature|refactor|bug --title <title>`.
 - G1 approves `brief.md`, `requirements.md`, risk, scope, and entry-specific discovery evidence.
 - G2 approves `design.md`, the immutable task definitions in `plan.md`, and high-risk analyses.
 - Implementation may start only when G2 remains current. Record task progress in `state.json` through engine commands; never check off tasks in `plan.md`.
-- G3 approves `acceptance.md`, current source-bound evidence, required command results, scope compliance, living baseline updates, and a current Knowledge Review disposition.
+- G3 approves `acceptance.md`, current source-bound evidence, required command results, scope compliance, living baseline updates, and a current Knowledge Review disposition. For high-risk G3, the existing router starts exactly one isolated read-only Independent Review Agent after final artifacts stabilize; Python only records its bounded, redacted `kind: review` evidence. Missing/unavailable/advisory results warn, named critical findings block unless an exact narrow `review-critical` waiver exists, and human approval remains required.
 - Before G1 approval, present the answered material decisions, problem, scope, non-goals, acceptance criteria, assumptions, waivers, and unresolved gaps after `validate --gate scope`; stop until the user clearly approves G1.
 - Before G2 approval, present the answered design decisions, selected and rejected options, interfaces, data flow, failure modes, rollback, verification strategy, task order, and residual risk after `validate --gate build`; stop until the user clearly approves G2.
 - Gate summaries are Double Checks against the current artifacts, not a license to invent a new requirement or design. A newly discovered decision returns through `revise`; G3 verifies conformance to approved intent.

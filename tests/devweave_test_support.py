@@ -55,13 +55,22 @@ class RepositoryHarness:
         risk: str = "standard",
     ) -> dict[str, Any]:
         self.init()
-        return core.create_work(
+        state = core.create_work(
             self.repo,
             kind=kind,
             title=title,
             risk=risk,
             risk_rationale="影響範圍已知，使用標準驗證與人工關卡。",
         )
+        if risk == "low":
+            state = core.set_risk(
+                self.repo,
+                state["id"],
+                "low",
+                "變更隔離、可逆且沒有 public contract 或 security impact。",
+                "低風險分類已由 fixture 明確記錄。",
+            )
+        return state
 
     def work_file(self, work_id: str, name: str) -> Path:
         return core.work_root(self.repo, work_id) / name
@@ -183,6 +192,39 @@ new 入口更新 architecture baseline；其餘入口記錄不需更新理由。
 
     def fill_acceptance(self, work_id: str, evidence_ids: list[str]) -> None:
         evidence = ", ".join(evidence_ids)
+        state = core.load_state(self.repo, work_id)
+        review_ids = [
+            item_id
+            for item_id, item in state.get("evidence", {}).items()
+            if item.get("kind") == "review"
+        ]
+        review_section = ""
+        if state.get("risk", {}).get("level") == "high":
+            review_lines = []
+            for review_id in review_ids:
+                review = state["evidence"][review_id].get("review", {})
+                finding_ids = [
+                    finding.get("id")
+                    for finding in review.get("findings", [])
+                    if isinstance(finding, dict) and finding.get("id")
+                ]
+                review_lines.append(
+                    f"{review_id}: result={review.get('result', 'unknown')}; "
+                    f"severity={review.get('severity', 'unknown')}; "
+                    f"report={state['evidence'][review_id].get('raw_log', 'unknown')}; "
+                    f"findings={', '.join(finding_ids) or 'none'}."
+                )
+            waiver_lines = [
+                f"{item.get('kind')} target={item.get('target')} id={item.get('id')}"
+                for item in state.get("waivers", [])
+                if item.get("kind") == "review-critical"
+            ]
+            review_section = f"""
+## 獨立 Review
+Review result、warning、findings 與 report evidence：
+{chr(10).join(review_lines) or '尚未記錄'}
+Waiver：{'; '.join(waiver_lines) or '無'}。
+"""
         self.work_file(work_id, "acceptance.md").write_text(
             f"""# 功能驗收
 
@@ -197,6 +239,8 @@ AC-001、AC-002 對應 TASK-001，證據為 {evidence}，且綁定目前 source 
 
 ## Wiki 知識提升
 已完成必要的 affected-page promotion；沒有目標時 Wiki 維持不變。
+
+{review_section}
 
 ## 殘餘風險
 無未處理的殘餘風險。

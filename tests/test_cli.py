@@ -120,6 +120,44 @@ class CliContractTests(unittest.TestCase):
             self.assertFalse(payload["ok"])
             self.assertEqual(7, payload["evidence"]["exit_code"])
 
+    def test_machine_only_review_record_cli_writes_review_evidence(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2(risk="high")
+            work_id = state["id"]
+            harness.implement(work_id, "CLI review change")
+            incoming = harness.repo / ".devweave" / "cache" / "incoming" / work_id
+            incoming.mkdir(parents=True, exist_ok=True)
+            report = incoming / "review.json"
+            report.write_text(
+                json.dumps(
+                    {
+                        "result": "passed",
+                        "severity": "none",
+                        "summary": "CLI independent review passed.",
+                        "source_fingerprint": core.git_snapshot(harness.repo)["fingerprint"],
+                        "covers": ["AC-001", "AC-002"],
+                        "tasks": ["TASK-001"],
+                        "findings": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result, payload = invoke(
+                harness.repo,
+                "review",
+                "record",
+                "--work",
+                work_id,
+                "--reviewer-id",
+                "opaque-cli-reviewer",
+                "--report-file",
+                report.relative_to(harness.repo).as_posix(),
+            )
+            self.assertEqual(0, result.returncode, payload)
+            self.assertTrue(payload["ok"])
+            self.assertEqual("review", payload["evidence"]["kind"])
+            self.assertEqual("passed", payload["evidence"]["review"]["result"])
+
     def test_command_set_preserves_argv_array(self) -> None:
         with RepositoryHarness() as harness:
             harness.init()

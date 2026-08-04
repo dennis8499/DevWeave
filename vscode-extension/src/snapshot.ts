@@ -482,6 +482,32 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
       if (!value) {
         return { value: null, diagnostics };
       }
+      const reviewValue = isRecord(value.review) ? value.review : null;
+      const review = reviewValue ? {
+        result: stringValue(reviewValue.result, "unknown"),
+        severity: stringValue(reviewValue.severity, "unknown"),
+        reviewerId: nullableString(reviewValue.reviewer_id) ?? undefined,
+        contextMode: nullableString(reviewValue.context_mode) ?? undefined,
+        reportSha256: nullableString(reviewValue.report_sha256) ?? undefined,
+        findings: Array.isArray(reviewValue.findings) ? reviewValue.findings.flatMap((raw): Array<{
+          id: string;
+          severity: string;
+          title: string;
+          evidence: string;
+          recommendation: string;
+        }> => {
+          if (!isRecord(raw)) return [];
+          return [{
+            id: stringValue(raw.id, "unknown"),
+            severity: stringValue(raw.severity, "unknown"),
+            title: stringValue(raw.title, "沒有標題"),
+            evidence: stringValue(raw.evidence, "沒有 supporting evidence"),
+            recommendation: stringValue(raw.recommendation, "沒有建議")
+          }];
+        }) : [],
+        covers: stringArray(reviewValue.covers),
+        tasks: stringArray(reviewValue.tasks)
+      } : undefined;
       return { value: {
         id: stringValue(value.id, entry.name.replace(/\.json$/, "")),
         kind: stringValue(value.kind),
@@ -495,7 +521,8 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
         rawLog: nullableString(value.raw_log),
         stale: Boolean(value.stale),
         bindsCurrentSource: Boolean(value.binds_current_source),
-        sourceFingerprint: nullableString(value.source_fingerprint) ?? undefined
+        sourceFingerprint: nullableString(value.source_fingerprint) ?? undefined,
+        ...(review ? { review } : {})
       }, diagnostics };
     }));
     const diagnostics = results.flatMap((result) => result.diagnostics);

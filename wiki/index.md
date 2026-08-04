@@ -6,7 +6,7 @@ last_updated: 2026-08-04
 tags: [index]
 status: active
 source_fingerprint: none
-verified_by: 20260804-102428-feature-vs-code-extension-wiki
+verified_by: 20260804-122803-feature-g3-review-agent
 ---
 
 # Codebase Wiki — 索引
@@ -17,16 +17,16 @@ verified_by: 20260804-102428-feature-vs-code-extension-wiki
 
 | 頁面 | 摘要 |
 | --- | --- |
-| [[overview]] | DevWeave workflow、G1/G2 逐題決策問答、Gate Double Check、Extension 投影與真實來源優先序概觀 |
+| [[overview]] | DevWeave workflow、G1/G2 逐題決策問答、high-risk G3 Independent Review、Gate Double Check、Extension 投影與真實來源優先序概觀 |
 
 ## Architecture
 
-- [[devweave-knowledge-workflow]] | Bootstrap、Wiki Query/Review/Promotion、G1/G2 互動決策與 G1/G2/G3 閉環
+- [[devweave-knowledge-workflow]] | Bootstrap、Wiki Query/Review/Promotion、G1/G2 互動決策、high-risk G3 isolated reviewer 與完整閉環
 
 ## Modules
 
-- [[knowledge-engine]] | Wiki model、coverage、canonical scaffold、seal、machine lifecycle 與互動問答的 router boundary
-- [[vscode-extension]] | Control Center 的 Wiki 搜尋、refresh/snapshot、完整 bootstrap repair、embedded help 與安全邊界
+- [[knowledge-engine]] | Wiki model、coverage、review record evidence、canonical scaffold、seal、machine lifecycle 與 router boundary
+- [[vscode-extension]] | Control Center 的 Wiki 搜尋、refresh/snapshot、Independent Review readiness、完整 bootstrap repair、embedded help 與安全邊界
 
 ## Entities
 

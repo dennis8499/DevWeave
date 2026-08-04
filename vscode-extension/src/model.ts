@@ -28,6 +28,25 @@ export interface TaskProjection {
   note: string;
 }
 
+export interface ReviewFindingProjection {
+  id: string;
+  severity: "advisory" | "critical" | string;
+  title: string;
+  evidence: string;
+  recommendation: string;
+}
+
+export interface IndependentReviewProjection {
+  result: "passed" | "unavailable" | "critical" | string;
+  severity: "none" | "advisory" | "critical" | string;
+  reviewerId?: string;
+  contextMode?: string;
+  reportSha256?: string;
+  findings: ReviewFindingProjection[];
+  covers: string[];
+  tasks: string[];
+}
+
 export interface EvidenceProjection {
   id: string;
   kind: string;
@@ -42,6 +61,7 @@ export interface EvidenceProjection {
   stale: boolean;
   bindsCurrentSource: boolean;
   sourceFingerprint?: string;
+  review?: IndependentReviewProjection;
 }
 
 export interface WaiverProjection {
@@ -223,6 +243,7 @@ export interface ReviewCheck {
   ok: boolean;
   detail: string;
   nextStep?: string;
+  level?: "info" | "warning" | "critical";
 }
 
 export type ReviewReadinessStatus = "ready" | "attention" | "not_ready" | "closed";

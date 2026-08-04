@@ -187,12 +187,13 @@ export function buildReviewReadiness(snapshot: WorkspaceSnapshot, work: WorkItem
     gateCheck(work, gate),
     taskCheck(work),
     evidenceCheck(work, gate),
+    independentReviewCheck(work, gate),
     knowledgeCheck(work)
   ];
   const failed = checks.filter((check) => !check.ok);
   const status: ReviewReadiness["status"] = failed.length === 0
     ? "ready"
-    : failed.some((check) => check.key === "diagnostics" || check.key === "blocker" || check.key === "gate")
+    : failed.some((check) => check.level === "critical" || check.key === "diagnostics" || check.key === "blocker" || check.key === "gate")
       ? "not_ready"
       : "attention";
   const summary = status === "ready"
@@ -331,6 +332,63 @@ function evidenceCheck(work: WorkItemProjection, gate: GateName | null): ReviewC
     ok,
     detail,
     nextStep: ok ? undefined : "重新執行對應 verification，再回到 Extension Refresh。"
+  };
+}
+
+function independentReviewCheck(work: WorkItemProjection, gate: GateName | null): ReviewCheck {
+  if (gate !== "acceptance" || work.risk !== "high") {
+    return {
+      key: "independent-review",
+      label: "Independent Review",
+      ok: true,
+      detail: "僅 high-risk G3 需要此檢查；目前風險或 gate 不適用。",
+      level: "info"
+    };
+  }
+  const current = work.evidence
+    .filter((item) => item.kind === "review" && !item.stale && item.bindsCurrentSource)
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const latest = current.at(-1);
+  if (!latest?.review) {
+    return {
+      key: "independent-review",
+      label: "Independent Review",
+      ok: false,
+      detail: "尚未有 current independent review；missing 或 unavailable 會需要人工留意。",
+      nextStep: "在 Codex Chat 依 verification instructions 完成 Review Agent，再 Refresh。",
+      level: "warning"
+    };
+  }
+  const review = latest.review;
+  if (review.result === "critical") {
+    return {
+      key: "independent-review",
+      label: "Independent Review",
+      ok: false,
+      detail: `Review ${latest.id} 有 critical finding；G3 目前 not-ready。`,
+      nextStep: "先處理 finding，或由人工依 engine 規則確認具名 narrow waiver。",
+      level: "critical"
+    };
+  }
+  if (review.result === "unavailable" || review.severity === "advisory" || review.findings.some((item) => item.severity === "advisory")) {
+    return {
+      key: "independent-review",
+      label: "Independent Review",
+      ok: false,
+      detail: review.result === "unavailable"
+        ? `Review ${latest.id} unavailable；可繼續人工 G3，但需要留意。`
+        : `Review ${latest.id} 通過但包含 advisory finding；需要留意。`,
+      nextStep: "查看 raw evidence 與 report findings，再由人工確認是否繼續。",
+      level: "warning"
+    };
+  }
+  return {
+    key: "independent-review",
+    label: "Independent Review",
+    ok: review.result === "passed",
+    detail: review.result === "passed" ? `Review ${latest.id} 已針對目前 source 通過。` : `Review ${latest.id} 結果需要 engine 重新確認。`,
+    nextStep: review.result === "passed" ? undefined : "在 Codex Chat 使用 status 取得 engine 的 review 判定。",
+    level: review.result === "passed" ? "info" : "warning"
   };
 }
 
