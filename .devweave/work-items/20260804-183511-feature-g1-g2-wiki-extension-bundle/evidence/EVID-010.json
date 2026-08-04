@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "npm.cmd",
+    "run",
+    "test"
+  ],
+  "binds_current_source": true,
+  "command_id": "extension-tests",
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010"
+  ],
+  "created_at": "2026-08-04T11:49:14+00:00",
+  "cwd": "vscode-extension",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "git_head": "6c75f4d289243306c8f469f27ac1f3c5cb9ee8d0",
+  "id": "EVID-010",
+  "kind": "regression",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260804-183511-feature-g1-g2-wiki-extension-bundle/EVID-010.log",
+  "schema_version": 1,
+  "source_fingerprint": "96a3076a11277a276679acc0274f0e4520e1e7258a795643a59ffc33a73ecb59",
+  "stale": false,
+  "started_at": "2026-08-04T11:49:11+00:00",
+  "status": "passed",
+  "summary": "aller applies only the declared date transform (1.4146ms)\n✔ BootstrapInstaller normalizes Windows-style and POSIX-style relative destinations (0.6973ms)\n✔ BootstrapInstaller adopts evolved project content through the declared semantic contract (2.1312ms)\n✔ BootstrapInstaller explains semantic incompatibility instead of adopting identity drift (0.354ms)\n✔ BootstrapInstaller rejects unknown compatibility metadata before any write (0.4332ms)\n✔ snapshot reader projects array commands, placeholder Wiki, work state, and stale evidence (16.2224ms)\n✔ snapshot reader projects nested independent review evidence and keeps legacy evidence compatible (3.3508ms)\n✔ snapshot reader reports an uninitialized workspace without invoking an engine (0.8303ms)\n✔ snapshot reader keeps managed false explicit and preserves multiple active/closed work items (1.269ms)\n✔ snapshot reader marks work with base knowledge but no review marker as legacy (0.6449ms)\n✔ snapshot reader fails closed for malformed and unsupported project/state (4.5833ms)\n✔ snapshot reader marks stale Wiki metadata and missing hook without rebuilding fingerprints (0.9648ms)\n✔ snapshot reader projects syntactic bootstrap, review coverage, and verified-by without Git (1.4117ms)\n✔ public prompt composition is deterministic, sanitized, and machine-command free (0.9453ms)\n✔ prompt composer redacts absolute paths and credential-like values (0.8179ms)\n✔ mutation public prompt is disabled when the snapshot has a critical diagnostic (0.5892ms)\n✔ every public command produces the documented command text (0.9242ms)\n✔ public Webview protocol accepts public intents and rejects machine actions (0.6449ms)\n✔ command catalog groups all nine public commands in task language (1.8681ms)\n✔ snapshot guidance is explicitly non-authoritative and hands off next to Codex (0.4088ms)\n✔ snapshot guidance handles an empty active-work state without selecting closed history (0.1519ms)\n✔ snapshot guidance makes initialization and bootstrap write boundary explicit (0.1253ms)\n✔ review readiness explains gate, blocker, stale evidence, task and Wiki checks (0.5632ms)\n✔ review readiness can be ready for a pending gate without pretending the gate is approved (0.1515ms)\n✔ high-risk acceptance readiness projects independent review states (0.579ms)\n✔ closed work is explicitly not reviewable (0.2867ms)\n✔ diagnostics and audit events become readable while preserving technical raw data (0.5747ms)\n✔ display mode protocol accepts only the typed preference message (0.3833ms)\n✔ RefreshCoordinator never overlaps reads and publishes the newest pending snapshot (6.0967ms)\n✔ RefreshCoordinator reports a read failure and accepts a later retry (1.3614ms)\n✔ Extension runtime has no process, shell, or external-network path and confines writes to bootstrap (4.1584ms)\n✔ package and Webview keep the approved dependency and CSP boundary (1.3868ms)\n✔ workflow mutations remain preview-first and bootstrap uses explicit confirmation (2.2381ms)\n✔ Wiki bootstrap has three prompt-only entrances with one public intent (0.938ms)\n✔ P2 preferences and Wiki browsing stay Extension-local and discoverable (1.1144ms)\n✔ selection never promotes closed history to the implicit current work (0.7647ms)\n✔ multiple active works require an explicit choice (0.4159ms)\n✔ work grouping exposes active work and closed history as separate collections (1.0918ms)\n✔ snapshot reader parallelizes independent text reads while keeping diagnostics sorted (30.3172ms)\n✔ WikiSearchModel keeps draft input separate until Enter commits it (2.0447ms)\n✔ WikiSearchModel matches title, path, and body case-insensitively with contains semantics (0.206ms)\n✔ WikiSearchModel applies exact type filtering and show-all state (0.1878ms)\n✔ RenderScheduler coalesces local renders into one frame (0.1286ms)\nℹ tests 60\nℹ suites 0\nℹ pass 60\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 384.7546",
+  "tasks": [],
+  "timed_out": false
+}

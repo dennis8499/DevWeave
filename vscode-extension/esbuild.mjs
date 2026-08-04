@@ -92,24 +92,25 @@ async function createBootstrapBundle(repo, outputRoot) {
     "wiki/synthesis"
   ];
   const fileMappings = [
-    { source: "AGENTS.md", destination: "AGENTS.md", transform: "copy" },
-    { source: "skills-lock.json", destination: "skills-lock.json", transform: "copy" },
-    { source: "hooks.json", destination: ".codex/hooks.json", transform: "copy" },
-    { source: "templates/project.json", destination: ".devweave/project.json", transform: "copy" },
-    { source: "templates/baseline-product.md", destination: ".devweave/baseline/product.md", transform: "copy" },
-    { source: "templates/baseline-architecture.md", destination: ".devweave/baseline/architecture.md", transform: "copy" },
-    { source: "templates/baseline-quality.md", destination: ".devweave/baseline/quality.md", transform: "copy" },
-    { source: "templates/wiki-index.md", destination: "wiki/index.md", transform: "date" },
-    { source: "templates/wiki-overview.md", destination: "wiki/overview.md", transform: "date" },
-    { source: "templates/wiki-log.md", destination: "wiki/log.md", transform: "date" }
+    { source: "AGENTS.md", destination: "AGENTS.md", transform: "copy", existingPolicy: "exact" },
+    { source: "skills-lock.json", destination: "skills-lock.json", transform: "copy", existingPolicy: "exact" },
+    { source: "hooks.json", destination: ".codex/hooks.json", transform: "copy", existingPolicy: "exact" },
+    { source: "templates/project.json", destination: ".devweave/project.json", transform: "copy", existingPolicy: "adopt-compatible", compatibility: "devweave-project-v1" },
+    { source: "templates/baseline-product.md", destination: ".devweave/baseline/product.md", transform: "copy", existingPolicy: "adopt-compatible", compatibility: "baseline-product-v1" },
+    { source: "templates/baseline-architecture.md", destination: ".devweave/baseline/architecture.md", transform: "copy", existingPolicy: "adopt-compatible", compatibility: "baseline-architecture-v1" },
+    { source: "templates/baseline-quality.md", destination: ".devweave/baseline/quality.md", transform: "copy", existingPolicy: "adopt-compatible", compatibility: "baseline-quality-v1" },
+    { source: "templates/wiki-index.md", destination: "wiki/index.md", transform: "date", existingPolicy: "adopt-compatible", compatibility: "wiki-index-v1" },
+    { source: "templates/wiki-overview.md", destination: "wiki/overview.md", transform: "date", existingPolicy: "adopt-compatible", compatibility: "wiki-overview-v1" },
+    { source: "templates/wiki-log.md", destination: "wiki/log.md", transform: "date", existingPolicy: "adopt-compatible", compatibility: "wiki-log-v1" }
   ];
   const skillFiles = await collectFiles(join(bootstrapRoot, "skill"));
   for (const source of skillFiles) {
-    fileMappings.push({
-      source: `skill/${source}`,
-      destination: `.agents/skills/devweave/${source.replaceAll("\\", "/")}`,
-      transform: "copy"
-    });
+      fileMappings.push({
+        source: `skill/${source}`,
+        destination: `.agents/skills/devweave/${source.replaceAll("\\", "/")}`,
+        transform: "copy",
+        existingPolicy: "exact"
+      });
   }
   for (const skill of companionSkills) {
     const companionFiles = await collectFiles(join(bootstrapRoot, "companions", skill));
@@ -117,7 +118,8 @@ async function createBootstrapBundle(repo, outputRoot) {
       fileMappings.push({
         source: `companions/${skill}/${source}`,
         destination: `.agents/skills/${skill}/${source.replaceAll("\\", "/")}`,
-        transform: "copy"
+        transform: "copy",
+        existingPolicy: "exact"
       });
     }
   }
@@ -129,6 +131,8 @@ async function createBootstrapBundle(repo, outputRoot) {
       source: mapping.source.replaceAll("\\", "/"),
       destination: mapping.destination,
       transform: mapping.transform,
+      existingPolicy: mapping.existingPolicy ?? "exact",
+      ...(mapping.compatibility ? { compatibility: mapping.compatibility } : {}),
       byteLength: bytes.byteLength,
       sha256: createHash("sha256").update(bytes).digest("hex")
     });

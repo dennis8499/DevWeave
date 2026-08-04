@@ -7,7 +7,7 @@ Read this reference only while the work item phase is design or build_review.
 1. Re-read the approved brief and requirements plus the relevant live code.
 2. Treat Wiki as read-only input throughout G2. Keep new decisions in `design.md`; do not promote them into persistent Wiki pages yet.
 3. Complete design.md in Traditional Chinese, using `codebase-design` vocabulary for the module, interface, seam, adapter, depth, locality, and test surface where relevant.
-4. Compare viable options. For each material design choice, ask one question at a time with a recommendation and trade-off, wait for the answer, and record DEC headings that trace to REQ or NFR IDs.
+4. Compare viable options. For each material design choice, ask one question at a time; prefer the Codex host's native question facility with two or three mutually exclusive options, recommended-first `(Recommended)` marking, descriptions, and host `Other`; if unavailable, use the same structured numbered fallback. Include a recommendation and trade-off, wait for the answer, and record DEC headings that trace to REQ or NFR IDs.
 5. Specify interfaces, data flow, state changes, compatibility, failure modes, rollback, and observability.
 6. For high risk, explicitly decide the applicable migration, rollback, security, compatibility, and performance treatment.
 

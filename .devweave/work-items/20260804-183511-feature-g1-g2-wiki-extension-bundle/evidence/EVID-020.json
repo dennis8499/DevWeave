@@ -1,0 +1,30 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [],
+  "created_at": "2026-08-04T12:26:37+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "6c75f4d289243306c8f469f27ac1f3c5cb9ee8d0",
+  "id": "EVID-020",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "neutral",
+  "raw_log": ".devweave/cache/logs/20260804-183511-feature-g1-g2-wiki-extension-bundle/EVID-020.log",
+  "review": {
+    "context_mode": "isolated_read_only",
+    "covers": [],
+    "findings": [],
+    "report_sha256": "ec1b7ed93409d5b0bcecead80614a7fadd92ca28365ef71548e5d4f15a250d9c",
+    "result": "unavailable",
+    "reviewer_id": "codex-reviewer-019fccbb-01f0-7df2-a636-83bdd71768bb",
+    "severity": "none",
+    "tasks": []
+  },
+  "schema_version": 1,
+  "source_fingerprint": "96a3076a11277a276679acc0274f0e4520e1e7258a795643a59ffc33a73ecb59",
+  "stale": false,
+  "status": "failed",
+  "summary": "bounded review interrupted before complete source and diff reconciliation; no review findings produced",
+  "tasks": []
+}

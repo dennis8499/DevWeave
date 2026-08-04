@@ -69,7 +69,7 @@ Invalidation is monotonic until reapproval:
 
 ## Wiki knowledge model
 
-`init` and `start` non-destructively ensure root `wiki/` contains `index.md`, `overview.md`, `log.md`, and typed directories for architecture, modules, entities, patterns, decisions, dependencies, guides, and synthesis. A compatible existing Wiki is adopted without overwriting Markdown. A non-empty Wiki without a recognized `type: index`, or an incompatible same-name starter file, returns `knowledge_conflict`; `doctor` reports the same condition.
+`init` and `start` non-destructively ensure root `wiki/` contains `index.md`, `overview.md`, `log.md`, and typed directories for architecture, modules, entities, patterns, decisions, dependencies, guides, and synthesis. A missing, empty, or custom-only Wiki is compatible and receives only missing starters; reserved starter files/directories are adopted only when their filesystem type and frontmatter are compatible. A wrong reserved type or frontmatter returns `knowledge_conflict`; `doctor` reports the same condition.
 
 Supported page types are `overview`, `architecture`, `module`, `entity`, `pattern`, `decision`, `dependency`, `guide`, `synthesis`, `index`, and `log`. Every page retains `title`, `type`, `sources`, `last_updated`, `tags`, and `status`, plus:
 
@@ -79,6 +79,8 @@ Supported page types are `overview`, `architecture`, `module`, `entity`, `patter
 Sources are normalized, unique, repo-relative paths and may not enter Wiki, `.devweave`, or `.git`. A page lists at most five. Files hash current bytes; symlinks hash their target text. Directories expand sorted Git-tracked and non-ignored untracked files, including tracked missing entries, then hash canonical path/content material. Source deletion, dirty content, rename, or directory membership changes therefore stales the page.
 
 G1 records `wiki/index.md` first and at most five related pages through `knowledge context`; missing, placeholder, stale, invalid, or contradictory knowledge requires a gap before raw-source fallback. G2 and implementation keep Wiki read-only. Source behavior and approved artifacts outrank conflicting Wiki claims.
+
+Project initialization runs a read-only Wiki reserved-starter preflight before the project lock and repeats it inside the lock before creating `.devweave/project.json`, baselines, cache, or work-item directories. An incompatible reserved path therefore preserves Wiki bytes and does not leave a partial control bundle.
 
 `knowledge bootstrap` assesses the whole repository Wiki. If an active, sourced, current overview, architecture page, and module page already exist, it returns `already_complete` without creating work. Otherwise it resumes the single active bootstrap profile or creates a normal feature work item with `knowledge_profile: "bootstrap"`. Bootstrap follows the same G1/G2/G3 lifecycle, accepts no scope argument, changes no product source, plans three to five content pages, and never permits `no-update` or deletion.
 

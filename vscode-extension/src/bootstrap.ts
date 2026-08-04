@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
 import { normalizeRelativePath } from "./filesystem";
+import {
+  BootstrapCompatibilityKind,
+  BootstrapExistingPolicy,
+  normalizeBootstrapCompatibility,
+  validateExistingBootstrapContent
+} from "./bootstrap-compat";
 
 export type BootstrapPathKind = "file" | "directory" | "symlink" | "other" | "absent";
 export type BootstrapTransform = "copy" | "date";
@@ -22,6 +28,8 @@ export interface BootstrapBundleFile {
   transform: BootstrapTransform;
   byteLength: number;
   sha256: string;
+  existingPolicy?: BootstrapExistingPolicy;
+  compatibility?: BootstrapCompatibilityKind;
 }
 
 export interface BootstrapBundle {
@@ -289,10 +297,18 @@ export class BootstrapInstaller {
         hadExistingContent = true;
         try {
           const existing = await workspace.readBytes(file.destination);
-          if (sameBytes(existing, bytes)) {
+          const semantic = file.existingPolicy === "adopt-compatible"
+            ? validateExistingBootstrapContent(file.compatibility as BootstrapCompatibilityKind, existing)
+            : { compatible: sameBytes(existing, bytes) };
+          if (semantic.compatible) {
             adopted.push(file.destination);
           } else {
-            conflicts.push({ path: file.destination, reason: "Existing file bytes differ from the bundled content." });
+            conflicts.push({
+              path: file.destination,
+              reason: file.existingPolicy === "adopt-compatible"
+                ? `Existing file is not compatible: ${semantic.reason ?? "semantic contract mismatch"}`
+                : "Existing file bytes differ from the bundled content."
+            });
           }
         } catch (error) {
           errors.push({ path: file.destination, reason: errorMessage(error) });
@@ -333,8 +349,18 @@ export class BootstrapInstaller {
         || !/^[a-f0-9]{64}$/i.test(file.sha256)) {
         return { error: `Malformed bootstrap file entry: ${String(file?.destination)}.` };
       }
+      const compatibility = normalizeBootstrapCompatibility(file);
+      if ("error" in compatibility) {
+        return { error: `Malformed bootstrap compatibility for ${String(file?.destination)}: ${compatibility.error}` };
+      }
       destinations.set(destination, "file");
-      files.push({ ...file, source, destination, sha256: file.sha256.toLowerCase() });
+      files.push({
+        ...file,
+        ...compatibility,
+        source,
+        destination,
+        sha256: file.sha256.toLowerCase()
+      });
     }
     for (const [path, kind] of destinations) {
       const parent = parentPath(path);

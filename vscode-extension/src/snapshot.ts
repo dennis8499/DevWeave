@@ -15,6 +15,7 @@ import {
 import { createHash } from "node:crypto";
 import { DirectoryEntry, FileSystemPort, joinRelativePath } from "./filesystem";
 import type { BootstrapBundleFile } from "./bootstrap";
+import { normalizeBootstrapCompatibility, validateExistingBootstrapContent } from "./bootstrap-compat";
 
 const ARTIFACT_NAMES = ["brief.md", "requirements.md", "design.md", "plan.md", "acceptance.md"];
 const MAX_EVENTS = 100;
@@ -42,7 +43,7 @@ export interface SnapshotReaderOptions {
   rootPath: string | null;
   now?: () => string;
   bootstrapPaths?: readonly string[];
-  bootstrapFiles?: readonly Pick<BootstrapBundleFile, "destination" | "transform" | "byteLength" | "sha256">[];
+  bootstrapFiles?: readonly Pick<BootstrapBundleFile, "destination" | "transform" | "byteLength" | "sha256" | "existingPolicy" | "compatibility">[];
 }
 
 export interface WorkspaceSnapshotReaderPort {
@@ -201,7 +202,23 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
     const checks = await Promise.all(expected.map(async (path) => {
       if (!(await this.files.exists(path))) return { missing: path, conflict: null };
       const contract = fileContracts.get(path);
-      if (!contract || contract.transform !== "copy" || !this.files.readBytes) return { missing: null, conflict: null };
+      if (!contract) return { missing: null, conflict: null };
+      const normalized = normalizeBootstrapCompatibility(contract);
+      if ("error" in normalized) return { missing: null, conflict: path };
+      if (normalized.existingPolicy === "adopt-compatible") {
+        try {
+          const bytes = this.files.readBytes
+            ? await this.files.readBytes(path)
+            : new TextEncoder().encode((await this.files.readText(path)).text);
+          const validation = validateExistingBootstrapContent(normalized.compatibility!, bytes);
+          return validation.compatible
+            ? { missing: null, conflict: null }
+            : { missing: null, conflict: path };
+        } catch {
+          return { missing: null, conflict: path };
+        }
+      }
+      if (contract.transform !== "copy" || !this.files.readBytes) return { missing: null, conflict: null };
       try {
         const bytes = await this.files.readBytes(path);
         const hash = createHash("sha256").update(Buffer.from(bytes)).digest("hex");

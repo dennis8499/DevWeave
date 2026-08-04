@@ -15,6 +15,15 @@ const bootstrapRoot = join(extensionRoot, "dist", "bootstrap");
 const manifest = JSON.parse(await readFile(join(bootstrapRoot, "manifest.json"), "utf8"));
 assert.equal(manifest.bundleVersion, version, "bundle and Extension versions must match");
 const destinations = new Set(manifest.files.map((file) => file.destination));
+const compatibleContracts = new Map([
+  [".devweave/project.json", "devweave-project-v1"],
+  [".devweave/baseline/product.md", "baseline-product-v1"],
+  [".devweave/baseline/architecture.md", "baseline-architecture-v1"],
+  [".devweave/baseline/quality.md", "baseline-quality-v1"],
+  ["wiki/index.md", "wiki-index-v1"],
+  ["wiki/overview.md", "wiki-overview-v1"],
+  ["wiki/log.md", "wiki-log-v1"]
+]);
 for (const required of [
   "AGENTS.md",
   "skills-lock.json",
@@ -35,6 +44,14 @@ for (const required of [
   assert.ok(destinations.has(required), `manifest is missing ${required}`);
 }
 for (const file of manifest.files) {
+  assert.ok(file.existingPolicy === "exact" || file.existingPolicy === "adopt-compatible", `invalid existing policy for ${file.destination}`);
+  if (compatibleContracts.has(file.destination)) {
+    assert.equal(file.existingPolicy, "adopt-compatible", `compatible policy missing for ${file.destination}`);
+    assert.equal(file.compatibility, compatibleContracts.get(file.destination), `compatibility kind mismatch for ${file.destination}`);
+  } else {
+    assert.equal(file.existingPolicy, "exact", `non-data bootstrap path must remain exact: ${file.destination}`);
+    assert.equal(file.compatibility, undefined, `exact bootstrap path must not declare compatibility: ${file.destination}`);
+  }
   assert.doesNotMatch(file.destination, /(?:^|\/)(?:README|docs|tests?|fixtures|work-items|history)(?:\/|$)/i, `forbidden bootstrap destination ${file.destination}`);
   const sourceBytes = await readFile(join(bootstrapRoot, file.source));
   assert.equal(sourceBytes.byteLength, file.byteLength, `byte length mismatch for ${file.source}`);

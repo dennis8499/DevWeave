@@ -7,6 +7,7 @@ const extensionRoot = resolve(process.cwd());
 const runtimeFiles = [
   "src/clipboard.ts",
   "src/bootstrap.ts",
+  "src/bootstrap-compat.ts",
   "src/dashboard.ts",
   "src/extension.ts",
   "src/filesystem.ts",

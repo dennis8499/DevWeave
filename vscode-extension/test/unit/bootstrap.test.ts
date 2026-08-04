@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   BootstrapInstaller,
@@ -7,6 +8,7 @@ import {
   BootstrapWorkspace,
   BootstrapBundle
 } from "../../src/bootstrap";
+import type { BootstrapCompatibilityKind } from "../../src/bootstrap-compat";
 
 class MemoryBootstrapWorkspace implements BootstrapWorkspace {
   private readonly files = new Map<string, Uint8Array>();
@@ -81,6 +83,31 @@ function bundle(): BootstrapBundle {
       byteLength: 17,
       sha256: "05c7e868def5b9baf9c16edbd5834ff501ff38aff6bbab33780a2a89fe28c577"
     }]
+  };
+}
+
+function compatibleProject(): string {
+  return JSON.stringify({
+    schema_version: 1,
+    managed: true,
+    locale: "zh-TW",
+    commands: [],
+    verification_profiles: { low: [], standard: [], high: [] },
+    evidence: { raw_log_limit_bytes: 5_000_000, version_summaries: true },
+    knowledge: { enabled: true, root: "wiki" }
+  });
+}
+
+function fileEntry(source: string, destination: string, text: string, compatibility: BootstrapCompatibilityKind): BootstrapBundle["files"][number] {
+  const bytes = new TextEncoder().encode(text);
+  return {
+    source,
+    destination,
+    transform: "copy",
+    byteLength: bytes.byteLength,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    existingPolicy: "adopt-compatible",
+    compatibility
   };
 }
 
@@ -294,4 +321,66 @@ test("BootstrapInstaller normalizes Windows-style and POSIX-style relative desti
   assert.equal(report.ok, true);
   assert.ok(report.created.includes(".devweave/nested/project.json"));
   assert.equal(await workspace.stat(".devweave/nested/project.json"), "file");
+});
+
+test("BootstrapInstaller adopts evolved project content through the declared semantic contract", async () => {
+  const bundled = compatibleProject();
+  const existing = JSON.stringify({ ...JSON.parse(bundled), commands: [], custom_metadata: "kept" }, null, 2);
+  const workspace = new MemoryBootstrapWorkspace();
+  workspace.seedDirectory(".devweave");
+  workspace.seedFile(".devweave/project.json", existing);
+  const resources = new MemoryBootstrapResources({ "project.json": bundled });
+  const adoptionBundle: BootstrapBundle = {
+    schemaVersion: 1,
+    bundleVersion: "test",
+    directories: [".devweave"],
+    files: [fileEntry("project.json", ".devweave/project.json", bundled, "devweave-project-v1")]
+  };
+
+  const report = await new BootstrapInstaller().install(adoptionBundle, resources, workspace);
+
+  assert.equal(report.ok, true);
+  assert.deepEqual(report.conflicts, []);
+  assert.deepEqual(report.created, []);
+  assert.deepEqual(report.adopted, [".devweave/project.json"]);
+  assert.equal(workspace.text(".devweave/project.json"), existing);
+});
+
+test("BootstrapInstaller explains semantic incompatibility instead of adopting identity drift", async () => {
+  const bundled = compatibleProject();
+  const existing = JSON.stringify({ ...JSON.parse(bundled), managed: false }, null, 2);
+  const workspace = new MemoryBootstrapWorkspace();
+  workspace.seedDirectory(".devweave");
+  workspace.seedFile(".devweave/project.json", existing);
+  const resources = new MemoryBootstrapResources({ "project.json": bundled });
+  const adoptionBundle: BootstrapBundle = {
+    schemaVersion: 1,
+    bundleVersion: "test",
+    directories: [".devweave"],
+    files: [fileEntry("project.json", ".devweave/project.json", bundled, "devweave-project-v1")]
+  };
+
+  const report = await new BootstrapInstaller().install(adoptionBundle, resources, workspace);
+
+  assert.equal(report.ok, false);
+  assert.ok(report.conflicts.some((item) => item.path === ".devweave/project.json" && /managed/i.test(item.reason)));
+  assert.equal(workspace.text(".devweave/project.json"), existing);
+});
+
+test("BootstrapInstaller rejects unknown compatibility metadata before any write", async () => {
+  const invalid = bundle();
+  invalid.files[0] = {
+    ...invalid.files[0],
+    existingPolicy: "adopt-compatible",
+    compatibility: "unknown-contract"
+  } as unknown as BootstrapBundle["files"][number];
+  const workspace = new MemoryBootstrapWorkspace();
+  const resources = new MemoryBootstrapResources({ "project.json": '{"managed":true}\n' });
+
+  const report = await new BootstrapInstaller().install(invalid, resources, workspace);
+
+  assert.equal(report.ok, false);
+  assert.equal(report.created.length, 0);
+  assert.ok(report.errors.some((item) => item.path === "manifest.json" && /compatibility/i.test(item.reason)));
+  assert.equal(await workspace.stat(".devweave"), "absent");
 });

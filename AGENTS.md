@@ -27,6 +27,8 @@ High-risk G3 review contract:
 
 `.devweave/baseline/` is accepted governance truth; root `wiki/` is detailed, source-bound codebase knowledge. Wiki-first controls read order, not factual priority: current source behavior and approved DevWeave artifacts win conflicts, which must be recorded as gaps.
 
+Initialization preflight is ordered before the project lock and before any `.devweave` control write, then repeated inside the lock. Missing, empty, or custom-only Wiki content is compatible; reserved starter type/frontmatter conflicts preserve Wiki bytes and leave no partial control bundle from that init call.
+
 `$devweave wiki bootstrap` is the only public Codebase Wiki bootstrap entry. It routes through `knowledge bootstrap`, explores the whole repository, and uses a normal feature work item with `knowledge_profile: bootstrap` plus the existing G1/G2/G3 lifecycle. An already complete core Wiki creates no work item; a missing bootstrap is advisory and does not block ordinary work. Bootstrap may write three to five planned Wiki content pages in G3 but must not modify product source.
 
 Machine keys and protocols are English. User-facing discovery, approval summaries, artifacts, and acceptance reports are Traditional Chinese unless the user asks otherwise. DevWeave observes Git state but never implicitly creates branches, worktrees, commits, or pushes.
@@ -42,7 +44,8 @@ DevWeave instructions take precedence whenever a companion skill conflicts with 
 Interactive decision contract:
 
 - Facts that can be discovered from Wiki, source, tests, or approved artifacts are resolved by inspection; they are not delegated back to the user as questions.
-- During G1, `grill-me`/`grilling` asks only material requirements decisions; during G2, `codebase-design` asks only material design decisions. Each question is asked one at a time with a recommendation and trade-off, and the agent waits for the answer.
+- During G1, `grill-me`/`grilling` asks only material requirements decisions; during G2, `codebase-design` asks only material design decisions. Prefer the Codex host's native question facility: one question at a time, two or three mutually exclusive options, the recommended option first and marked `(Recommended)`, evidence/trade-off descriptions, and the host's `Other` freeform answer. If native questions are unavailable, use the same structured numbered fallback with an explicit custom-answer entry rather than an unbounded freeform question.
+- Each question is asked one at a time with a recommendation and trade-off, and the agent waits for the answer.
 - User answers return to the current DevWeave artifacts. An unanswered material decision, silence, or ambiguous agreement never permits the agent to invent a decision or approve a Gate.
 - G1/G2 summaries are Double Checks after validation. New requirements, design, scope, or task decisions use `$devweave revise` from the earliest affected phase; G3 verifies approved intent rather than silently redefining it.
 

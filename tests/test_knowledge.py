@@ -580,17 +580,17 @@ class KnowledgeCoreTests(unittest.TestCase):
             wiki.mkdir()
             custom = wiki / "notes.md"
             custom.write_text("user-owned\n", encoding="utf-8")
-            with self.assertRaises(core.ValidationError) as caught:
-                harness.init()
-            self.assertEqual("knowledge_conflict", caught.exception.details["code"])
+            harness.init()
             self.assertEqual("user-owned\n", custom.read_text(encoding="utf-8"))
-            self.assertFalse((wiki / "index.md").exists())
+            self.assertTrue((wiki / "index.md").is_file())
+            self.assertTrue((wiki / "overview.md").is_file())
+            self.assertTrue((wiki / "log.md").is_file())
+            self.assertTrue((wiki / "modules").is_dir())
             knowledge_check = next(
                 item for item in core.doctor(harness.repo)["checks"]
                 if item["name"] == "knowledge"
             )
-            self.assertFalse(knowledge_check["ok"])
-            self.assertIn("knowledge_conflict", knowledge_check["detail"])
+            self.assertTrue(knowledge_check["ok"])
 
         with RepositoryHarness() as harness:
             wiki = harness.repo / "wiki"
@@ -608,6 +608,20 @@ class KnowledgeCoreTests(unittest.TestCase):
             self.assertEqual(
                 incompatible, (wiki / "overview.md").read_text(encoding="utf-8")
             )
+            self.assertFalse((harness.repo / ".devweave").exists())
+
+        with RepositoryHarness() as harness:
+            wiki = harness.repo / "wiki"
+            wiki.mkdir()
+            (wiki / "modules").write_text("user-owned directory placeholder\n", encoding="utf-8")
+            with self.assertRaises(core.ValidationError) as caught:
+                harness.init()
+            self.assertEqual("knowledge_conflict", caught.exception.details["code"])
+            self.assertEqual(
+                "user-owned directory placeholder\n",
+                (wiki / "modules").read_text(encoding="utf-8"),
+            )
+            self.assertFalse((harness.repo / ".devweave").exists())
 
     def test_project_upgrade_is_read_only_until_init_and_legacy_state_loads(self) -> None:
         with RepositoryHarness() as harness:

@@ -334,23 +334,32 @@ def inspect_wiki(repo: Path, *, root: str = "wiki") -> dict[str, Any]:
     if not existing_entries:
         return {"root": knowledge_root, "status": "empty", "compatible": True, "conflicts": []}
     conflicts: list[dict[str, str]] = []
-    index = wiki / "index.md"
-    if not index.is_file():
-        conflicts.append({"path": f"{knowledge_root}/index.md", "reason": "non-empty Wiki has no recognized index"})
-    else:
-        frontmatter, _, parse_errors = parse_frontmatter_text(index.read_text(encoding="utf-8"))
-        if parse_errors or frontmatter.get("type") != "index":
-            conflicts.append({"path": f"{knowledge_root}/index.md", "reason": "existing index is incompatible"})
     for filename, expected_type in SPECIAL_TYPES.items():
         path = wiki / filename
-        if not path.exists() or filename == "index.md":
+        if not path.exists() and not path.is_symlink():
             continue
-        if not path.is_file():
-            conflicts.append({"path": f"{knowledge_root}/{filename}", "reason": "starter path is not a file"})
+        relative = f"{knowledge_root}/{filename}"
+        if path.is_symlink() or not path.is_file():
+            conflicts.append({"path": relative, "reason": "reserved starter path is not a regular file"})
             continue
-        frontmatter, _, parse_errors = parse_frontmatter_text(path.read_text(encoding="utf-8"))
+        try:
+            frontmatter, _, parse_errors = parse_frontmatter_text(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError):
+            conflicts.append({"path": relative, "reason": f"expected type {expected_type}"})
+            continue
         if parse_errors or frontmatter.get("type") != expected_type:
-            conflicts.append({"path": f"{knowledge_root}/{filename}", "reason": f"expected type {expected_type}"})
+            conflicts.append({"path": relative, "reason": f"expected type {expected_type}"})
+    for directory in TYPE_DIRECTORIES.values():
+        path = wiki / directory
+        if not path.exists() and not path.is_symlink():
+            continue
+        if path.is_symlink() or not path.is_dir():
+            conflicts.append(
+                {
+                    "path": f"{knowledge_root}/{directory}",
+                    "reason": "reserved starter directory is not a directory",
+                }
+            )
     return {
         "root": knowledge_root,
         "status": "conflict" if conflicts else "compatible",

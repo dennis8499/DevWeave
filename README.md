@@ -70,6 +70,8 @@ python -B .agents\skills\devweave\scripts\devweave.py --repo . init
 `init` 會非破壞性建立 `.devweave/`、三份 baseline、work-item 目錄與 root `wiki/` starter。
 既有相容 Wiki 會被採用，不會覆寫使用者內容；不相容內容會回報 `knowledge_conflict`。
 
+初始化順序是：先以 read-only preflight 檢查 Wiki，再取得 project lock 並重新檢查，接著補齊 Wiki 缺檔，最後才建立 project、baseline、cache 與 work-item control state。因此 `wiki/` 只有自訂 `notes.md` 時會保留內容並補齊 starter；若 reserved `index.md`、`overview.md`、`log.md` 或 starter directory 的型別／frontmatter 不相容，會在任何本次控制檔寫入前停止，不會留下半套 `.devweave/`。
+
 在未初始化 repository 中，Codex 不會自行隱式啟動 DevWeave。請在對話中明確使用：
 
 ```text
@@ -115,10 +117,11 @@ G1 確認問題、使用者、成功條件、非目標、risk、scope 與 featur
 item 還必須完成 Wiki-first context：先讀 `wiki/index.md`，再讀最多五個相關頁面；只有
 placeholder、stale、缺漏或矛盾被記錄為 gap 後，才回溯 raw source。
 
-G1 的聊天流程是：先由 Codex 查證 repository facts，再使用 `grill-me`／`grilling` 逐題確認
-會影響目標、範圍、風險、相容性或驗收的 material decisions。每題提供目前證據、推薦選項與
-主要取捨，等待使用者回答後才回流 `brief.md`／`requirements.md`；可由 repository 查出的
-facts 不重複詢問。
+G1 的逐題決策流程是：先由 Codex 查證 repository facts，再使用 `grill-me`／`grilling` 確認
+會影響目標、範圍、風險、相容性或驗收的 material decisions。Codex host 提供原生 question
+facility 時，題目使用兩至三個互斥選項、第一項標記 `(Recommended)`、選項說明與 `Other`
+自訂答案；若 host 沒有原生能力，使用相同格式的 structured numbered fallback。每次只問一題，
+等待使用者回答後才回流 `brief.md`／`requirements.md`；可由 repository 查出的 facts 不重複詢問。
 
 G1 artifacts：
 
@@ -227,7 +230,7 @@ docs/使用手冊.md                詳細繁體中文操作手冊
 
 本 repository 的 project-local companions 是：
 
-- `grill-me`／`grilling`：G1 material requirements interview，一次一題並等待使用者回答。
+- `grill-me`／`grilling`：G1 material requirements interview；優先使用 host-native question，否則使用 structured options fallback，一次一題並等待使用者回答。
 - `codebase-design`：G2 module、interface、seam 與 adapter 設計，一次一題確認 material trade-off。
 - `diagnosing-bugs`：bug discovery 與可重現 feedback loop。
 - `tdd`：G2 後 implementation 的 red → green slice。

@@ -511,38 +511,72 @@ def init_project(repo: Path) -> dict[str, Any]:
             "DevWeave requires Python 3.11 or newer.",
             {"current": list(sys.version_info[:3])},
         )
-    with WorkLock(repo, "project"):
-        root = devweave_root(repo)
-        root.mkdir(parents=True, exist_ok=True)
-        (root / "cache" / "sessions").mkdir(parents=True, exist_ok=True)
-        (root / "work-items").mkdir(parents=True, exist_ok=True)
-        (root / "baseline" / "capabilities").mkdir(parents=True, exist_ok=True)
-        if not project_path(repo).exists():
-            atomic_write_json(project_path(repo), project_defaults())
-        else:
-            existing = read_json(project_path(repo))
-            if "knowledge" not in existing:
+    root = devweave_root(repo)
+    root_existed = root.exists()
+    cache_existed = (root / "cache").exists()
+    locks_existed = (root / "cache" / "locks").exists()
+
+    def validate_wiki_preflight() -> None:
+        inspection = knowledge.inspect_wiki(repo, root=knowledge_root(repo))
+        if not inspection["compatible"]:
+            raise ValidationError(
+                "Existing Wiki content is not compatible and was not modified.",
+                {"code": "knowledge_conflict", "details": {"conflicts": inspection["conflicts"]}},
+            )
+
+    validate_wiki_preflight()
+    try:
+        with WorkLock(repo, "project"):
+            validate_wiki_preflight()
+            existing = read_json(project_path(repo)) if project_path(repo).exists() else None
+            locale = (
+                existing.get("locale", "zh-TW")
+                if isinstance(existing, dict)
+                else "zh-TW"
+            )
+            if not isinstance(locale, str) or not locale:
+                locale = "zh-TW"
+            try:
+                knowledge.bootstrap_wiki(
+                    repo,
+                    assets_root(),
+                    root=knowledge_root(repo),
+                    locale=locale,
+                )
+            except knowledge.KnowledgeError as exc:
+                raise ValidationError(exc.message, {"code": exc.code, "details": exc.details}) from exc
+
+            root.mkdir(parents=True, exist_ok=True)
+            (root / "cache" / "sessions").mkdir(parents=True, exist_ok=True)
+            (root / "work-items").mkdir(parents=True, exist_ok=True)
+            (root / "baseline" / "capabilities").mkdir(parents=True, exist_ok=True)
+            if existing is None:
+                atomic_write_json(project_path(repo), project_defaults())
+            elif "knowledge" not in existing:
                 existing["knowledge"] = {"enabled": True, "root": "wiki"}
                 atomic_write_json(project_path(repo), existing)
-        for target, asset in (
-            ("product.md", "baseline-product.md.tmpl"),
-            ("architecture.md", "baseline-architecture.md.tmpl"),
-            ("quality.md", "baseline-quality.md.tmpl"),
+            for target, asset in (
+                ("product.md", "baseline-product.md.tmpl"),
+                ("architecture.md", "baseline-architecture.md.tmpl"),
+                ("quality.md", "baseline-quality.md.tmpl"),
+            ):
+                output = root / "baseline" / target
+                if not output.exists():
+                    atomic_write_text(output, _render_asset(asset, {}))
+            load_project(repo)
+            _ensure_gitignore(repo)
+    except ValidationError:
+        for candidate, existed in (
+            (root / "cache" / "locks", locks_existed),
+            (root / "cache", cache_existed),
+            (root, root_existed),
         ):
-            output = root / "baseline" / target
-            if not output.exists():
-                atomic_write_text(output, _render_asset(asset, {}))
-        project = load_project(repo)
-        try:
-            knowledge.bootstrap_wiki(
-                repo,
-                assets_root(),
-                root=project["knowledge"]["root"],
-                locale=project["locale"],
-            )
-        except knowledge.KnowledgeError as exc:
-            raise ValidationError(exc.message, {"code": exc.code, "details": exc.details}) from exc
-        _ensure_gitignore(repo)
+            if not existed and candidate.is_dir():
+                try:
+                    candidate.rmdir()
+                except OSError:
+                    pass
+        raise
     return load_project(repo)
 
 

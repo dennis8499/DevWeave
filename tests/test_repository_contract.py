@@ -131,6 +131,9 @@ class RepositoryContractTests(unittest.TestCase):
         for fragment in (
             "Interactive decision contract:",
             "Facts that can be discovered from Wiki, source, tests, or approved artifacts",
+            "native question facility",
+            "two or three mutually exclusive options",
+            "structured numbered fallback",
             "Each question is asked one at a time with a recommendation and trade-off",
             "never permits the agent to invent a decision or approve a Gate",
             "New requirements, design, scope, or task decisions use `$devweave revise`",
@@ -140,6 +143,8 @@ class RepositoryContractTests(unittest.TestCase):
         for fragment in (
             "## Interactive decision protocol",
             "During G1, use `grill-me`/`grilling`; during G2, use `codebase-design`.",
+            "Prefer the Codex host's native question facility",
+            "structured numbered fallback",
             "Ask one material decision at a time.",
             "Do not silently choose an unresolved material decision",
             "Before G1 approval, present the answered material decisions",
@@ -150,6 +155,8 @@ class RepositoryContractTests(unittest.TestCase):
 
         for fragment in (
             "Invoke `grill-me`/`grilling` for material requirements decisions.",
+            "native question facility",
+            "structured numbered fallback",
             "wait for the user's answer before recording the next decision",
             "Stop at the Gate if approval is absent",
         ):
@@ -170,7 +177,8 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertIn(fragment, verification)
 
         for fragment in (
-            "G1 的聊天流程是",
+            "G1 的逐題決策流程是",
+            "structured numbered fallback",
             "G2 使用 `codebase-design` 逐題確認",
             "每道 Gate 都是 validation 後的 Double Check",
             "若 Gate 發現新需求或設計決策，必須使用 `revise`",
@@ -179,6 +187,8 @@ class RepositoryContractTests(unittest.TestCase):
 
         for fragment in (
             "使用 `grill-me`／`grilling` 逐題確認 material requirements",
+            "host-native question",
+            "structured numbered fallback",
             "使用 `codebase-design` 逐題確認 material design trade-off",
             "G1/G2 Gate 是對目前 artifacts 的 Double Check",
             "必須使用 `revise` 回到最早受影響 phase",
@@ -228,6 +238,8 @@ class RepositoryContractTests(unittest.TestCase):
                 "knowledge review",
                 "knowledge scaffold",
                 "at most five related pages",
+                "read-only Wiki preflight",
+                "custom-only",
             ),
             ".agents/skills/devweave/references/requirements-phase.md": (
                 "bootstrap",
@@ -244,26 +256,38 @@ class RepositoryContractTests(unittest.TestCase):
                 "knowledge_review_required",
                 "knowledge bootstrap",
                 "knowledge scaffold",
+                "reserved-starter preflight",
             ),
             "AGENTS.md": (
                 "$devweave wiki bootstrap",
                 "Knowledge Review",
                 "no-update",
+                "Initialization preflight",
             ),
             "README.md": (
                 "$devweave wiki bootstrap",
                 "Codebase LLM Wiki",
                 "Knowledge Review",
+                "read-only preflight",
+                "半套 `.devweave/`",
             ),
             "docs/使用手冊.md": (
                 "knowledge bootstrap",
                 "knowledge review",
                 "knowledge scaffold",
+                "exclusive-create",
+                "partial control bundle",
             ),
             "vscode-extension/README.md": (
                 "DevWeave: Bootstrap Codebase Wiki",
                 "$devweave wiki bootstrap",
                 "九個公開",
+                "semantic contract",
+                "adopted",
+            ),
+            "vscode-extension/assets/bootstrap/AGENTS.md": (
+                "Initialization order",
+                "partial control bundle",
             ),
         }
         for relative, fragments in documents.items():

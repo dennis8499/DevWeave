@@ -5,15 +5,15 @@ sources: [.agents/skills/devweave/assets/wiki/templates, .agents/skills/devweave
 last_updated: 2026-08-04
 tags: [module]
 status: active
-source_fingerprint: "sha256:13d1a90a6f4e4b8c758c60eb52c36e8f25c1ca40ed7c892948c878e48fa07551"
-verified_by: 20260804-122803-feature-g3-review-agent
+source_fingerprint: "sha256:5e93c79cc5767b2e868067cee81bd8a1b5cef07e90f1b61ace52ab6fc907904e"
+verified_by: 20260804-183511-feature-g1-g2-wiki-extension-bundle
 ---
 
 # Knowledge Engine
 
 ## Responsibility
 
-Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`knowledge_core.py` 提供純 Wiki/source 運算與安全檔案操作；`devweave_core.py` 將這些能力綁定 Work Item phase、gate、review、plan、event 與 acceptance policy；`devweave.py` 暴露穩定 JSON machine commands。Engine 是 machine lifecycle 與 knowledge state 的權威；G1/G2 的逐題問答則由唯一 router 與 phase guidance 驅動，回答寫入既有 artifacts，不在 Engine 內維護 pending-question state。
+Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`knowledge_core.py` 提供純 Wiki/source 運算、reserved-starter preflight 與安全檔案操作；`devweave_core.py` 將這些能力綁定 Work Item phase、gate、review、plan、event 與 acceptance policy；`devweave.py` 暴露穩定 JSON machine commands。Engine 是 machine lifecycle 與 knowledge state 的權威；G1/G2 的逐題問答則由唯一 router 與 phase guidance 驅動，回答寫入既有 artifacts，不在 Engine 內維護 pending-question state。
 
 ## Public Surface
 
@@ -24,6 +24,7 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 - `knowledge plan`：replace 一至五個 content targets，自動 coupling index/log。
 - `knowledge scaffold`：只對 planned new upsert，以九種 canonical template 進行 exclusive create。
 - `knowledge seal`：只接受 planned upserts/coupled pages，拒絕 placeholder、template token、invalid source 與 critical lint。
+- `init/start`：在 project lock 外與 lock 內做 Wiki reserved-starter preflight；missing、empty、custom-only root 可補 starter，reserved type/frontmatter conflict 以 `knowledge_conflict` fail closed，且不留下 partial `.devweave` control state。
 - machine-only `review record`：由既有 router 傳入固定 reviewer JSON report 與 opaque reviewer ID；只接受 high-risk G3 的 isolated/read-only review，產生 source-bound `kind: review` evidence 與 redacted report provenance，不是新的 public chat verb。
 
 互動式決策不是新的 public machine command：G1 由 `grill-me`/`grilling` 協助確認 material requirements，G2 由 `codebase-design` 協助確認 material design；每次只處理一題並等待使用者回答。Gate 在 `validate` 後再做 Double Check，若答案或決策改變，沿既有 `revise` 使 Gate 與 artifacts 回到正確階段。
@@ -39,6 +40,7 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 ## Behavior and Gaps
 
 - Bootstrap readiness 要求無 critical lint，且 overview、architecture、module 皆 active、sourced、current 並有 `verified_by`；既有 Wiki 超過五頁仍可視為完成。
+- Wiki bootstrap skeleton 的 compatibility 只檢查保留 starter files/directories；非保留自訂內容不會因缺少 `index.md` 被誤判 conflict。`init_project()` 成功完成 Wiki preflight 後才建立 project、baseline、cache 與 work-item directories。
 - `affected_pages` 依 Work Item 起始 Wiki source overlap 計算；既有 affected page 在 G3 必須 refresh/seal 或 delete。Coverage 將 current active pages 的 source overlap 投影成 covered/uncovered，供 durable-value review 判斷。
 - Knowledge Engine 不替 agent 判斷哪些 repository facts 應詢問使用者；可由 Wiki/source/artifacts 查出的事實由流程自動整理，只有會改變目標、範圍、介面、風險、相容性或驗收的 material decision 進入對話。這是 router policy，不是 engine 自動決策。
 - 新式 state 以 `knowledge_review_required: true` 啟用完整 contract；缺少 marker 的 schema-v1 Work Item 維持 legacy compatibility，不追溯阻擋。
@@ -53,7 +55,7 @@ DevWeave 仍是唯一 router；Companion Skills 是階段內方法，不建立�
 
 ## Extension integration boundary
 
-- `vscode-extension/src/snapshot.ts` 只把 project、work、gate、task、evidence、Wiki 與 diagnostics 投影成 filesystem snapshot；它不執行 Python engine、shell、Git、network 或 Codex API。
+- `vscode-extension/src/snapshot.ts` 只把 project、work、gate、task、evidence、Wiki 與 diagnostics 投影成 filesystem snapshot；它不執行 Python engine、shell、Git、network 或 Codex API，並與 installer 共用 `bootstrap-compat.ts` semantic validator。
 - `vscode-extension/src/presentation.ts` 是 Extension-local 的 presentation seam，集中 public command 任務語言、非權威 snapshot guidance、review readiness、diagnostic copy 與 audit event mapping；它不改變 Python schema 或 `$devweave` prompt contract。
 - `vscode-extension/src/snapshot.ts` 以 optional nested review projection 讀取 result/severity/findings/hash；`presentation.ts` 在 high-risk acceptance 增加 Independent Review check，missing/unavailable/advisory 顯示 attention、critical 顯示 not-ready，Extension 不啟動 Agent 或修改 lifecycle。
 - Control Center Webview 以總覽、工作項目、知識、驗證與稽核分區；active work 與 closed history 分組，Knowledge 列表以 snapshot 內資料提供搜尋、分類與 bounded initial list，使用者可明確顯示全部。
@@ -67,6 +69,6 @@ Extension 的 Wiki 搜尋不新增 knowledge machine command 或索引服務。`
 
 Watcher refresh 與手動 refresh 共用 `RefreshCoordinator`。Coordinator 一次只允許一個 snapshot read；burst 期間保留最新 pending request，成功結果不被較舊 read 回退。Reader 對互不依賴的檔案操作使用平行讀取，但以 sorted path/id 合併 projection 與 diagnostics，維持 engine contract 的 deterministic output。
 
-Bootstrap bundle 的來源與目的地由 build-time manifest 固定：`devweave` 加上五個核准 companion skills、通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。`BootstrapInstaller.inspect()` 先做 read-only integrity/path preflight；install 只建立缺少且不衝突的檔案，same bytes 視為 adopted，different bytes 列 conflict，寫入失敗則 rollback 本輪建立的檔案。Dashboard 以 completeness projection 提供初始化／補齊入口。
+Bootstrap bundle 的來源與目的地由 build-time manifest 固定：`devweave` 加上五個核准 companion skills、通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。`existingPolicy` 缺少時安全預設 `exact`；只有 project、三份 baseline、三份 Wiki starter 宣告 `adopt-compatible` 與固定 compatibility kind。`BootstrapInstaller.inspect()` 與 snapshot 先做 read-only integrity/path preflight，再以 shared validator 判定 evolved bytes；install 只建立 missing paths，寫入失敗則 rollback 本輪建立的檔案。Dashboard 以 completeness projection 提供初始化／補齊入口。
 
 說明內容嵌入 Extension bundle 並在首次切換 help section 時 render；它不落地到 workspace、不發 network request。Extension runtime 維持 no process、no shell、no external network，除使用者確認的固定 bootstrap path 外不提供 workspace write seam。

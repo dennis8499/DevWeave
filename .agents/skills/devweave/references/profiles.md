@@ -26,6 +26,7 @@ Use one state machine for every profile. Change the required discovery and evide
 - Keep `kind: feature` and add `knowledge_profile: bootstrap`; do not create another lifecycle or work kind.
 - Explore the whole repository and prohibit product-source changes.
 - In G2 select three to five core/high-value content pages; in G3 require promote, complete overview plus architecture plus module, and reject no-update or deletion.
+- A missing or incomplete bootstrap is advisory for ordinary `new`/`feature` work; recommend `$devweave wiki bootstrap` without hard-blocking the ordinary work lifecycle.
 
 ### refactor
 

@@ -34,6 +34,8 @@ Translate those intents into engine commands. Never edit `state.json`, `events.j
 
 For an explicit `new`, `feature`, `refactor`, or `bug` request in an uninitialized repository, the startup order is an exception to the normal continuation protocol: run `init`, configure proposed commands, and run `start` before the first `status`. Do not treat the expected absence of a work item before `start` as a blocker.
 
+`init` performs a read-only Wiki preflight before acquiring the project lock or creating `.devweave` control state, then repeats the inspection inside the lock before writing anything. A missing, empty, or custom-only `wiki/` is compatible: starter files and typed directories are created only when absent. Existing `index.md`, `overview.md`, `log.md`, or starter directories are checked as reserved paths; wrong filesystem types or frontmatter return `knowledge_conflict` while preserving all existing bytes and leaving no partial control bundle from that call.
+
 For `$devweave wiki bootstrap`, run `knowledge bootstrap` without a scope argument. Report `already_complete` without creating a work item; otherwise use the returned created or resumed standard feature work item, bind it, and continue through the same G1/G2/G3 protocol. Bootstrap explores the whole repository, changes no product source, selects three to five high-value content pages in G2, and writes Wiki only in G3.
 
 ## Engine protocol
@@ -63,6 +65,7 @@ Facts and decisions have different handling:
 
 - Read Wiki, repository guidance, source, tests, and existing artifacts to answer facts that are discoverable in the environment. Do not ask the user to repeat repository facts.
 - During G1, use `grill-me`/`grilling`; during G2, use `codebase-design`. Ask only material decisions that affect user value, scope, interface, seam, risk, compatibility, acceptance, rollback, or observability.
+- Prefer the Codex host's native question facility when it is exposed: ask one decision at a time with two or three mutually exclusive options, put the recommended option first and mark it `(Recommended)`, include evidence/trade-off descriptions, and allow the host's `Other` freeform answer. If the host does not expose that facility, render the same contract as a structured numbered fallback with an explicit custom-answer entry; do not use an unbounded freeform question.
 - Ask one material decision at a time. Include the current evidence, the recommended option, the meaningful trade-off, and the consequence of each answer. Wait for the user's answer before asking the next question or changing the artifact.
 - Do not silently choose an unresolved material decision, treat silence or ambiguous agreement as approval, or continue past a blocked question. Low-risk equivalent implementation details may be chosen by Codex only when recorded as assumptions in the current artifact and Gate summary.
 - Return user answers to the current phase artifacts: G1 to `brief.md`/`requirements.md`, G2 to `design.md`/`plan.md`. Do not create a second spec, question ledger, or conversation state.

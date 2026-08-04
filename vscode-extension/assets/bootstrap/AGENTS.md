@@ -18,4 +18,13 @@ DevWeave observes Git state but does not create branches, worktrees, commits, pu
 
 `codebase-design`, `diagnosing-bugs`, `grill-me`, `grilling`, and `tdd` are methods inside the current DevWeave phase. They do not replace DevWeave artifacts, gates, evidence, or human approval.
 
+## Interactive decisions
+
+During G1/G2, ask only material requirements/design decisions. Prefer the Codex host's native question facility with two or three mutually exclusive options, the recommended option first marked `(Recommended)`, evidence/trade-off descriptions, and `Other` freeform. If native questions are unavailable, use the same structured numbered fallback with an explicit custom-answer entry. Ask one question at a time, wait for the answer, and return it to the current artifact; do not create a second question state or ledger.
+
 Machine keys and protocols remain English. User-facing discovery, approvals, and acceptance reports use Traditional Chinese unless the user asks otherwise.
+
+## Initialization order
+
+- DevWeave `init` checks Wiki compatibility before the project lock and repeats the check inside the lock before creating `.devweave` control state.
+- Missing, empty, or custom-only Wiki content is compatible and receives only missing starters; incompatible reserved starter paths return `knowledge_conflict` without overwriting user bytes or leaving a partial control bundle.
