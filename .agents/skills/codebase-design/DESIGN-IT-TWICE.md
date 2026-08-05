@@ -1,6 +1,6 @@
 # Design It Twice
 
-When the user wants to explore alternative interfaces for a chosen deepening candidate, use this parallel sub-agent pattern. Based on "Design It Twice" (Ousterhout) — your first idea is unlikely to be the best.
+When the user explicitly wants alternative interfaces for a chosen deepening candidate, use this parallel sub-agent pattern. Based on "Design It Twice" (Ousterhout), treat the first idea as a candidate rather than the default.
 
 Uses the vocabulary in [SKILL.md](SKILL.md) — **module**, **interface**, **seam**, **adapter**, **leverage**.
 
@@ -8,7 +8,7 @@ Uses the vocabulary in [SKILL.md](SKILL.md) — **module**, **interface**, **sea
 
 ### 1. Frame the problem space
 
-Before spawning sub-agents, write a user-facing explanation of the problem space for the chosen candidate:
+Before spawning sub-agents, write a user-facing explanation of the problem space for the chosen candidate. Ground it in the approved requirements/design and current Wiki/source context:
 
 - The constraints any new interface would need to satisfy
 - The dependencies it would rely on, and which category they fall into (see [DEEPENING.md](DEEPENING.md))
@@ -27,7 +27,7 @@ Prompt each sub-agent with a separate technical brief (file paths, coupling deta
 - Agent 3: "Optimise for the most common caller — make the default case trivial."
 - Agent 4 (if applicable): "Design around ports & adapters for cross-seam dependencies."
 
-Include both [SKILL.md](SKILL.md) vocabulary and CONTEXT.md vocabulary in the brief so each sub-agent names things consistently with the architecture language and the project's domain language.
+Include both [SKILL.md](SKILL.md) vocabulary and the project's current domain vocabulary in the brief. Read an existing `CONTEXT.md` only when the repository provides one; the current Wiki and approved artifacts remain authoritative, and this skill creates no parallel context file.
 
 Each sub-agent outputs:
 
@@ -41,4 +41,8 @@ Each sub-agent outputs:
 
 Present designs sequentially so the user can absorb each one, then compare them in prose. Contrast by **depth** (leverage at the interface), **locality** (where change concentrates), and **seam placement**.
 
-After comparing, give your own recommendation: which design you think is strongest and why. If elements from different designs would combine well, propose a hybrid. Be opinionated — the user wants a strong read, not a menu.
+After comparing, give your own recommendation: which design is strongest and why. If elements from different designs combine well, propose one hybrid. Ask the user to choose the design decision and return it to the current design artifact; keep implementation paused until the decision is recorded.
+
+## Completion criterion
+
+Design It Twice is complete when at least three radically different interfaces are shown, each includes its invariants, usage, hidden behaviour, adapters, and trade-offs, and the comparison records depth, locality, seam placement, recommendation, and the user's selected outcome.

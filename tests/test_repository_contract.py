@@ -18,16 +18,18 @@ COMPANION_SKILLS = {
     "grilling",
     "tdd",
 }
+MAINTENANCE_ONLY_SKILLS = {"writing-great-skills"}
 EXPECTED_REPOSITORY_SKILLS = COMPANION_SKILLS | {"devweave"}
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 
 
 class RepositoryContractTests(unittest.TestCase):
     def test_devweave_is_the_only_router_with_expected_companions(self) -> None:
-        skills = {
+        discovered = {
             path.parent.name
             for path in (REPOSITORY_ROOT / ".agents" / "skills").glob("*/SKILL.md")
         }
+        skills = discovered - MAINTENANCE_ONLY_SKILLS
         self.assertEqual(EXPECTED_REPOSITORY_SKILLS, skills)
 
         agents = (REPOSITORY_ROOT / "AGENTS.md").read_text(encoding="utf-8")
@@ -40,6 +42,72 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertTrue(source.startswith("---\n"), name)
             frontmatter = source.split("---", 2)[1]
             self.assertRegex(frontmatter, rf"(?m)^name:\s*{re.escape(name)}\s*$")
+
+    def test_maintenance_only_skill_is_excluded_from_governed_sets_and_bundle(
+        self,
+    ) -> None:
+        discovered = {
+            path.parent.name
+            for path in (REPOSITORY_ROOT / ".agents" / "skills").glob("*/SKILL.md")
+        }
+        self.assertIn("writing-great-skills", discovered)
+        self.assertNotIn("writing-great-skills", COMPANION_SKILLS)
+
+        lock = json.loads(
+            (REPOSITORY_ROOT / "skills-lock.json").read_text(encoding="utf-8")
+        )
+        self.assertNotIn("writing-great-skills", lock["skills"])
+
+        bundle = (REPOSITORY_ROOT / "vscode-extension" / "esbuild.mjs").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            'const companionSkills = ["codebase-design", "diagnosing-bugs", "grill-me", "grilling", "tdd"]',
+            bundle,
+        )
+        self.assertNotIn("writing-great-skills", bundle)
+
+    def test_skill_frontmatter_metadata_and_invocation_policy_are_explicit(
+        self,
+    ) -> None:
+        for name in sorted(EXPECTED_REPOSITORY_SKILLS):
+            skill_root = REPOSITORY_ROOT / ".agents" / "skills" / name
+            source = (skill_root / "SKILL.md").read_text(encoding="utf-8")
+            self.assertTrue(source.startswith("---\n"), name)
+            frontmatter = source.split("---", 2)[1]
+            self.assertRegex(frontmatter, r"(?m)^description:\s*\S.+$")
+
+            metadata = skill_root / "agents" / "openai.yaml"
+            self.assertTrue(metadata.exists(), name)
+            metadata_source = metadata.read_text(encoding="utf-8")
+            self.assertRegex(metadata_source, r'(?m)^\s*display_name:\s*"[^"]+"$')
+            self.assertRegex(
+                metadata_source, r'(?m)^\s*short_description:\s*"[^"]+"$'
+            )
+
+        grill_me = (
+            REPOSITORY_ROOT / ".agents" / "skills" / "grill-me" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("disable-model-invocation: true", grill_me)
+        grill_me_metadata = (
+            REPOSITORY_ROOT
+            / ".agents"
+            / "skills"
+            / "grill-me"
+            / "agents"
+            / "openai.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("allow_implicit_invocation: false", grill_me_metadata)
+
+        devweave_metadata = (
+            REPOSITORY_ROOT
+            / ".agents"
+            / "skills"
+            / "devweave"
+            / "agents"
+            / "openai.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("allow_implicit_invocation: true", devweave_metadata)
 
     def test_companion_skill_provenance_and_relative_links_are_complete(self) -> None:
         lock = json.loads(

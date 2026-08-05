@@ -1,6 +1,6 @@
 # Deepening
 
-How to deepen a cluster of shallow modules safely, given its dependencies. Assumes the vocabulary in [SKILL.md](SKILL.md) — **module**, **interface**, **seam**, **adapter**.
+Use this reference when a cluster of shallow modules should hide dependency complexity behind one deeper **module**. It assumes the vocabulary in [SKILL.md](SKILL.md): **module**, **interface**, **seam**, and **adapter**.
 
 ## Dependency categories
 
@@ -26,8 +26,8 @@ Third-party services (Stripe, Twilio, etc.) you don't control. The deepened modu
 
 ## Seam discipline
 
-- **One adapter means a hypothetical seam. Two adapters means a real one.** Don't introduce a port unless at least two adapters are justified (typically production + test). A single-adapter seam is just indirection.
-- **Internal seams vs external seams.** A deep module can have internal seams (private to its implementation, used by its own tests) as well as the external seam at its interface. Don't expose internal seams through the interface just because tests use them.
+- **One adapter means a hypothetical seam. Two adapters means a real one.** Introduce a port only when at least two adapters are justified (typically production + test); a single-adapter seam is indirection without leverage.
+- **Internal seams vs external seams.** Keep private test seams inside the implementation while the external seam remains the module's caller-facing interface.
 
 ## Testing strategy: replace, don't layer
 
@@ -35,3 +35,7 @@ Third-party services (Stripe, Twilio, etc.) you don't control. The deepened modu
 - Write new tests at the deepened module's interface. The **interface is the test surface**.
 - Tests assert on observable outcomes through the interface, not internal state.
 - Tests should survive internal refactors — they describe behaviour, not implementation. If a test has to change when the implementation changes, it's testing past the interface.
+
+## Completion criterion
+
+The deepening design is complete when it names the dependency category, the external seam, every production/test adapter, the behaviour hidden behind the interface, and the tests that cross that interface. Old shallow tests are either replaced at the deep module's interface or explicitly retained with a reason.

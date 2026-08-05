@@ -1,12 +1,20 @@
 ---
 name: grilling
-description: Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases.
+description: Stress-test a plan, decision, or idea one question at a time. Use when the user wants to examine trade-offs, resolve dependencies, or reach shared understanding.
 ---
 
-Interview me relentlessly about every aspect of this until we reach a shared understanding. Walk down each branch of the decision tree, resolving dependencies between decisions one-by-one. For each question, provide your recommended answer.
+# Grilling
 
-Ask the questions one at a time, waiting for feedback on each question before continuing. Asking multiple questions at once is bewildering.
+Use this skill to turn an idea or plan into an explicit decision tree.
 
-If a *fact* can be found by exploring the environment (filesystem, tools, etc.), look it up rather than asking me. The *decisions*, though, are mine — put each one to me and wait for my answer.
+## Procedure
 
-Do not act on it until I confirm we have reached a shared understanding.
+1. Inspect the repository, Wiki, and approved artifacts for facts; resolve discoverable facts yourself.
+2. Identify the next material decision and its dependencies.
+3. Ask exactly one question with two or three mutually exclusive options. Put the recommended option first and mark it `(Recommended)`, explain the evidence and trade-off, and allow the host's `Other` freeform answer. Use a structured numbered fallback when native questions are unavailable.
+4. Wait for the answer, record it in the current artifact, and re-evaluate dependent branches.
+5. Keep execution paused until the user explicitly confirms shared understanding.
+
+## Completion criterion
+
+The session ends only when every material decision has an answer or an explicit blocker, the answers are returned to the current artifact, and the user confirms shared understanding.

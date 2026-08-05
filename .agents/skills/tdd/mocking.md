@@ -1,13 +1,15 @@
 # When to Mock
 
+Mock only a system boundary whose behavior cannot be made deterministic in the test. Prefer real in-memory or test adapters when they provide a faithful, fast boundary.
+
 Mock at **system boundaries** only:
 
 - External APIs (payment, email, etc.)
-- Databases (sometimes - prefer test DB)
+- Databases when a test database is unavailable or would make the test materially non-deterministic; otherwise prefer a test DB
 - Time/randomness
-- File system (sometimes)
+- File system when isolation is required; otherwise prefer a temporary or in-memory filesystem
 
-Don't mock:
+Keep these parts real:
 
 - Your own classes/modules
 - Internal collaborators
@@ -57,3 +59,7 @@ The SDK approach means:
 - No conditional logic in test setup
 - Easier to see which endpoints a test exercises
 - Type safety per endpoint
+
+## Completion criterion
+
+Mocking is complete when each mock represents an external or otherwise non-deterministic system boundary, the selected adapter preserves the contract needed by the test, and no internal collaborator is mocked merely for convenience.

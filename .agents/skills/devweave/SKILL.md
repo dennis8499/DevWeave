@@ -1,18 +1,18 @@
 ---
 name: devweave
-description: Drive repository-managed software changes and Codebase Wiki bootstrap through traceable discovery, design, implementation, verification, and human acceptance. Use when the user explicitly invokes $devweave for a new project, feature, refactor, bug, or Wiki bootstrap, or when a managed repository request would modify product code, tests, schemas, dependencies, build, or CI configuration.
+description: Drive repository-managed software changes and Codebase Wiki bootstrap through Wiki-first discovery, design, implementation, verification, and explicit human gates. Use when the user explicitly invokes $devweave for a new project, feature, refactor, bug, or Wiki bootstrap, or when a managed repository request would modify product code, tests, schemas, dependencies, build, or CI configuration.
 ---
 
 # DevWeave
 
-Use DevWeave as the repository's SDLC router. Keep machine state in the Python engine; create requirements, design, implementation, and acceptance content yourself. Communicate with the user in Traditional Chinese unless they request another language.
+Use DevWeave as the repository's sole SDLC router. Keep machine state in the Python engine, keep human-facing artifacts and Gate summaries in Traditional Chinese unless requested otherwise, and treat companion Skills as phase methods rather than lifecycle owners.
 
 ## Activation boundary
 
 1. Check for `.devweave/project.json` at the Git repository root.
-2. If it does not exist, activate only for an explicit `$devweave` request. For an explicit request, run `init`, inspect the repository for likely build/test/lint/typecheck commands, propose those commands, and start the requested work item. Initialization also installs a non-destructive root `wiki/` skeleton.
-3. If it exists and `managed` is true, activate implicitly for requests that would modify product code, tests, schemas, dependencies, build configuration, or CI configuration.
-4. Do not create a work item for read-only exploration, explanation, status reporting, or review. Do not take over Git operations such as branching, committing, worktrees, or pushing.
+2. Without a project file, activate only for an explicit `$devweave` request. For `new`, `feature`, `refactor`, or `bug`, run `init`, inspect likely build/test/lint/typecheck commands, configure the commands, then run `start` before the first `status`.
+3. With `managed: true`, activate implicitly for requests that modify product code, tests, schemas, dependencies, build configuration, or CI configuration. Read-only exploration, explanation, status reporting, and review do not create a work item.
+4. Keep Git ownership with the user: do not create branches, worktrees, commits, pushes, pull requests, or remote-tracker records.
 
 The public chat surface is:
 
@@ -38,6 +38,10 @@ For an explicit `new`, `feature`, `refactor`, or `bug` request in an uninitializ
 
 For `$devweave wiki bootstrap`, run `knowledge bootstrap` without a scope argument. Report `already_complete` without creating a work item; otherwise use the returned created or resumed standard feature work item, bind it, and continue through the same G1/G2/G3 protocol. Bootstrap explores the whole repository, changes no product source, selects three to five high-value content pages in G2, and writes Wiki only in G3.
 
+## Operating sequence
+
+For every active turn, resolve the work item, bind the session, read the single phase reference returned by `instructions`, complete that phase's artifact and CLI state, run its validation, and stop at the next human Gate. Treat a turn as complete only when the phase reference's completion criterion passes and the next action is either an approved Gate or an explicit stop for human input.
+
 ## Engine protocol
 
 Run the engine from the repository root:
@@ -50,14 +54,18 @@ Every engine response is JSON. Treat a nonzero exit code or `"ok": false` as a b
 
 For every active turn:
 
-1. Run `status --work <id>` if an ID is known; otherwise run `status`. If resolution is ambiguous, present the returned candidates and ask the user to choose.
-2. Run `bind --work <id>` so the hook can bind the current Codex session. Never fabricate a session ID.
-3. Run `instructions --work <id>`.
-4. Read only the `reference` returned by `instructions`; then follow its completion criteria. Read [profiles.md](references/profiles.md) only when the current phase requires entry-specific or risk-specific rules.
-5. Run `validate --work <id>` before presenting any approval summary.
-6. Stop for explicit human approval at G1, G2, and G3. Run `approve` only after the user clearly approves the current gate.
+1. Resolve with `status --work <id>` or `status`. If several candidates remain, show their IDs, titles, kinds, phases, and statuses and ask the user to choose.
+2. Run `bind --work <id>` and never fabricate a session ID. Treat the session as trusted only when the PreToolUse hook confirms the work ID; `awaiting_hook` means the guard may be untrusted.
+3. Run `instructions --work <id>` and read only its returned `reference`. Read [profiles.md](references/profiles.md) only when profile or risk rules are needed.
+4. Complete the phase artifact and CLI state/evidence, then run `validate --work <id>` before presenting an approval summary.
+5. Stop for explicit human approval at G1, G2, and G3. Run `approve` only after the user clearly approves the current gate.
 
-Consider a session bound only when the PreToolUse hook returns additional context confirming the work ID, or when an integration supplies a real `--session-id` and the CLI returns `status: bound`. A plain CLI response with `status: awaiting_hook` means the request was issued but the guard binding was not observable. Report that the hook may be untrusted or disabled; never claim the guardrail is active without confirmation.
+## Phase routing
+
+- **G1 requirements:** read Wiki-first context, inspect accepted baseline and the smallest necessary source ranges, then use `grill-me`/`grilling` for material requirements decisions. Produce complete `brief.md` and `requirements.md`, record risk and scope, validate `scope`, and stop at the Gate.
+- **G2 design:** keep Wiki read-only, use `codebase-design` vocabulary for module, interface, seam, adapter, depth, locality, and test surface, compare viable options, complete `design.md` and immutable `plan.md`, validate `build`, and stop before product-code or tracked-test changes.
+- **Implementation:** use the CLI task loop in dependency order. With current G2, use `tdd` for red → minimal green vertical slices and `diagnosing-bugs` for approved diagnosis work. Keep Wiki read-only and record targeted evidence.
+- **G3 verification:** inspect the complete diff, run every command required by the risk profile, reconcile scope/baseline/evidence, complete `acceptance.md`, and finish the Knowledge Review. Standard and low-risk work do not start the independent reviewer; high-risk work uses exactly one isolated read-only reviewer through the existing router and machine-only `review record` boundary.
 
 ## Interactive decision protocol
 
@@ -71,6 +79,8 @@ Facts and decisions have different handling:
 - Return user answers to the current phase artifacts: G1 to `brief.md`/`requirements.md`, G2 to `design.md`/`plan.md`. Do not create a second spec, question ledger, or conversation state.
 - If an answer changes an approved requirement, design, scope, or task, use `revise` from the earliest affected phase and wait for the invalidated Gate to be reapproved.
 
+The decision loop is complete when every material decision has a recorded answer or an explicit unresolved blocker, the answer is returned to the current artifact, and the relevant Gate summary reflects the current evidence. Silence, an inferred answer, or Codex's recommendation never closes the loop.
+
 ## Wiki-first knowledge discipline
 
 - In G1, read `wiki/index.md` first and then at most five related pages. Record the complete read set with `knowledge context`, including each page's status, content hash, and source fingerprint. Record a gap before source fallback for missing, placeholder, stale, contradictory, or insufficient knowledge, then inspect only the smallest necessary raw-source range. Current source behavior and approved DevWeave artifacts win conflicts.
@@ -80,6 +90,8 @@ Facts and decisions have different handling:
 - In verification, every new-format work item must record `knowledge review --disposition promote|no-update --rationale <text>`. Product-source fingerprint changes invalidate the review and plan. Legacy work items remain compatible and are not retrospectively blocked.
 - Use `promote` for durable reusable knowledge. Record a non-empty plan with one to five content-page upserts/deletes, refresh or delete every affected page, and cover durable uncovered changes with one or more pages rather than one page per file. Use `knowledge scaffold` for a planned new page, replace its placeholder content, update coupled `wiki/index.md` and `wiki/log.md`, append one work-attributed `promote` entry, and seal every upsert plus index/log.
 - Use `no-update` only for non-bootstrap work with no affected page, no Wiki diff, and a non-empty rationale. Critical lint, placeholders or template tokens on seal targets, undeclared Wiki changes, unrefreshed affected pages, rewritten log history, more than five content targets, or an incomplete bootstrap block G3; unrelated warnings are reported without blocking.
+
+The knowledge branch is complete only when its ordered context or current promotion plan is recorded, every required page obligation is covered, and the corresponding fingerprint remains current at validation.
 
 When starting work, use `start --kind new|feature|refactor|bug --title <title>`. Set risk with `risk`, scope with `scope`, verification commands with `command set`, tasks with `task`, evidence with `evidence add` or `verify`, baseline decisions with `baseline`, and rejection/rework with `revise`. `scope` replaces the complete scope set: pass every path in one call by repeating `--path`, for example `scope --path src --path tests`. Close only after G3 is current and approved.
 
@@ -95,6 +107,8 @@ When starting work, use `start --kind new|feature|refactor|bug --title <title>`.
 - G1 fingerprints the recorded knowledge context. Product verification excludes `wiki/`; G3 separately fingerprints the knowledge tree and promotion ledger.
 - Any stale fingerprint means the previous approval or evidence is no longer valid. Return to the earliest phase reported by `instructions` and do not bypass it with manual state edits.
 - Waivers must be explicit, narrow, justified, attributable, and accepted by the relevant gate. A waiver is not a generic substitute for missing validation.
+
+G3 is complete only when the current acceptance artifact, task/evidence graph, source and knowledge fingerprints, baseline decisions, scope diff, Knowledge Review, and required command results all reconcile successfully and explicit human approval has been recorded.
 
 Use the current phase reference:
 

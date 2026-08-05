@@ -5,15 +5,19 @@ description: Diagnosis loop for hard bugs and performance regressions. Use when 
 
 # Diagnosing Bugs
 
-A discipline for hard bugs. Skip phases only when explicitly justified.
+A deterministic discipline for hard bugs and performance regressions. Use the phase order unless the current artifact records a concrete reason to skip a phase.
 
-When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
+When exploring the codebase, read an existing `CONTEXT.md` and relevant ADRs when they exist, while following the current DevWeave Wiki/source precedence. Create no parallel context or decision document.
+
+## DevWeave boundary
+
+In a managed repository, resolve the current work item and phase before changing anything. During G1/G2, build the feedback loop with existing commands, temporary files, or `.devweave/cache` harnesses; create or modify a tracked regression test only after current G2 approval. Return hypotheses, reproduction evidence, root cause, and cleanup results to the current DevWeave artifact/evidence. A discovered requirement, design, scope, or task change goes through `devweave revise`.
 
 ## Phase 1 — Build a feedback loop
 
-**This is the skill.** Everything else is mechanical. If you have a **tight** pass/fail signal for the bug — one that goes red on _this_ bug — you will find the cause; bisection, hypothesis-testing, and instrumentation all just consume it. If you don't have one, no amount of staring at code will save you.
+**This is the skill.** Everything else is mechanical. A **tight** pass/fail signal for the bug — one that goes red on _this_ bug — turns bisection, hypothesis-testing, and instrumentation into useful probes; a theory without that signal remains unverified.
 
-Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give up.**
+Spend disproportionate effort here. Make the loop specific, fast, deterministic, and agent-runnable.
 
 ### Ways to construct one — try them in roughly this order
 
@@ -89,7 +93,7 @@ Each hypothesis must be **falsifiable**: state the prediction it makes.
 
 If you cannot state the prediction, the hypothesis is a vibe — discard or sharpen it.
 
-**Show the ranked list to the user before testing.** They often have domain knowledge that re-ranks instantly ("we just deployed a change to #3"), or know hypotheses they've already ruled out. Cheap checkpoint, big time saver. Don't block on it — proceed with your ranking if the user is AFK.
+**Show the ranked list to the user before testing.** Their domain knowledge can re-rank it; when no answer arrives, continue with the recorded ranking because hypotheses are not approvals.
 
 ## Phase 4 — Instrument
 
@@ -99,13 +103,15 @@ Tool preference:
 
 1. **Debugger / REPL inspection** if the env supports it. One breakpoint beats ten logs.
 2. **Targeted logs** at the boundaries that distinguish hypotheses.
-3. Never "log everything and grep".
+3. Use targeted logs at distinguishing boundaries; broad logging obscures the signal.
 
-**Tag every debug log** with a unique prefix, e.g. `[DEBUG-a4f2]`. Cleanup at the end becomes a single grep. Untagged logs survive; tagged logs die.
+**Tag every debug log** with a unique prefix, e.g. `[DEBUG-a4f2]`. Cleanup can search for the unique prefix, so tagged logs are easy to remove without disturbing unrelated output.
 
 **Perf branch.** For performance regressions, logs are usually wrong. Instead: establish a baseline measurement (timing harness, `performance.now()`, profiler, query plan), then bisect. Measure first, fix second.
 
 ## Phase 5 — Fix + regression test
+
+In a managed repository, current G2 approval is the boundary: before G2, keep the minimized repro in temporary or cache evidence; after G2, convert it to a tracked regression test before applying the fix.
 
 Write the regression test **before the fix** — but only if there is a **correct seam** for it.
 
@@ -127,8 +133,12 @@ Required before declaring done:
 
 - [ ] Original repro no longer reproduces (re-run the Phase 1 loop)
 - [ ] Regression test passes (or absence of seam is documented)
-- [ ] All `[DEBUG-...]` instrumentation removed (`grep` the prefix)
+- [ ] All `[DEBUG-...]` instrumentation removed (search the prefix)
 - [ ] Throwaway prototypes deleted (or moved to a clearly-marked debug location)
-- [ ] The hypothesis that turned out correct is stated in the commit / PR message — so the next debugger learns
+- [ ] The hypothesis that turned out correct is recorded in the current acceptance/evidence artifact; include it in a commit or PR only when that workflow is explicitly authorized
 
-**Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) hand off to the `/improve-codebase-architecture` skill with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
+**Then ask: what would have prevented this bug?** If the answer requires architectural change, record a follow-up recommendation with the specifics and use the approved `codebase-design` method or `devweave revise` in a later authorized work item. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
+
+## Completion criterion
+
+The diagnosis is complete when the original red-capable loop is green, the minimized regression passes or the absence of a correct seam is documented, all debug instrumentation and throwaway harnesses are removed or explicitly retained, and the root cause plus preventive recommendation are recorded in the current DevWeave acceptance/evidence artifact.

@@ -11,7 +11,8 @@
 - Independent Review safety：report 只可從 work-item incoming containment 讀取，受 fixed JSON、UTF-8、size bound、AC/TASK validation、secret redaction、SHA-256、source fingerprint 與 Git HEAD provenance 保護；critical finding 必須 exact named `review-critical` acceptance waiver。
 - Review compatibility：schema version 1 additive nested review metadata；legacy evidence 可讀但不能冒充 current high-risk review，standard/low risk 不產生 reviewer requirement。
 - Bounded knowledge：G1 固定 index 加最多五個內容頁，每個 Wiki page 最多五個 sources，每次 promotion 最多五個 content targets；不加入 vector/FTS/token measurement runtime。
-- Instruction safety：repository contract 固定唯一 `devweave` router、精確五個 companion allowlist、folder/frontmatter identity、local-link containment 與 root precedence policy。
+- Instruction safety：repository contract 固定唯一 `devweave` router、精確五個 companion allowlist、folder/frontmatter identity、local-link containment、root precedence policy，並將 `writing-great-skills` 標記為 maintenance-only exclusion。
+- Skill predictability：repository contract 檢查六個受治理 Skill 的 frontmatter/metadata、`devweave` implicit invocation、`grill-me` disabled implicit invocation 與必要 `disable-model-invocation` 欄位；UTF-8 quick validation、隔離 forward-test 與 stale-reference scan 檢查 phase routing、G1/G2 stop、public seam、independent oracle、red-capable loop 與 completion criteria。
 - Supply-chain traceability：`skills-lock.json` 記錄每個 upstream source、skillPath 與 computed hash；更新只能在新的 DevWeave feature 中人工觸發與檢閱。
 - Extension bootstrap safety：manifest destinations/source 必須 repo-relative 且不重複；每個 bundled source 驗證 SHA-256/byte length；ancestor symlink、非預期 type、content conflict 與 malformed bundle 均在寫入前拒絕。所有 repository write 只存在於確認後的 VS Code filesystem adapter，rollback 只刪除本次建立的 files；semantic adoption 只限七個明確資料 contract。
 - Extension bootstrap compatibility：同 bytes 採用、合法 evolved project/baseline/Wiki bytes 列 adopted、重跑回報 idempotent、Windows/POSIX relative paths canonicalize 成相同 targets；既有合法或 critical-diagnostic project 不會由 initialize 自動修復。
@@ -21,10 +22,11 @@
 
 ## Verification Commands
 
-- `python -B -m unittest discover -s tests -v`：94 項通過、1 項因 Windows symlink privilege skip，包含 Wiki reserved preflight、bootstrap G1→G3、review/no-update、context currentness、coverage、九種 scaffold、seal、CLI/guard、legacy 與 repository contract coverage。
-- Repository contract tests：7 項通過，包含 single-router Codebase Wiki 閉環文件契約。
+- `python -B -m unittest discover -s tests -v`：96 項通過、1 項因 Windows symlink privilege skip，包含 Wiki reserved preflight、bootstrap G1→G3、review/no-update、context currentness、coverage、九種 scaffold、seal、CLI/guard、legacy 與 repository contract coverage。
+- Repository contract tests：11 項通過，包含 single-router Codebase Wiki 閉環、maintenance-only exclusion、metadata 與 invocation policy 契約。
 - `npx skills@latest list -a codex`：只列出唯一 local `devweave` router 與五個 `mattpocock/skills` companions。
-- `python -B <skill-creator>/scripts/quick_validate.py .agents/skills/devweave`：通過。
+- `python -X utf8 -B <skill-creator>/scripts/quick_validate.py`：`devweave`、`codebase-design`、`diagnosing-bugs`、`grilling`、`tdd` 通過；`grill-me` 保留必要的 `disable-model-invocation`，由 repository contract 補驗目前 validator 未支援的欄位。
+- Isolated forward-test：通過 managed Wiki-first feature、G1 one-question grilling、G2 interface/seam/adapter design、bug red-capable/G2 regression boundary 與 TDD public-seam independent-oracle vertical-slice scenarios。
 - `git diff --check`：無 whitespace error；Windows checkout 僅回報既有 LF/CRLF conversion warnings。
 - `vscode-extension/npm.cmd run test`：73 項通過，涵蓋 PreviewGate 的結構化 typed-intent 比較與控制字元拒絕、actionPreview protocol、Wiki DOM mount、ARIA/keyboard、legacy/multi-work、shared semantic validator、BootstrapInstaller、prompt 與 security regression。
 - `vscode-extension/npm.cmd run typecheck`：通過；`npm.cmd run package` 產生 0.2.1 production bundle，manifest 具 57 bootstrap files、117 VSIX entries，source hash/length、bundle version 與 compatibility declarations 全數匹配，並保留 0.2.0/0.1.0 artifacts。
@@ -37,9 +39,11 @@
 - Python 3.11+、Git repository、UTF-8、無第三方 runtime dependencies。
 - Source pages 預期維持 1–5 個核心 sources；health payload 限制 page/finding summaries 數量。
 - Repository 必須信任 hook；外部 editor 或停用 hook 的修改只能在 G3 reconciliation 被偵測。
-- 完整 94 項 Windows suite 在目前環境約 227 秒內完成；其中一項既有 symlink privilege case skip；`unit-tests` verification timeout 為 360 秒以保留合理環境抖動餘裕。
+- 完整 96 項 Windows suite 在目前環境約 230 秒內完成；其中一項既有 symlink privilege case skip；`unit-tests` verification timeout 為 360 秒以保留合理環境抖動餘裕。
 - Companion Skills 僅增加 Markdown、YAML 與一個未自動執行的 Bash template；Node.js／npx 與 network 只在人工安裝或更新時需要，不是 DevWeave runtime dependency。
 - Extension bootstrap 的 VSIX package source 是 build-time source-derived；runtime 僅使用內嵌 manifest/resource reader 與 VS Code workspace API，不啟動 Python、shell、Git、network 或任意 child process。
+
+Skill overlay provenance：`20260805-081842-feature-skills-writing-great-skills`（待 G3 核准）；上游五 companion 的 source/path/hash 仍以未修改的 `skills-lock.json` 為準。
 
 Provenance: `20260802-200224-feature-wiki-first`（待 G3 核准）。
 

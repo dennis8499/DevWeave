@@ -1,12 +1,12 @@
 ---
 title: DevWeave Knowledge Workflow
 type: architecture
-sources: [.agents/skills/devweave, AGENTS.md, README.md, docs/使用手冊.md, vscode-extension]
-last_updated: 2026-08-04
+sources: [.agents/skills, AGENTS.md, skills-lock.json, tests/test_repository_contract.py, vscode-extension/esbuild.mjs]
+last_updated: 2026-08-05
 tags: [architecture]
 status: active
-source_fingerprint: "sha256:cc55b453b85cb27f69a6543576a74ed20186931b4f76c1595a05b982018dd389"
-verified_by: 20260804-205655-feature-devweave-0-2-1-windows
+source_fingerprint: "sha256:73659abd2a990a8fa75a0352292e9b51b1cec70cd533d085dc437e830cb8c70e"
+verified_by: 20260805-081842-feature-skills-writing-great-skills
 ---
 
 # DevWeave Knowledge Workflow
@@ -14,6 +14,14 @@ verified_by: 20260804-205655-feature-devweave-0-2-1-windows
 ## Context
 
 DevWeave 將 Codebase Wiki 納入既有 Work Item lifecycle，而不是建立第二套 Wiki skill 或背景索引服務。Wiki 提供快速定位入口；source 與已核准 artifacts 仍是權威事實來源。互動式 G1/G2 問答是 router 與 phase guidance 的決策協作規則，不是另一個 lifecycle 或 engine state。
+
+## Companion Skill routing and completion
+
+`devweave` 先決定 managed work item、session binding、current phase 與 human Gate；companion Skills 只在該 phase 內提供方法。G1 由 `grill-me`/`grilling` 逐題處理 material requirements，選項以推薦答案、trade-off 與 `Other` 返回使用者；G2 由 `codebase-design` 固定 module/interface/seam/depth/locality/test-surface，只有 current G2 後 `tdd` 才能以 public seam 執行 red → minimal green vertical slices，bug diagnosis 則維持 red-capable loop 並在 G2 前使用 temporary/cache repro。每個 Skill 的答案、假設、設計與 evidence 回到當前 DevWeave artifact；新決策以 `revise` 回到最早受影響 phase。
+
+`writing-great-skills` 是 maintenance-only overlay，不是 router 或 companion；它不在精確五個 companion allowlist、`skills-lock.json` 五筆 upstream set 或 Extension bootstrap bundle 中。五個 companion 的 upstream source/path/computedHash 保持 lock provenance 不變，local optimization 只整理 description、progressive disclosure、positive steering、completion criteria、metadata 與 phase boundaries。
+
+Repository contract 以 exact six-governed-Skill set、frontmatter identity、relative-link containment、`devweave` implicit invocation、`grill-me` disabled implicit invocation 與 `disable-model-invocation` policy 補充驗證；UTF-8 quick validation、isolated forward-test、unit/Extension package/smoke/tests/typecheck 與 `git diff --check` 提供 current evidence。這個 overlay 不新增 public CLI、JSON schema、router、state、ledger 或 Git mutation。
 
 ## Components and Data Flow
 

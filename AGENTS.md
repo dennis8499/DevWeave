@@ -37,7 +37,7 @@ The single PreToolUse hook is a Codex guardrail, not an operating-system sandbox
 
 ## Companion engineering skills
 
-DevWeave remains the sole SDLC router. The only approved project-local companion skills are `grill-me`, `grilling`, `codebase-design`, `diagnosing-bugs`, and `tdd`. They provide methods inside the current DevWeave phase; they never create a parallel work-item lifecycle or replace DevWeave artifacts, state, evidence, or human gates.
+DevWeave remains the sole SDLC router. The only approved project-local companion skills are `grill-me`, `grilling`, `codebase-design`, `diagnosing-bugs`, and `tdd`. They provide methods inside the current DevWeave phase; they never create a parallel work-item lifecycle or replace DevWeave artifacts, state, evidence, or human gates. The maintenance-only `writing-great-skills` Skill helps maintain these instructions; it is outside the five-companion allowlist, never routes work, and is excluded from product SDLC behavior.
 
 DevWeave instructions take precedence whenever a companion skill conflicts with repository policy:
 

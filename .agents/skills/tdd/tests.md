@@ -20,7 +20,9 @@ Characteristics:
 - Uses public API only
 - Survives internal refactors
 - Describes WHAT, not HOW
-- One logical assertion per test
+- One behavior per test; multiple assertions are appropriate when they establish that one behavior.
+- The expected result comes from an independent oracle such as a known-good literal, worked example, specification, or trusted fixture.
+- The test observes the behavior through the approved public seam and does not use a side channel to inspect implementation state.
 
 ## Bad Tests
 

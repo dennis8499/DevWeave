@@ -59,3 +59,10 @@ Bootstrap provenance: `20260803-112312-feature-vs-code-devweave`（待 G3 核准
 Codebase LLM Wiki provenance: `20260803-161041-feature-codebase-llm-wiki`（待 G3 核准）。
 
 Independent Review provenance: `20260804-122803-feature-g3-review-agent`（待 G3 核准）。
+
+## Skill Governance Overlay
+
+- DevWeave 仍是唯一 SDLC router；`codebase-design`、`diagnosing-bugs`、`grill-me`、`grilling` 與 `tdd` 是唯一五個 project-local companion allowlist，僅提供 current phase method，不建立第二套 lifecycle。
+- `writing-great-skills` 是 maintenance-only Skill：可協助維護 Skill instructions，但不屬於 companion allowlist、Extension bootstrap bundle 或 product SDLC routing。
+- 五個 companion 是保留 upstream `source`、`skillPath` 與 `computedHash` 的 local optimization overlay；`skills-lock.json` 是 provenance authority，最佳化文字不冒充 upstream release。
+- Skill completion 以可檢查的 phase boundary、public seam、decision return、evidence、metadata/invocation policy 與 explicit completion criterion 為治理契約；不新增 public CLI、JSON schema、router、state、ledger 或 Git 操作。

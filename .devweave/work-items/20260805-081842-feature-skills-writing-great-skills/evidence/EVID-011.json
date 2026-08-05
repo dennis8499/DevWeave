@@ -1,0 +1,28 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005"
+  ],
+  "created_at": "2026-08-05T00:51:21+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "27ca18f67c87c464c61d22241023e6424fe20947",
+  "id": "EVID-011",
+  "kind": "regression",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "0531966d5288afe8e5fb06b272097e9bfa0f4eb60c8cea441cecb439e9e3d543",
+  "stale": false,
+  "status": "passed",
+  "summary": "TASK-005 完整驗證集合通過：UTF-8 quick_validate（五個 validator valid，grill-me 的必要 disable-model-invocation 由 contract 補驗）、repository contract 11 tests、隔離唯讀 forward-test、unit-tests 96 tests（1 skipped）、Extension package/VSIX verification、Extension smoke、Extension tests 73/73、Extension typecheck、git diff --check，以及 writer/skills-lock provenance hash unchanged。",
+  "tasks": [
+    "TASK-005"
+  ]
+}

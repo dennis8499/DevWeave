@@ -1,0 +1,25 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-002",
+    "AC-005"
+  ],
+  "created_at": "2026-08-05T00:50:28+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "27ca18f67c87c464c61d22241023e6424fe20947",
+  "id": "EVID-010",
+  "kind": "correction",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "0531966d5288afe8e5fb06b272097e9bfa0f4eb60c8cea441cecb439e9e3d543",
+  "stale": false,
+  "status": "passed",
+  "summary": "更正 EVID-009 文字：repository contract 並未透過 DevWeave verify 產生 EVID-011；TASK-004 已直接執行 tests.test_repository_contract，共 11 tests 全部通過。quick_validate 的 grill-me 欄位例外由該 11-test contract 補驗。",
+  "tasks": [
+    "TASK-005"
+  ]
+}

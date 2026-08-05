@@ -1,12 +1,12 @@
 ---
 title: Knowledge Engine
 type: module
-sources: [.agents/skills/devweave/assets/wiki/templates, .agents/skills/devweave/scripts, tests, vscode-extension]
-last_updated: 2026-08-04
+sources: [.agents/skills, .agents/skills/devweave/assets/wiki/templates, .agents/skills/devweave/scripts, tests/test_repository_contract.py, vscode-extension/esbuild.mjs]
+last_updated: 2026-08-05
 tags: [module]
 status: active
-source_fingerprint: "sha256:f65e2279e62f1a8e493e9a3d799a4806cfa066db3b370dd2dce0df2d70200838"
-verified_by: 20260804-205655-feature-devweave-0-2-1-windows
+source_fingerprint: "sha256:63cf5c851e6abf0720d8e749a1eea3455ddca3e1e3edb21c1a1bceefa584856a"
+verified_by: 20260805-081842-feature-skills-writing-great-skills
 ---
 
 # Knowledge Engine
@@ -56,6 +56,12 @@ Release verification 將這個 boundary 綁到 current source fingerprint：Exte
 ## Lifecycle boundary
 
 DevWeave 仍是唯一 router；Companion Skills 是階段內方法，不建立第二套 work-item lifecycle、artifact set 或 approval protocol。`diagnosing-bugs` 仍限於既有診斷階段，`tdd` 仍只能在 current G2 approval 後的 implementation 使用。此互動規則不新增 CLI、JSON schema、ledger 欄位或 VS Code UI。
+
+## Skill governance boundary
+
+Engine 以 repository contract 投影精確六個受治理 Skill：唯一 `devweave` router 加五個 companion。`writing-great-skills` 僅是 maintenance-only instruction overlay，不進 companion allowlist、lock provenance 或 Extension bootstrap bundle。五個 companion 的 upstream source/path/computedHash 維持 `skills-lock.json` 原值；local optimization 不改寫 upstream provenance。
+
+Skill quality checks 是 engine 外的 repository contract 與 UTF-8 validator 輸入：frontmatter identity、metadata、relative links、implicit invocation policy、單題決策、G1/G2 stop、public seam、red-capable repro、independent oracle 與 completion criteria。`grill-me` 的 `disable-model-invocation` 是必要 metadata，validator 不支援時由 contract 補驗；不因此增加 machine lifecycle state 或 public command。
 
 ## Extension integration boundary
 

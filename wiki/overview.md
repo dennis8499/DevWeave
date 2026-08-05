@@ -1,12 +1,12 @@
 ---
 title: DevWeave Codebase Overview
 type: overview
-sources: [.agents/skills/devweave/SKILL.md, AGENTS.md, README.md, docs/使用手冊.md, vscode-extension/README.md]
-last_updated: 2026-08-04
+sources: [.agents/skills, AGENTS.md, skills-lock.json, tests/test_repository_contract.py, vscode-extension/esbuild.mjs]
+last_updated: 2026-08-05
 tags: [overview]
 status: active
-source_fingerprint: "sha256:e3ef6fe76b1f0a946d321b1a8b26e3d14d72a39eeaabc49bae97342e461ba406"
-verified_by: 20260804-205655-feature-devweave-0-2-1-windows
+source_fingerprint: "sha256:73659abd2a990a8fa75a0352292e9b51b1cec70cd533d085dc437e830cb8c70e"
+verified_by: 20260805-081842-feature-skills-writing-great-skills
 ---
 
 # DevWeave Codebase Overview
@@ -56,3 +56,11 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 - Current source behavior 與已核准 DevWeave artifacts 優先於 Wiki；衝突保留為 gap。
 - Wiki 是可重建的 source-bound 知識快取，不是產品事實的最終權威。
 - 探索上限是 index 加五個內容頁；系統不加入向量資料庫、全文索引或 Token 計量，也不宣稱精確節省數字。
+
+## Skill governance overlay
+
+本 Work Item 將 Skill instructions 視為可治理的 repository policy overlay。`devweave` 是唯一 router；`codebase-design`、`diagnosing-bugs`、`grill-me`、`grilling`、`tdd` 是唯一五個 companion allowlist，提供目前 phase 的方法並把結果回流既有 artifact/evidence。`.agents/skills/writing-great-skills` 是 maintenance-only：它不進 companion allowlist、不進 Extension bootstrap bundle，也不建立工作流程。
+
+五個 companion 的 local optimization 保留 `skills-lock.json` 的 upstream source、skillPath 與 computed hash；local wording 是 overlay，不冒充 upstream release。Skill body 以 trigger branch、progressive disclosure、Wiki/phase precedence、停止條件與可檢查 completion criterion 組成；`grill-me` 維持 user-only invocation，`devweave` 維持 implicit invocation。這些修改沒有新增 CLI、JSON schema、router、state、ledger、branch、commit 或 PR 行為。
+
+品質檢查包含 UTF-8 quick validation、repository contract 的 exact six-governed-Skill set、frontmatter/metadata/link/invocation policy、maintenance-only/bootstrap exclusion、隔離 forward-test，以及 Python/Extension full verification。validator 尚未支援的 `disable-model-invocation` 欄位由 repository contract 補驗，並保留 `grill-me` 的必要 policy。
