@@ -24,7 +24,7 @@ DevWeave 以單一 `$devweave` router，讓 Codex 在 repository 內以可追溯
 - Project initialization 在任何 `.devweave` control write 前完成 Wiki reserved-starter preflight；custom-only Wiki 會補齊缺少 starter，錯誤 reserved path 會回報 `knowledge_conflict` 且不留下 partial control bundle。
 - Extension 對 project、三份 baseline 與三份 Wiki starter 採 destination-specific semantic adoption；AGENTS、skills、hook、lock 與其他 policy controls 仍維持 exact bytes。
 - Extension 的公開下拉、Knowledge recommendation CTA 與 Command Palette `DevWeave: Bootstrap Codebase Wiki` 共用同一 prompt-only intent，精確產生 `$devweave wiki bootstrap`；Extension 不執行 CLI、不寫 live Wiki。
-- 0.2.1 Windows 公開版正式支援 Windows、VS Code 1.90+、Python 3.11+、Git 與 Codex；交付 repository 與 `devweave-control-center-0.2.1.vsix`，不包含 Marketplace 上架或 macOS/Linux 支援承諾，`0.2.0` 與 `0.1.0` VSIX bytes 保留作為回退。
+- 本次只提供 `devweave-control-center-0.2.1.vsix`。認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；VS Code 1.90+、Python 3.11+ 是技術門檻，不代表其他組合已完成本次認證。發布事故時停止散布並停用或解除安裝 0.2.1，保留 `.devweave`、Wiki、workspace snapshot 與 logs，以新版本修復；不提供舊版 binary rollback。
 - Control Center 的 workflow mutation 永遠先 Preview，再由使用者確認複製到 Codex Chat；Refresh、初始化、work selection 或 snapshot revision 更新後，舊 prompt 必須重新預覽。`devweave.copyNextAction` 保留 command ID 但只開啟 Control Center，多 active work 必須明確選取，`status` 可查詢全部 active work。
 - 首次初始化採使用者確認、non-overwrite、semantic adoption 與 fail-closed rollback；取消、conflict 或 write failure 不留下 partial control bundle。Control Center 提供 Wiki DOM 搜尋、ARIA/keyboard tabs、focus restore、繁中 primary UI 與 embedded Windows release help。
 

@@ -46,7 +46,7 @@ Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；`devweave.p
 - Control Center 對 high-risk acceptance 投影 `Independent Review` readiness：missing/unavailable/advisory 為 attention，critical 為 not-ready，passed 且 source current 才為 ready；Extension 不啟動 Agent、engine、shell、Git、network 或 lifecycle mutation。
 - Activity Bar TreeView 提供 repository/work-item navigation；Dashboard/Webview 提供 welcome、doctor、phase/gate、task/evidence、Wiki-first、acceptance 與唯讀 audit projection。多 work item 必須明確選取，不以第一筆資料默選。
 - UI 使用 VS Code theme tokens、Codicons、CSP、ARIA/focus、high-contrast、reduced-motion 與非色彩單獨狀態表達；主要內容保持不透明，僅在控制項使用輕微透明效果。
-- `extension-typecheck`、`extension-tests`、`extension-package` 與 `extension-smoke` 透過 DevWeave command profiles 管理；Extension 不提供 branch、commit、push、PR、Marketplace release、版本比較或還原。0.2.1 package verifier 必須同時確認 0.2.0/0.1.0 rollback artifacts retention。
+- `extension-typecheck`、`extension-tests`、`extension-package` 與 `extension-smoke` 透過 DevWeave command profiles 管理；Extension 不提供 branch、commit、push、PR、Marketplace release、版本比較或還原。0.2.1 package verifier 只讀取 current VSIX，並對 package／bundle version、58 個 bootstrap files、118 個 VSIX entries、required entries、每個 bundled source 的 byte length／SHA-256 及 current artifact SHA-256 fail closed；其他 VSIX 不屬於輸入或回復條件。
 
 Provenance: `20260802-200224-feature-wiki-first`（待 G3 核准）。
 

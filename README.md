@@ -37,7 +37,7 @@ G3 功能驗收：acceptance、回歸測試、scope、Wiki／baseline
 
 ## 前置需求
 
-- 目前公開版支援範圍是 Windows；VS Code 1.90+、Python 3.11+、Git 與 Codex。
+- 技術門檻是 VS Code 1.90+、Python 3.11+、Git 與 Codex；這些是安裝／執行條件，不代表所有組合都已完成本次認證。
 - Git repository。
 - Python 3.11 或更新版本。
 - Codex CLI 或 VS Code Codex Extension。
@@ -49,9 +49,11 @@ hook、project state、Wiki 與 baseline 一起運作。
 
 ## Windows 公開版 0.2.1
 
-交付內容是 repository 與 `vscode-extension/devweave-control-center-0.2.1.vsix`。VSIX 可在 VS Code 的 Extensions 視窗使用「Install from VSIX…」安裝；安裝後開啟 DevWeave repository，即可從 Activity Bar 進入 Control Center。完整流程請看[繁體中文使用手冊](docs/使用手冊.md)與 [Control Center README](vscode-extension/README.md)。
+本次只提供 0.2.1 VSIX，交付檔為 `vscode-extension/devweave-control-center-0.2.1.vsix`。VSIX 可在 VS Code 的 Extensions 視窗使用「Install from VSIX…」安裝；安裝後開啟 DevWeave repository，即可從 Activity Bar 進入 Control Center。完整流程請看[繁體中文使用手冊](docs/使用手冊.md)與 [Control Center README](vscode-extension/README.md)。
 
-這個 release 不包含 Marketplace 上架，也不對 macOS/Linux 做支援承諾。舊版 `devweave-control-center-0.2.0.vsix` 與 `devweave-control-center-0.1.0.vsix` 會保留，必要時可在 VS Code 重新安裝 0.2.0 回退。
+本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；驗收基準為 Python full suite 98 項與 Extension unit tests 73 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻，不是本次已認證組合的宣告。這個 release 不包含 Marketplace 上架，也不對 macOS/Linux 做支援承諾。
+
+若發生發布事故，處理方式是立即停止散布並停用或解除安裝 0.2.1；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。應保留 workspace snapshot 與 logs，以新版本修復，不覆寫已發布的 0.2.1 artifact。
 
 Control Center 的公開操作都遵循「預覽 → 你確認複製 → Codex Chat 審閱並送出 → Refresh」；Refresh、切換 work 或 workspace snapshot 更新後，舊 prompt 必須重新預覽。`devweave.copyNextAction` 仍保留，但現在會開啟 Control Center；多個 active work 時必須先明確選取 work。
 

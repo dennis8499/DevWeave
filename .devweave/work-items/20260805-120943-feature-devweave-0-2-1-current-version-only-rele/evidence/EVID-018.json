@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "npm.cmd",
+    "run",
+    "package"
+  ],
+  "binds_current_source": true,
+  "command_id": "extension-package",
+  "covers": [
+    "AC-002",
+    "AC-003",
+    "AC-007"
+  ],
+  "created_at": "2026-08-05T05:51:42+00:00",
+  "cwd": "vscode-extension",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "git_head": "ce6d661a21530b20e9f23c43b0117c0a25175690",
+  "id": "EVID-018",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260805-120943-feature-devweave-0-2-1-current-version-only-rele/EVID-018.log",
+  "schema_version": 1,
+  "source_fingerprint": "c5895da4a8096f3885efb2221e7e7a5783a65e546d7f268e75df88c692185eba",
+  "stale": false,
+  "started_at": "2026-08-05T05:51:40+00:00",
+  "status": "passed",
+  "summary": "> devweave-control-center@0.2.1 package\n> node esbuild.mjs --production && node scripts/package-vsix.mjs && node scripts/verify-package.mjs\n\nCreated C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\devweave-control-center-0.2.1.vsix (277076 bytes, 118 entries)\nVerified 0.2.1: 58 bootstrap files and 118 VSIX entries. VSIX SHA-256: 3e23ba0a75b49dd4bfbb645d7296d68d5e882cf303078aeefdcf574c61530aba\n\n\n  dist\\extension.js  57.9kb\n\nDone in 11ms\n\n  dist\\webview\\main.js  75.6kb\n\nDone in 7ms",
+  "tasks": [
+    "TASK-001",
+    "TASK-004"
+  ],
+  "timed_out": false
+}

@@ -5,8 +5,8 @@ sources: [.agents/skills, .agents/skills/devweave/assets/wiki/templates, .agents
 last_updated: 2026-08-05
 tags: [module]
 status: active
-source_fingerprint: "sha256:34e108cb8f265da2bc7fa84eb13a87a765ce515d1b59febcc6bb7f855897b327"
-verified_by: 20260805-104700-bug-windows-codex-pretooluse-hook
+source_fingerprint: "sha256:604c782de6c4739f7684d56e57222e23d879c1a366784d3564eda88ba4707144"
+verified_by: 20260805-120943-feature-devweave-0-2-1-current-version-only-rele
 ---
 
 # Knowledge Engine
@@ -27,7 +27,7 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 - `init/start`：在 project lock 外與 lock 內做 Wiki reserved-starter preflight；missing、empty、custom-only root 可補 starter，reserved type/frontmatter conflict 以 `knowledge_conflict` fail closed，且不留下 partial `.devweave` control state。
 - machine-only `review record`：由既有 router 傳入固定 reviewer JSON report 與 opaque reviewer ID；只接受 high-risk G3 的 isolated/read-only review，產生 source-bound `kind: review` evidence 與 redacted report provenance，不是新的 public chat verb。
 
-0.2.1 Windows release 不新增 Python public command、CLI schema 或 engine lifecycle。Extension 的 PreviewGate、`actionPreview` protocol、legacy `copyNextAction` 與 Wiki DOM mount 都是 projection/client-side seams；Python engine 仍是 work state、multi-work `next/status --all`、bootstrap cancel/failure 與 gate/evidence 的權威來源。
+0.2.1 current-version-only release 不新增 Python public command、CLI schema 或 engine lifecycle。Repository contract 以既有 test surface 機械檢查 README、使用手冊、Extension README 與內嵌 Help 的單一 0.2.1 交付、限定認證環境、98 項 Python suite、73 項 Extension tests 與 data-preserving incident response；Extension 的 PreviewGate、`actionPreview` protocol、legacy `copyNextAction` 與 Wiki DOM mount 都是 projection/client-side seams。Python engine 仍是 work state、multi-work `next/status --all`、bootstrap cancel/failure 與 gate/evidence 的權威來源。
 
 Release verification 將這個 boundary 綁到 current source fingerprint：Extension bounded walkthrough 需覆蓋 fresh/evolved/conflict/rollback 與 multi-work selection，Python targeted fixtures 需確認 conflict 保留 user bytes；high-risk review 仍只能由 router 透過 machine-only `review record` 記錄，不能由 engine 或 Extension 自行啟動。
 

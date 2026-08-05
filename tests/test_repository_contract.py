@@ -9,7 +9,12 @@ import sys
 import unittest
 from pathlib import Path
 
-from devweave_test_support import REPOSITORY_ROOT, RepositoryHarness, SCRIPT_ROOT, core
+try:
+    from devweave_test_support import REPOSITORY_ROOT, RepositoryHarness, SCRIPT_ROOT, core
+except ModuleNotFoundError as error:
+    if error.name != "devweave_test_support":
+        raise
+    from tests.devweave_test_support import REPOSITORY_ROOT, RepositoryHarness, SCRIPT_ROOT, core
 
 
 COMPANION_SKILLS = {
@@ -390,7 +395,7 @@ class RepositoryContractTests(unittest.TestCase):
             report = core.doctor(harness.repo)
             self.assertTrue(report["ok"], report["checks"])
 
-    def test_codebase_wiki_closed_loop_is_documented_on_the_single_router(self) -> None:
+    def test_codebase_wiki_and_current_release_contracts_are_documented(self) -> None:
         documents = {
             ".agents/skills/devweave/SKILL.md": (
                 "$devweave wiki bootstrap",
@@ -454,6 +459,33 @@ class RepositoryContractTests(unittest.TestCase):
             for fragment in fragments:
                 self.assertIn(fragment, source, f"{relative}: {fragment}")
             self.assertNotIn("八個公開", source, relative)
+
+        release_surfaces = (
+            "README.md",
+            "docs/使用手冊.md",
+            "vscode-extension/README.md",
+            "vscode-extension/webview/help-content.ts",
+        )
+        release_contract = (
+            "本次只提供 0.2.1 VSIX",
+            "本次認證環境",
+            "Windows x64 build 10.0.26200／25H2",
+            "VS Code 1.131.0",
+            "Python 3.14.6",
+            "Git 2.51.0.windows.1",
+            "目前 Codex host",
+            "技術門檻",
+            "Python full suite 98 項",
+            "Extension unit tests 73 項",
+            "停止散布",
+            "停用或解除安裝 0.2.1",
+            "不會自動刪除 `.devweave`、Wiki 或 workspace 資料",
+        )
+        for relative in release_surfaces:
+            source = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+            for fragment in release_contract:
+                self.assertIn(fragment, source, f"{relative}: {fragment}")
+            self.assertNotRegex(source, r"\b0\.(?:1\.0|2\.0)\b", relative)
 
     def test_high_risk_review_stays_on_the_single_router_and_read_only_extension(self) -> None:
         router = (REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "SKILL.md").read_text(encoding="utf-8")

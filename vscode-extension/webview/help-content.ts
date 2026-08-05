@@ -24,10 +24,12 @@ export const helpContent: readonly HelpSection[] = [
     ]
   },
   {
-    title: "Windows 安裝與支援範圍",
+    title: "Windows 安裝與認證範圍",
     paragraphs: [
-      "0.2.1 正式支援 Windows、VS Code 1.90+、Python 3.11+、Git 與 Codex。請在 VS Code Extensions 的 `...` 選單選擇 Install from VSIX…，安裝 repository 內的 `devweave-control-center-0.2.1.vsix`，再從 Activity Bar 開啟 Control Center。",
-      "本公開版交付 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援；0.2.0 與 0.1.0 VSIX 會保留作為回退版本。"
+      "本次只提供 0.2.1 VSIX。請在 VS Code Extensions 的 `...` 選單選擇 Install from VSIX…，安裝 repository 內的 `devweave-control-center-0.2.1.vsix`，再從 Activity Bar 開啟 Control Center。",
+      "本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；驗收基準為 Python full suite 98 項與 Extension unit tests 73 項。",
+      "VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。本公開版不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。",
+      "若發生發布事故，立即停止散布並停用或解除安裝 0.2.1；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。"
     ]
   },
   {

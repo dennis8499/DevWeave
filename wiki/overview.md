@@ -5,8 +5,8 @@ sources: [.agents/skills, AGENTS.md, README.md, docs/使用手冊.md, tests/test
 last_updated: 2026-08-05
 tags: [overview]
 status: active
-source_fingerprint: "sha256:117a39898529b1997c82e3862c37b7d80b84bb3d6c5de28d5c5b41c6c2905ac2"
-verified_by: 20260805-104700-bug-windows-codex-pretooluse-hook
+source_fingerprint: "sha256:a2e67e3f7f0f6ffb73647a34ba487f7389953b8850876df90df9eb8b7986af80"
+verified_by: 20260805-120943-feature-devweave-0-2-1-current-version-only-rele
 ---
 
 # DevWeave Codebase Overview
@@ -21,7 +21,7 @@ DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router�
 4. G2 使用 `codebase-design` 在 Plan Mode 逐題確認重要設計取捨，採用同一套 native-first/fallback 問答規則；回答回流 `design.md`/`plan.md`，完成 `validate` 後展示方案、介面、失敗處理、回復方式與 task plan，等待明確 G2 approval。G2 前的普通/Skill context 若看不到工具，必須先回到 Plan Mode；G2 後普通模式只執行 approved tasks，新的 material decision 必須用 `revise` 回到最早受影響 phase。Wiki 在 verification 前保持唯讀。
 5. G3 驗證 current evidence、scope、baseline 與 Knowledge Review，確認實作符合已批准內容。新式 Work Item 必須選擇 `promote` 或 `no-update`；promote 最多變更五個內容頁並同步 index/log/seal。
 6. High-risk Work Item 在 final artifacts 穩定後由唯一 DevWeave router 啟動一個 isolated、read-only Independent Review Agent。Python engine 只接收 machine-only `review record`，保存 source-bound `kind: review` evidence、redacted report hash 與 provenance；standard/low risk 不啟動此 reviewer。
-7. 0.2.1 Windows 公開版交付 repository 與 VSIX，正式支援 Windows、VS Code 1.90+、Python 3.11+、Git 與 Codex；不包含 Marketplace 上架或 macOS/Linux 支援承諾。Control Center 的公開操作採 preview → 使用者確認複製 → Codex Chat handoff → Refresh，0.2.0 與 0.1.0 VSIX 保留作為回退。
+7. 本次 0.2.1 Windows 公開版只提供 `devweave-control-center-0.2.1.vsix`；認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host，VS Code 1.90+／Python 3.11+ 僅為技術門檻。Control Center 的公開操作採 preview → 使用者確認複製 → Codex Chat handoff → Refresh；事故時停止散布並停用或解除安裝 0.2.1，保留 repository 資料，以新版本修復，不提供舊版 binary rollback。
 
 本次 release hardening 另固定幾個容易被使用者誤解的邊界：`devweave.wikiBootstrap` 與 legacy `devweave.copyNextAction` 都只開啟 Control Center 的 preview flow，host 的 `PreviewGate` 仍是最後 copy gate；多 active work 的 `next` 必須明確選取，未指定 work 的 `status` 明確交給 `$devweave status --all`；五個 section 的 tab/tabpanel 關聯在 inactive 狀態也保持有效 target，方向鍵/Home/End、focus restore 與 forced-colors contract 由 Extension-local seam 驗證。
 

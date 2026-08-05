@@ -1,0 +1,25 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-006",
+    "AC-007"
+  ],
+  "created_at": "2026-08-05T05:57:18+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "ce6d661a21530b20e9f23c43b0117c0a25175690",
+  "id": "EVID-026",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "c5895da4a8096f3885efb2221e7e7a5783a65e546d7f268e75df88c692185eba",
+  "stale": false,
+  "status": "passed",
+  "summary": "User explicitly confirmed GUI install, Control Center walkthrough, disable, and uninstall. Isolated VS Code logs show 0.2.1 managed-workspace activation and clean exit, with an empty isolated extensions registry after uninstall. CLI install, same-version reinstall, disable launch, and uninstall also passed without workspace data changes.",
+  "tasks": [
+    "TASK-005"
+  ]
+}

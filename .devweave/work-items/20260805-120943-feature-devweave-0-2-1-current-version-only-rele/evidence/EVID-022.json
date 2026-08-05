@@ -1,0 +1,40 @@
+{
+  "argv": [
+    "python",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-v"
+  ],
+  "binds_current_source": true,
+  "command_id": "unit-tests",
+  "covers": [
+    "AC-005",
+    "AC-008"
+  ],
+  "created_at": "2026-08-05T05:56:28+00:00",
+  "cwd": ".",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "git_head": "ce6d661a21530b20e9f23c43b0117c0a25175690",
+  "id": "EVID-022",
+  "kind": "regression",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260805-120943-feature-devweave-0-2-1-current-version-only-rele/EVID-022.log",
+  "schema_version": 1,
+  "source_fingerprint": "c5895da4a8096f3885efb2221e7e7a5783a65e546d7f268e75df88c692185eba",
+  "stale": false,
+  "started_at": "2026-08-05T05:52:25+00:00",
+  "status": "passed",
+  "summary": "edge.KnowledgeCoreTests.test_project_upgrade_is_read_only_until_init_and_legacy_state_loads) ... ok\r\ntest_scaffold_supports_all_nine_types_and_conditional_fields (test_knowledge.KnowledgeCoreTests.test_scaffold_supports_all_nine_types_and_conditional_fields) ... ok\r\ntest_scaffold_uses_canonical_template_and_never_overwrites (test_knowledge.KnowledgeCoreTests.test_scaffold_uses_canonical_template_and_never_overwrites) ... ok\r\ntest_seal_rejects_placeholder_and_template_tokens_before_writing (test_knowledge.KnowledgeCoreTests.test_seal_rejects_placeholder_and_template_tokens_before_writing) ... ok\r\ntest_source_fingerprint_tracks_dirty_directory_rename_delete_and_ignores_ignored (test_knowledge.KnowledgeCoreTests.test_source_fingerprint_tracks_dirty_directory_rename_delete_and_ignores_ignored) ... ok\r\ntest_declared_delete_and_append_only_log_rules (test_knowledge.KnowledgeLifecycleTests.test_declared_delete_and_append_only_log_rules) ... ok\r\ntest_only_affected_page_blocks_and_unrelated_stale_page_warns (test_knowledge.KnowledgeLifecycleTests.test_only_affected_page_blocks_and_unrelated_stale_page_warns) ... ok\r\ntest_plan_requires_real_changes_and_seal_rejects_unplanned_pages (test_knowledge.KnowledgeLifecycleTests.test_plan_requires_real_changes_and_seal_rejects_unplanned_pages) ... ok\r\ntest_refresh_promotion_passes_g3_and_wiki_only_change_stales_only_g3 (test_knowledge.KnowledgeLifecycleTests.test_refresh_promotion_passes_g3_and_wiki_only_change_stales_only_g3) ... ok\r\ntest_codebase_wiki_and_current_release_contracts_are_documented (test_repository_contract.RepositoryContractTests.test_codebase_wiki_and_current_release_contracts_are_documented) ... ok\r\ntest_companion_skill_precedence_policy_covers_side_effect_boundaries (test_repository_contract.RepositoryContractTests.test_companion_skill_precedence_policy_covers_side_effect_boundaries) ... ok\r\ntest_companion_skill_provenance_and_relative_links_are_complete (test_repository_contract.RepositoryContractTests.test_companion_skill_provenance_and_relative_links_are_complete) ... ok\r\ntest_devweave_is_the_only_router_with_expected_companions (test_repository_contract.RepositoryContractTests.test_devweave_is_the_only_router_with_expected_companions) ... ok\r\ntest_doctor_passes_for_an_initialized_fixture_with_hook (test_repository_contract.RepositoryContractTests.test_doctor_passes_for_an_initialized_fixture_with_hook) ... ok\r\ntest_high_risk_review_stays_on_the_single_router_and_read_only_extension (test_repository_contract.RepositoryContractTests.test_high_risk_review_stays_on_the_single_router_and_read_only_extension) ... ok\r\ntest_hook_contract_is_json_and_resolves_from_git_root (test_repository_contract.RepositoryContractTests.test_hook_contract_is_json_and_resolves_from_git_root) ... ok\r\ntest_hook_launcher_runs_through_windows_cmd_and_preserves_deny_json (test_repository_contract.RepositoryContractTests.test_hook_launcher_runs_through_windows_cmd_and_preserves_deny_json) ... ok\r\ntest_interactive_decision_policy_is_explicit (test_repository_contract.RepositoryContractTests.test_interactive_decision_policy_is_explicit) ... ok\r\ntest_maintenance_only_skill_is_excluded_from_governed_sets_and_bundle (test_repository_contract.RepositoryContractTests.test_maintenance_only_skill_is_excluded_from_governed_sets_and_bundle) ... ok\r\ntest_native_question_contract_is_shared_without_host_or_engine_adapters (test_repository_contract.RepositoryContractTests.test_native_question_contract_is_shared_without_host_or_engine_adapters) ... ok\r\ntest_runtime_has_no_openspec_or_third_party_imports (test_repository_contract.RepositoryContractTests.test_runtime_has_no_openspec_or_third_party_imports) ... ok\r\ntest_skill_frontmatter_metadata_and_invocation_policy_are_explicit (test_repository_contract.RepositoryContractTests.test_skill_frontmatter_metadata_and_invocation_policy_are_explicit) ... ok\r\n\r\n----------------------------------------------------------------------\r\nRan 98 tests in 241.591s\r\n\r\nOK (skipped=1)",
+  "tasks": [
+    "TASK-003",
+    "TASK-005"
+  ],
+  "timed_out": false
+}

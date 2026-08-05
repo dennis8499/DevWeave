@@ -1,0 +1,26 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-005",
+    "AC-007",
+    "AC-008"
+  ],
+  "created_at": "2026-08-05T05:43:22+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "ce6d661a21530b20e9f23c43b0117c0a25175690",
+  "id": "EVID-010",
+  "kind": "regression",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "7f28b4f0f5fcdc176d18dd35b21f5f45ee9ed153315e433eb9faabc214d74311",
+  "stale": false,
+  "status": "passed",
+  "summary": "The ordinary 98-test Windows run had one privilege-only symlink skip; the same containment test was executed under UAC on the same build and unchanged product source, Ran 1 and passed. Raw result is retained at .devweave/cache/symlink-elevated.log.",
+  "tasks": [
+    "TASK-005"
+  ]
+}

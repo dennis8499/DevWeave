@@ -1,0 +1,26 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-002",
+    "AC-003",
+    "AC-007"
+  ],
+  "created_at": "2026-08-05T05:57:14+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "ce6d661a21530b20e9f23c43b0117c0a25175690",
+  "id": "EVID-024",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "c5895da4a8096f3885efb2221e7e7a5783a65e546d7f268e75df88c692185eba",
+  "stale": false,
+  "status": "passed",
+  "summary": "Before RC freeze, two consecutive package builds from the same debug-log-free product source produced identical 277076-byte 0.2.1 VSIX files with SHA-256 3e23ba0a75b49dd4bfbb645d7296d68d5e882cf303078aeefdcf574c61530aba; final EVID-018 independently reconfirmed 58 bootstrap files and 118 VSIX entries.",
+  "tasks": [
+    "TASK-004"
+  ]
+}

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 
 const extensionRoot = resolve(process.cwd());
 
-test("release package derives 0.2.1 bundle metadata and preserves rollback artifacts", () => {
+test("release package derives and verifies only the current 0.2.1 artifact", () => {
   const packageJson = JSON.parse(readFileSync(resolve(extensionRoot, "package.json"), "utf8")) as { version?: string };
   const packageLock = JSON.parse(readFileSync(resolve(extensionRoot, "package-lock.json"), "utf8")) as { version?: string; packages?: { ""?: { version?: string } } };
   const esbuild = readFileSync(resolve(extensionRoot, "esbuild.mjs"), "utf8");
@@ -17,7 +17,12 @@ test("release package derives 0.2.1 bundle metadata and preserves rollback artif
   assert.match(esbuild, /const version = packageJson\.version/);
   assert.match(esbuild, /bundleVersion: version/);
   assert.match(verifier, /package version must be 0\.2\.1/);
-  for (const version of ["0.1.0", "0.2.0", "0.2.1"]) {
-    assert.ok(statSync(resolve(extensionRoot, `devweave-control-center-${version}.vsix`)).size > 0, `${version} artifact is missing`);
-  }
+  assert.match(verifier, /const vsixPath = join\(extensionRoot, `devweave-control-center-\$\{version\}\.vsix`\)/);
+  assert.match(verifier, /const vsixInfo = await stat\(vsixPath\)/);
+  assert.match(verifier, /createHash\("sha256"\)\.update\(vsixBytes\)/);
+  assert.match(verifier, /assert\.equal\(manifest\.files\.length, 58/);
+  assert.match(verifier, /assert\.equal\(vsixEntries\.size, 118/);
+  assert.match(verifier, /native-question-contract\.md/);
+  assert.match(verifier, /VSIX SHA-256/);
+  assert.doesNotMatch(verifier, /legacyArtifacts|0\.1\.0|0\.2\.0/);
 });

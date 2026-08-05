@@ -9,23 +9,11 @@ const extensionRoot = fileURLToPath(new URL("../", import.meta.url));
 const packageJson = JSON.parse(await readFile(join(extensionRoot, "package.json"), "utf8"));
 const version = packageJson.version;
 assert.equal(version, "0.2.1", "package version must be 0.2.1");
-const legacyArtifacts = [
-  { version: "0.1.0", byteLength: 258106, sha256: "75fbad761c6a8c6db1997f5a6ed56dee2ff5a9d95a17f9329e5b6a8bfa2fb357" },
-  { version: "0.2.0", byteLength: 255162, sha256: "3e3610d3fcc888dd5b1f94f73360c3023ba51336018e14dbc67c2e664c218917" }
-];
-for (const legacy of legacyArtifacts) {
-  const legacyPath = join(extensionRoot, `devweave-control-center-${legacy.version}.vsix`);
-  const info = await stat(legacyPath);
-  assert.ok(info.isFile(), `the existing ${legacy.version} VSIX must be a regular file`);
-  assert.ok(info.size > 0, `the existing ${legacy.version} VSIX must be non-empty`);
-  const bytes = await readFile(legacyPath);
-  assert.equal(bytes.byteLength, legacy.byteLength, `the existing ${legacy.version} VSIX byte length changed`);
-  assert.equal(createHash("sha256").update(bytes).digest("hex"), legacy.sha256, `the existing ${legacy.version} VSIX hash changed`);
-}
 
 const bootstrapRoot = join(extensionRoot, "dist", "bootstrap");
 const manifest = JSON.parse(await readFile(join(bootstrapRoot, "manifest.json"), "utf8"));
 assert.equal(manifest.bundleVersion, version, "bundle and Extension versions must match");
+assert.equal(manifest.files.length, 58, "bootstrap manifest must contain the certified 58 files");
 const bootstrapHook = JSON.parse(await readFile(join(bootstrapRoot, "hooks.json"), "utf8"));
 const bootstrapHookCommand = bootstrapHook.hooks?.PreToolUse?.[0]?.hooks?.[0];
 assert.ok(bootstrapHookCommand, "bootstrap must contain the PreToolUse command hook");
@@ -53,6 +41,7 @@ for (const required of [
   "wiki/index.md",
   "wiki/overview.md",
   ".agents/skills/devweave/SKILL.md",
+  ".agents/skills/devweave/references/native-question-contract.md",
   ".agents/skills/codebase-design/SKILL.md",
   ".agents/skills/diagnosing-bugs/SKILL.md",
   ".agents/skills/grill-me/SKILL.md",
@@ -77,7 +66,13 @@ for (const file of manifest.files) {
 }
 
 const vsixPath = join(extensionRoot, `devweave-control-center-${version}.vsix`);
-const vsixEntries = readZipEntries(await readFile(vsixPath));
+const vsixInfo = await stat(vsixPath);
+assert.ok(vsixInfo.isFile(), "the current VSIX must be a regular file");
+assert.ok(vsixInfo.size > 0, "the current VSIX must be non-empty");
+const vsixBytes = await readFile(vsixPath);
+const vsixSha256 = createHash("sha256").update(vsixBytes).digest("hex");
+const vsixEntries = readZipEntries(vsixBytes);
+assert.equal(vsixEntries.size, 118, "VSIX must contain the certified 118 entries");
 const packageEntry = JSON.parse(vsixEntries.get("extension/package.json").toString("utf8"));
 assert.equal(packageEntry.version, version, "VSIX package metadata version mismatch");
 const vsixManifest = vsixEntries.get("extension.vsixmanifest").toString("utf8");
@@ -87,6 +82,7 @@ for (const required of [
   "extension/dist/bootstrap/AGENTS.md",
   "extension/dist/bootstrap/skills-lock.json",
   "extension/dist/bootstrap/skill/SKILL.md",
+  "extension/dist/bootstrap/skill/references/native-question-contract.md",
   "extension/dist/bootstrap/companions/codebase-design/SKILL.md",
   "extension/dist/bootstrap/companions/diagnosing-bugs/SKILL.md",
   "extension/dist/bootstrap/companions/grill-me/SKILL.md",
@@ -95,7 +91,7 @@ for (const required of [
 ]) {
   assert.ok(vsixEntries.has(required), `VSIX is missing ${required}`);
 }
-console.log(`Verified ${version}: ${manifest.files.length} bootstrap files and ${vsixEntries.size} VSIX entries.`);
+console.log(`Verified ${version}: ${manifest.files.length} bootstrap files and ${vsixEntries.size} VSIX entries. VSIX SHA-256: ${vsixSha256}`);
 
 function readZipEntries(bytes) {
   const entries = new Map();

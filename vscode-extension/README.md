@@ -2,7 +2,9 @@
 
 DevWeave Control Center 是以新手為先的 VS Code Extension。它把 DevWeave repository 的檔案狀態整理成五個區域：`總覽`、`工作項目`、`知識`、`驗證與稽核`、`說明`，讓你先知道目前狀態與下一步，再按需要查看治理細節。
 
-本頁對應 DevWeave 0.2.1 Windows 公開版。正式支援 Windows、VS Code 1.90+、Python 3.11+、Git 與 Codex；交付方式是 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。
+本頁對應 DevWeave 0.2.1 Windows 公開版；本次只提供 0.2.1 VSIX。本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；驗收基準為 Python full suite 98 項與 Extension unit tests 73 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。交付方式是 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。
+
+若發生發布事故，立即停止散布並停用或解除安裝 0.2.1；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。保留 workspace snapshot 與 logs，修復後產生新版本。
 
 ## 先記住三件事
 
@@ -24,7 +26,7 @@ DevWeave Control Center 是以新手為先的 VS Code Extension。它把 DevWeav
 2. 在 VS Code 開啟 Extensions 視窗，按右上角 `...`，選擇「Install from VSIX…」，選取該檔案並等待安裝完成。
 3. 重新載入 VS Code（若畫面提示需要 reload），再開啟 DevWeave repository，從 Activity Bar 選擇 DevWeave Control Center。
 
-也可以在 Windows 終端執行 `code --install-extension vscode-extension/devweave-control-center-0.2.1.vsix`。VSIX 只支援本公開版的 Windows 範圍；本 release 不會自動從 Marketplace 更新。
+也可以在 Windows 終端執行 `code --install-extension vscode-extension/devweave-control-center-0.2.1.vsix`。本 release 不會自動從 Marketplace 更新。
 
 ## Preview、Codex handoff 與 Refresh
 
@@ -88,8 +90,8 @@ npm run test:smoke
 npx --yes @vscode/vsce package --allow-missing-repository
 ```
 
-`npm run package` 會從 `package.json` 產生 0.2.1 production bundle、完整 bootstrap manifest 與 `devweave-control-center-0.2.1.vsix`；`npm run test:smoke` 會使用 VS Code Extension Host 驗證 activation、Activity Bar view 與公開 commands。Extension unit tests 目前為 73 項，全部通過。
+`npm run package` 會從 `package.json` 產生 0.2.1 production bundle、完整 bootstrap manifest 與 `devweave-control-center-0.2.1.vsix`；`npm run test:smoke` 會使用 VS Code Extension Host 驗證 activation、Activity Bar view 與公開 commands。Extension unit tests 73 項全部通過。
 
 ## 打包 VSIX
 
-既有的 `devweave-control-center-0.2.0.vsix` 與 `devweave-control-center-0.1.0.vsix` 不會被覆寫；package verification 會檢查 0.2.1 及兩個保留 artifact、manifest integrity 與 VSIX 必要 entries。需要回退時，可在 VS Code 重新安裝保留的 0.2.0 VSIX。
+Package verification 只處理 `devweave-control-center-0.2.1.vsix`，並檢查 package／bundle version、58 個 bootstrap files、118 個 VSIX entries、必要 entries、source byte length／SHA-256 與 current artifact SHA-256。其他 VSIX 不是本次封裝、驗收或回復條件。

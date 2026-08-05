@@ -1,0 +1,27 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-004",
+    "AC-007",
+    "AC-008"
+  ],
+  "created_at": "2026-08-05T05:43:19+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "ce6d661a21530b20e9f23c43b0117c0a25175690",
+  "id": "EVID-008",
+  "kind": "regression",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "7f28b4f0f5fcdc176d18dd35b21f5f45ee9ed153315e433eb9faabc214d74311",
+  "stale": false,
+  "status": "passed",
+  "summary": "Exact repository contract passed 13 of 13; bounded audit found no legacy release tokens in current docs, Help, baseline, or four promoted Wiki pages; Knowledge status is healthy and git diff check has no whitespace errors.",
+  "tasks": [
+    "TASK-002",
+    "TASK-005"
+  ]
+}

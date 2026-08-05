@@ -5,15 +5,15 @@ sources: [.codex/hooks.json, vscode-extension/esbuild.mjs, vscode-extension/pack
 last_updated: 2026-08-05
 tags: [module, vscode, control-center]
 status: active
-source_fingerprint: "sha256:cee98932a20a98f7c092eb62f1edde71af893c7d980ffde2f9252f9a93d366ef"
-verified_by: 20260805-104700-bug-windows-codex-pretooluse-hook
+source_fingerprint: "sha256:e6b1881770e1a43c93df6cbe92a7aa699cea17f26c3afd1f82b74eda83d24161"
+verified_by: 20260805-120943-feature-devweave-0-2-1-current-version-only-rele
 ---
 
 # DevWeave VS Code Extension
 
 ## Responsibility
 
-`devweave-control-center` 是 DevWeave 0.2.1 Windows 公開版的唯讀 Control Center。正式支援 Windows、VS Code 1.90+、Python 3.11+、Git 與 Codex；交付 repository 與 VSIX，不包含 Marketplace 上架或 macOS/Linux 支援承諾。Extension host 將 project、Work Item、Wiki、evidence、diagnostics 與 bootstrap completeness 投影給 Webview；workflow decision 仍以 prompt handoff 回到 Codex Chat，Extension 不執行 DevWeave engine、CLI、shell、Git 或 network。
+`devweave-control-center` 是 DevWeave 0.2.1 Windows 公開版的唯讀 Control Center，本次只提供 `devweave-control-center-0.2.1.vsix`。認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；VS Code 1.90+／Python 3.11+ 是技術門檻，不代表其他組合已完成本次認證。Extension host 將 project、Work Item、Wiki、evidence、diagnostics 與 bootstrap completeness 投影給 Webview；workflow decision 仍以 prompt handoff 回到 Codex Chat，Extension 不執行 DevWeave engine、CLI、shell、Git 或 network。
 
 ## Webview interaction
 
@@ -43,12 +43,12 @@ Windows Codex 的 PreToolUse hook 是由根目錄 `.codex/hooks.json` 產生的 
 
 `BootstrapInstaller.inspect()` 先驗證 manifest path、byte length 與 SHA-256，再依 `bootstrap-compat.ts` shared validator 檢查 semantic identity。合法 evolved project/baseline/Wiki bytes 會 adopted；AGENTS、skills、hook、lock 與其他 controls 仍以 exact bytes 判定。初始化或修復只建立 missing paths，不同或不合法內容永不覆寫並列為 conflict；只要仍有 missing 或 conflict，report 與 Dashboard 就標示 partial；若中途寫入失敗，僅 rollback 本輪新增內容，既有檔案保持不變。重跑完整 bundle 是 idempotent。
 
-Hook 的 source-derived consistency 由 package verifier 檢查根目錄 hook 與 `dist/bootstrap/hooks.json` 的 PowerShell／`python -B` semantic contract；0.2.1 VSIX 重新產出，既有 0.2.0 與 0.1.0 rollback artifacts 維持固定 bytes/hash。
+Hook 的 source-derived consistency 由 package verifier 檢查根目錄 hook 與 `dist/bootstrap/hooks.json` 的 PowerShell／`python -B` semantic contract；0.2.1 VSIX 從 current source 重新產出，其他 VSIX 不屬於封裝、驗收或回復條件。
 
 ## Security and compatibility
 
-Runtime 維持 CSP、no process、no shell、no external network 與 preview-first public command boundary。所有 workspace write 都集中在使用者確認後的 allowlisted bootstrap installer；snapshot、搜尋、help、prompt composition 與 Independent Review readiness 都是 Extension-local/read-only。Extension 不啟動 Review Agent、不呼叫 Python engine、不判定或核准 gate；0.2.1 VSIX 另行產出，既有 `0.2.0.vsix` 與 dirty `0.1.0.vsix` 保留不覆寫；public commands 與 legacy snapshot projection 維持相容。`devweave.copyNextAction` 僅開啟 Control Center，單一 active work 才能自動顯示 next preview，多 work 必須先明確選取。
+Runtime 維持 CSP、no process、no shell、no external network 與 preview-first public command boundary。所有 workspace write 都集中在使用者確認後的 allowlisted bootstrap installer；snapshot、搜尋、help、prompt composition 與 Independent Review readiness 都是 Extension-local/read-only。Extension 不啟動 Review Agent、不呼叫 Python engine、不判定或核准 gate；事故時停止散布並停用或解除安裝 0.2.1，不自動刪除 `.devweave`、Wiki 或 workspace 資料，修復以新版本發布。Public commands 與 legacy snapshot projection 維持相容；`devweave.copyNextAction` 僅開啟 Control Center，單一 active work 才能自動顯示 next preview，多 work 必須先明確選取。
 
 ## Verification seams
 
-`WikiSearchModel`、`RenderScheduler`、`RefreshCoordinator`、`PreviewGate`、Wiki result mount adapter、instrumented snapshot reader、`dashboard-sections.ts`、copy transaction boundary、`bootstrap-compat.ts` 與 `BootstrapInstaller.inspect()` 是不依賴 VS Code UI 的測試 seams。package verifier 會檢查 manifest 每個 entry 的 destination、byte length、SHA-256、policy/kind、0.2.1 VSIX version/entries，並以 regular-file、size 與固定 SHA-256 確認 0.2.0/0.1.0 artifact retention；73 項 Extension tests、typecheck 與 smoke test 再確認 host 可載入 bundle。Configured full-suite raw logs 另保留四條 Windows walkthrough 與 accessibility marker。
+`WikiSearchModel`、`RenderScheduler`、`RefreshCoordinator`、`PreviewGate`、Wiki result mount adapter、instrumented snapshot reader、`dashboard-sections.ts`、copy transaction boundary、`bootstrap-compat.ts` 與 `BootstrapInstaller.inspect()` 是不依賴 VS Code UI 的測試 seams。package verifier 只讀取 current 0.2.1 VSIX，檢查 manifest 每個 entry 的 destination、byte length、SHA-256、policy/kind、package／bundle version、58 個 bootstrap files、118 個 VSIX entries、required entries 與 current artifact SHA-256；73 項 Extension tests、typecheck 與 smoke test 再確認 host 可載入 bundle。Configured full-suite raw logs 另保留 Windows walkthrough 與 accessibility marker。

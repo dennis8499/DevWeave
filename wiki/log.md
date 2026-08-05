@@ -6,7 +6,7 @@ last_updated: 2026-08-05
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260805-104700-bug-windows-codex-pretooluse-hook
+verified_by: 20260805-120943-feature-devweave-0-2-1-current-version-only-rele
 ---
 
 # Activity Log
@@ -70,3 +70,8 @@ verified_by: 20260805-104700-bug-windows-codex-pretooluse-hook
 
 - Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，記錄 Windows Codex runner 以標準 `command` 經 `cmd.exe` 啟動 PowerShell／`python -B` guard 的 bootstrap contract。
 - 提升 process failure 與 DevWeave policy `permissionDecision: deny` 的分層語意、`commandWindows` 移除、source-derived 0.2.1 embedded hook verifier，以及既有 exact workspace hook 需使用者確認、不由 Extension 靜默覆寫的邊界；0.1.0／0.2.0 rollback artifacts 保持不變。
+
+## [2026-08-05] promote | 20260805-120943-feature-devweave-0-2-1-current-version-only-rele
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，將 0.2.1 release contract 統一為 current-version-only，並限定本次 Windows x64／VS Code／Python／Git／Codex 認證環境。
+- 記錄 98 項 Python suite、73 項 Extension tests、58 個 bootstrap files、118 個 VSIX entries、current artifact SHA-256 與無舊版 binary rollback 的資料保留事故處理。
