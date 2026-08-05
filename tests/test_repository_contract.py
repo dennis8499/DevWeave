@@ -199,7 +199,9 @@ class RepositoryContractTests(unittest.TestCase):
         for fragment in (
             "Interactive decision contract:",
             "Facts that can be discovered from Wiki, source, tests, or approved artifacts",
-            "native question facility",
+            "native-question-contract.md",
+            "request_user_input",
+            "Plan-first is mandatory",
             "two or three mutually exclusive options",
             "structured numbered fallback",
             "Each question is asked one at a time with a recommendation and trade-off",
@@ -211,7 +213,9 @@ class RepositoryContractTests(unittest.TestCase):
         for fragment in (
             "## Interactive decision protocol",
             "During G1, use `grill-me`/`grilling`; during G2, use `codebase-design`.",
-            "Prefer the Codex host's native question facility",
+            "Follow [native-question-contract.md](references/native-question-contract.md)",
+            "Plan Mode is the formal native-question entry",
+            "request_user_input",
             "structured numbered fallback",
             "Ask one material decision at a time.",
             "Do not silently choose an unresolved material decision",
@@ -222,23 +226,28 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertIn(fragment, router)
 
         for fragment in (
-            "Invoke `grill-me`/`grilling` for material requirements decisions.",
-            "native question facility",
+            "grill-me`/`grilling` for material requirements decisions and follow",
+            "follow [native-question-contract.md](native-question-contract.md)",
+            "Plan Mode as the formal native-question entry",
+            "request_user_input",
             "structured numbered fallback",
-            "wait for the user's answer before recording the next decision",
+            "Wait for the user's answer before recording the next decision",
             "Stop at the Gate if approval is absent",
         ):
             self.assertIn(fragment, requirements)
 
         for fragment in (
             "using `codebase-design` vocabulary",
-            "For each material design choice, ask one question at a time",
+            "For each material design choice, follow",
+            "native-question-contract.md",
+            "Plan Mode",
             "Stop before product-code or tracked-test changes",
         ):
             self.assertIn(fragment, design)
 
         for fragment in (
             "Treat G3 as a conformance check against the approved",
+            "request_user_input",
             "Do not silently resolve a newly discovered product or design decision",
             "silence or an inferred acceptance is not approval",
         ):
@@ -246,8 +255,11 @@ class RepositoryContractTests(unittest.TestCase):
 
         for fragment in (
             "G1 的逐題決策流程是",
+            "G1/G2/Gate 的正式入口是",
+            "request_user_input",
             "structured numbered fallback",
-            "G2 使用 `codebase-design` 逐題確認",
+            "G2 使用 `codebase-design` 在 Plan Mode 逐題確認",
+            "Plan Mode",
             "每道 Gate 都是 validation 後的 Double Check",
             "若 Gate 發現新需求或設計決策，必須使用 `revise`",
         ):
@@ -255,13 +267,59 @@ class RepositoryContractTests(unittest.TestCase):
 
         for fragment in (
             "使用 `grill-me`／`grilling` 逐題確認 material requirements",
-            "host-native question",
+            "G1/G2/Gate 的正式入口是 Plan Mode",
+            "request_user_input",
             "structured numbered fallback",
-            "使用 `codebase-design` 逐題確認 material design trade-off",
+            "在 Plan Mode 使用 `codebase-design` 逐題確認 material design trade-off",
             "G1/G2 Gate 是對目前 artifacts 的 Double Check",
             "必須使用 `revise` 回到最早受影響 phase",
         ):
             self.assertIn(fragment, manual)
+
+    def test_native_question_contract_is_shared_without_host_or_engine_adapters(
+        self,
+    ) -> None:
+        contract = (
+            REPOSITORY_ROOT
+            / ".agents"
+            / "skills"
+            / "devweave"
+            / "references"
+            / "native-question-contract.md"
+        ).read_text(encoding="utf-8")
+        for fragment in (
+            "canonical host tool name is `request_user_input`",
+            "questions` contains exactly one item",
+            "options` contains two or three mutually exclusive choices",
+            "(Recommended)",
+            "host-provided `Other`",
+            "Before current G2",
+            "return to Plan Mode",
+            "structured numbered fallback",
+            "existing validation and CLI `approve`/`revise` contract",
+            "Tool visibility is a host capability",
+        ):
+            self.assertIn(fragment, contract)
+        self.assertNotIn("requestUserInput(", contract)
+
+        for name in sorted(COMPANION_SKILLS):
+            source = (
+                REPOSITORY_ROOT / ".agents" / "skills" / name / "SKILL.md"
+            ).read_text(encoding="utf-8")
+            self.assertIn("native question contract", source, name)
+            self.assertIn("Plan Mode", source, name)
+        router = (
+            REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("native-question-contract.md", router)
+        self.assertIn("request_user_input", router)
+
+        extension_sources = list(
+            (REPOSITORY_ROOT / "vscode-extension" / "src").rglob("*.ts")
+        ) + list((REPOSITORY_ROOT / "vscode-extension" / "webview").rglob("*.ts"))
+        for path in extension_sources:
+            self.assertNotIn("request_user_input", path.read_text(encoding="utf-8"), path)
+            self.assertNotIn("requestUserInput", path.read_text(encoding="utf-8"), path)
 
     def test_runtime_has_no_openspec_or_third_party_imports(self) -> None:
         for path in SCRIPT_ROOT.glob("*.py"):

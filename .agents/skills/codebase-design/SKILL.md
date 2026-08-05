@@ -5,6 +5,13 @@ description: Shared vocabulary for designing deep modules. Use when the user wan
 
 # Codebase Design
 
+For material design choices, follow the shared native question contract at
+`../devweave/references/native-question-contract.md`: before current G2 use Plan
+Mode and the host `request_user_input` when visible, one decision at a time with
+recommended-first options. If the tool is unavailable in an ordinary context,
+request Plan Mode or use the explicitly selected structured fallback. New design
+decisions after G2 return through `$devweave revise`.
+
 Design **deep modules**: place a lot of behaviour behind a small interface at a clean seam, then test through that interface. Use this vocabulary whenever code is designed or restructured. Optimize for leverage for callers, locality for maintainers, and testability for everyone.
 
 ## Working sequence

@@ -13,6 +13,8 @@ When exploring the codebase, read an existing `CONTEXT.md` and relevant ADRs whe
 
 In a managed repository, resolve the current work item and phase before changing anything. During G1/G2, build the feedback loop with existing commands, temporary files, or `.devweave/cache` harnesses; create or modify a tracked regression test only after current G2 approval. Return hypotheses, reproduction evidence, root cause, and cleanup results to the current DevWeave artifact/evidence. A discovered requirement, design, scope, or task change goes through `devweave revise`.
 
+When this skill needs a material user choice, follow the shared native question contract at `../devweave/references/native-question-contract.md`. Before current G2, ask through Plan Mode and `request_user_input` when visible; an ordinary-mode context without the tool must return to Plan Mode or use the explicitly selected structured fallback. Diagnosis facts and hypotheses remain distinct from approval decisions.
+
 ## Phase 1 — Build a feedback loop
 
 **This is the skill.** Everything else is mechanical. A **tight** pass/fail signal for the bug — one that goes red on _this_ bug — turns bisection, hypothesis-testing, and instrumentation into useful probes; a theory without that signal remains unverified.

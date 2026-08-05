@@ -127,10 +127,11 @@ item 還必須完成 Wiki-first context：先讀 `wiki/index.md`，再讀最多�
 placeholder、stale、缺漏或矛盾被記錄為 gap 後，才回溯 raw source。
 
 G1 的逐題決策流程是：先由 Codex 查證 repository facts，再使用 `grill-me`／`grilling` 確認
-會影響目標、範圍、風險、相容性或驗收的 material decisions。Codex host 提供原生 question
-facility 時，題目使用兩至三個互斥選項、第一項標記 `(Recommended)`、選項說明與 `Other`
-自訂答案；若 host 沒有原生能力，使用相同格式的 structured numbered fallback。每次只問一題，
-等待使用者回答後才回流 `brief.md`／`requirements.md`；可由 repository 查出的 facts 不重複詢問。
+會影響目標、範圍、風險、相容性或驗收的 material decisions。G1/G2/Gate 的正式入口是
+Plan Mode；Codex host 暴露 `request_user_input` 時，題目使用兩至三個互斥選項、第一項標記
+`(Recommended)`、選項說明與 host `Other` 自訂答案。每次只問一題，等待使用者回答後才回流
+artifact；普通模式在 G2 前若看不到工具，先要求回到 Plan Mode，只有無法切換或明確選擇相容性時
+才使用同格式的 structured numbered fallback。可由 repository 查出的 facts 不重複詢問。
 
 G1 artifacts：
 
@@ -145,9 +146,13 @@ G1 artifacts：
 G2 確認設計選擇、介面、資料流、失敗模式、回復方式與 immutable task plan。G2 通過前，Codex
 不能修改 scope 內的產品文件或程式；只能修改該 work item 的 Markdown artifacts。
 
-G2 使用 `codebase-design` 逐題確認會影響 module、interface、seam、data flow、failure mode、
+G2 使用 `codebase-design` 在 Plan Mode 逐題確認會影響 module、interface、seam、data flow、failure mode、
 rollback、compatibility、observability 或 verification 的設計決策。G2 approval 前不會自行
 補上未決選擇，也不會開始 implementation 或 TDD。
+
+G2 核准後普通模式只執行 approved tasks；若實作或 Skill 發現新的 material decision，必須停止並
+使用 `$devweave revise` 回到最早受影響 phase。`request_user_input` 是否出現在普通/Skill context
+是 Codex host capability，repository policy 不會偽造或宣稱已支援。
 
 G2 artifacts：
 
@@ -239,8 +244,8 @@ docs/使用手冊.md                詳細繁體中文操作手冊
 
 本 repository 的 project-local companions 是：
 
-- `grill-me`／`grilling`：G1 material requirements interview；優先使用 host-native question，否則使用 structured options fallback，一次一題並等待使用者回答。
-- `codebase-design`：G2 module、interface、seam 與 adapter 設計，一次一題確認 material trade-off。
+- `grill-me`／`grilling`：G1 material requirements interview；Plan Mode 使用 `request_user_input`，否則依 shared contract structured fallback，一次一題並等待使用者回答。
+- `codebase-design`：G2 Plan Mode 的 module、interface、seam 與 adapter 設計，一次一題確認 material trade-off。
 - `diagnosing-bugs`：bug discovery 與可重現 feedback loop。
 - `tdd`：G2 後 implementation 的 red → green slice。
 

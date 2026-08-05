@@ -7,6 +7,8 @@ description: Run test-first development through public seams using red → minim
 
 Use this method only for a current G2-approved implementation task. TDD is the red → green loop, and this skill is the reference that makes each loop produce a test worth keeping: what a good test is, where tests go, the anti-patterns, and the rules of the loop. Every section applies on every cycle — consult them before and during the loop, not after.
 
+If implementation reveals a material requirement, design, scope, or task decision, stop the ordinary task loop and follow the shared native question contract at `../devweave/references/native-question-contract.md` through Plan Mode, then use `$devweave revise` before further mutation. TDD does not create a question state or a second router.
+
 When exploring the codebase, use the current DevWeave Wiki and approved artifacts for interface vocabulary and precedence. Read an existing `CONTEXT.md` and relevant ADRs when they exist; create or update no parallel context or decision document.
 
 ## What a good test is

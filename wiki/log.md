@@ -6,7 +6,7 @@ last_updated: 2026-08-05
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260805-081842-feature-skills-writing-great-skills
+verified_by: 20260805-094544-feature-plan-first
 ---
 
 # Activity Log
@@ -59,3 +59,9 @@ verified_by: 20260805-081842-feature-skills-writing-great-skills
 - Refresh [[overview]]、[[devweave-knowledge-workflow]] 與 [[knowledge-engine]]，記錄五個 companion Skill 的 local predictability overlay、唯一 router/phase boundary、G1/G2 decision return、G2 前 bug repro 與 TDD public-seam 規則。
 - 固定 `writing-great-skills` 為 maintenance-only exclusion；`skills-lock.json` 的五筆 upstream source/path/hash 與 Extension bootstrap 六組受治理 Skill set 維持不變。
 - 補記 frontmatter/metadata/invocation contract、UTF-8 quick validation、isolated forward-test、repository contract 與 Python/Extension verification evidence。
+
+## [2026-08-05] promote | 20260805-094544-feature-plan-first
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]] 與 [[knowledge-engine]]，將 Plan Mode 定為 G1/G2/Gate material decision 的正式 native 入口，canonical host tool 固定為 `request_user_input`。
+- 記錄一題／二至三選項／推薦第一項 `(Recommended)`／host `Other`、等待 answer、普通 pre-G2 回到 Plan Mode、明確 compatibility structured fallback、G2 後 approved-task boundary 與新決策 `revise` 回流。
+- 記錄 ordinary/Skill native tool visibility 是外部 host capability；不新增 engine question state、CLI、ledger、fake adapter 或 Extension 問答 UI，並保留 cancel/timeout/malformed 的 no-guess/no-mutation safety。

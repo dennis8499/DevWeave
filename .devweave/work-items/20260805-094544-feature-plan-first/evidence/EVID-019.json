@@ -1,0 +1,25 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-004",
+    "AC-012"
+  ],
+  "created_at": "2026-08-05T02:32:59+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "2a9a33234cf212ed51b1a32b15a8cadf3836a05c",
+  "id": "EVID-019",
+  "kind": "host-integration",
+  "log_truncated": false,
+  "observed_result": "neutral",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "f284f8c090acc2f4bc99441611aeffec98ab4b35b355930ef7bba55f0eea52af",
+  "stale": false,
+  "status": "waived",
+  "summary": "Final current host limitation: this host exposes no callback injection seam for cancel, timeout, or malformed request_user_input results. The limitation is recorded as compatibility, not native pass; EVID-014 current contract regression covers invalid identity, pending Gate, no-guess, and no-mutation behavior.",
+  "tasks": [
+    "TASK-004"
+  ]
+}

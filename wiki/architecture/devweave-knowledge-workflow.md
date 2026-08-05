@@ -1,23 +1,23 @@
 ---
 title: DevWeave Knowledge Workflow
 type: architecture
-sources: [.agents/skills, AGENTS.md, skills-lock.json, tests/test_repository_contract.py, vscode-extension/esbuild.mjs]
+sources: [.agents/skills, AGENTS.md, README.md, docs/使用手冊.md, tests/test_repository_contract.py]
 last_updated: 2026-08-05
 tags: [architecture]
 status: active
-source_fingerprint: "sha256:73659abd2a990a8fa75a0352292e9b51b1cec70cd533d085dc437e830cb8c70e"
-verified_by: 20260805-081842-feature-skills-writing-great-skills
+source_fingerprint: "sha256:469e65b74bee6bc106127debdea25c80ec606cc02a24fe9672ee319b02498a81"
+verified_by: 20260805-094544-feature-plan-first
 ---
 
 # DevWeave Knowledge Workflow
 
 ## Context
 
-DevWeave 將 Codebase Wiki 納入既有 Work Item lifecycle，而不是建立第二套 Wiki skill 或背景索引服務。Wiki 提供快速定位入口；source 與已核准 artifacts 仍是權威事實來源。互動式 G1/G2 問答是 router 與 phase guidance 的決策協作規則，不是另一個 lifecycle 或 engine state。
+DevWeave 將 Codebase Wiki 納入既有 Work Item lifecycle，而不是建立第二套 Wiki skill 或背景索引服務。Wiki 提供快速定位入口；source 與已核准 artifacts 仍是權威事實來源。G1/G2/Gate 的 material decision 問答採 Plan-first：canonical `request_user_input` 是 Codex host seam，router/phase guidance 只定義 payload 與 lifecycle，不新增另一個 lifecycle、engine state 或 UI。
 
 ## Companion Skill routing and completion
 
-`devweave` 先決定 managed work item、session binding、current phase 與 human Gate；companion Skills 只在該 phase 內提供方法。G1 由 `grill-me`/`grilling` 逐題處理 material requirements，選項以推薦答案、trade-off 與 `Other` 返回使用者；G2 由 `codebase-design` 固定 module/interface/seam/depth/locality/test-surface，只有 current G2 後 `tdd` 才能以 public seam 執行 red → minimal green vertical slices，bug diagnosis 則維持 red-capable loop 並在 G2 前使用 temporary/cache repro。每個 Skill 的答案、假設、設計與 evidence 回到當前 DevWeave artifact；新決策以 `revise` 回到最早受影響 phase。
+`devweave` 先決定 managed work item、session binding、current phase 與 human Gate；companion Skills 只在該 phase 內提供方法。G1 由 `grill-me`/`grilling` 在 Plan Mode 逐題處理 material requirements，使用 `request_user_input` 時每次一題、二至三個互斥選項、推薦第一項 `(Recommended)`、trade-off 與 host `Other`；G2 由 `codebase-design` 在 Plan Mode 固定 module/interface/seam/depth/locality/test-surface。普通或 Skill context 在 G2 前看不到工具時先回到 Plan Mode，只有明確 compatibility 才用結構化 fallback。只有 current G2 後 `tdd` 才能以 public seam 執行 red → minimal green vertical slices，bug diagnosis 則維持 red-capable loop 並在 G2 前使用 temporary/cache repro。每個 Skill 的答案、假設、設計與 evidence 回到當前 DevWeave artifact；新決策以 `revise` 回到最早受影響 phase。
 
 `writing-great-skills` 是 maintenance-only overlay，不是 router 或 companion；它不在精確五個 companion allowlist、`skills-lock.json` 五筆 upstream set 或 Extension bootstrap bundle 中。五個 companion 的 upstream source/path/computedHash 保持 lock provenance 不變，local optimization 只整理 description、progressive disclosure、positive steering、completion criteria、metadata 與 phase boundaries。
 
@@ -27,8 +27,8 @@ Repository contract 以 exact six-governed-Skill set、frontmatter identity、re
 
 1. `$devweave wiki bootstrap` 由 router 轉成 `knowledge bootstrap`。Engine 先評估 active、sourced、current 的 overview、architecture 與 module；完整時回 `already_complete`，否則 resume 或 create bootstrap-profile feature Work Item。
 2. G1 的 `knowledge context` 固定先記錄 index，再記錄最多五頁的 path、status、content hash、stored/computed source fingerprint。Nonfresh、矛盾或不足 knowledge 必須先形成 gap，才允許最小 raw-source fallback；repository 已能證實的事實不轉成使用者問題。
-3. G1 由 `grill-me`/`grilling` 逐題處理 material decisions。Codex host 原生 question facility 可用時，題目提供兩至三個互斥選項、第一項 `(Recommended)`、trade-off 與 `Other`；不可用時使用相同結構的 numbered fallback。等待回答後才回流 `brief.md`/`requirements.md`；`validate` 後的問題、範圍、非目標、驗收與剩餘假設才可送 G1 explicit approval。
-4. G2 由 `codebase-design` 逐題處理 design choices，沿用 native-first/fallback interface。回答回流 `design.md`/`plan.md`，並在 `validate` 後以 Gate Double Check 展示選定/淘汰方案、介面、資料流、失敗處理、回復方式與 immutable task plan；G2 前不修改產品內容或 tracked tests。
+3. G1 由 `grill-me`/`grilling` 在 Plan Mode 逐題處理 material decisions。Codex host 可見時使用 `request_user_input`，題目提供兩至三個互斥選項、第一項 `(Recommended)`、trade-off 與 host `Other`；不可用時，普通 context 先回到 Plan Mode，只有無法切換或明確 compatibility 才使用相同結構的 numbered fallback。等待有效 answer 後才回流 `brief.md`/`requirements.md`；`validate` 後的問題、範圍、非目標、驗收與剩餘假設才可送 G1 explicit approval。
+4. G2 由 `codebase-design` 在 Plan Mode 逐題處理 design choices，沿用 shared native-question contract。回答回流 `design.md`/`plan.md`，並在 `validate` 後以 Gate Double Check 展示選定/淘汰方案、介面、資料流、失敗處理、回復方式與 immutable task plan；G2 前不修改產品內容或 tracked tests。G2 後普通模式只執行 approved tasks；新的 material requirement/design/scope/task decision 必須停止並 `revise`。
 5. G2 決定 bootstrap 的三至五個高價值頁或一般工作的 product design；Wiki 到 verification 前皆唯讀。使用者改變已批准答案或 Gate 發現新決策時，透過 `revise` 使受影響 Gate 失效並回到最早階段。
 6. `init`/`start` 先以 read-only preflight 檢查 Wiki，再取得 project lock 並重檢；missing、empty 或 custom-only root 只補缺少的 starter，reserved file/directory type 或 frontmatter conflict 則在 `.devweave` project、baseline、cache、work-item 建立前回報 `knowledge_conflict`。
 7. High-risk G3 在 final product/Wiki/baseline/diff/scope/evidence 穩定後，由唯一 router 啟動 exactly one isolated read-only Independent Review Agent。Reviewer 只能讀取 approved artifacts、完整 diff、risk/scope、baseline、Wiki context 與 evidence，不繼承主 Agent reasoning，也不能寫 source/Wiki/ledger 或 approve/revise/close；G2 `Design It Twice` 的 3+ design sub-agents 是不同階段的 optional comparison。
@@ -61,6 +61,7 @@ Control Center 的五個區域使用 tab/tabpanel `aria-controls`、`aria-labell
 - Guard 只允許 verification 中 knowledge plan 的 content paths，以及自動 coupling 的 `wiki/index.md`、`wiki/log.md`。
 - Review Agent 的啟動權只在既有 router；Python engine 只記錄 machine report，Extension 只投影 readiness，三者不產生第二個 lifecycle 或平行 ledger。
 - 互動式問答由 router/phase guidance 約束；不新增 pending-question state、CLI、JSON schema、VS Code UI 或第二套 question ledger。沉默與模糊同意不構成 approval，未回答的 material decision 會停在目前階段。
+- `request_user_input` 的可見性由 Codex host 決定；repository 不宣稱 ordinary/Skill native support，也不提供 fake alias 或 adapter。取消、逾時、malformed、空值與 ambiguous result 維持 pending，Gate 仍只接受 validation 後的既有 `approve`/`revise` CLI contract。
 - 每頁最多五個 sources；每次 context 最多五個內容頁；每次 promotion 最多五個 content targets。
 - Bootstrap 不接受 repository 子路徑 scope，不修改產品 source，且需 promote overview、至少一個 architecture、至少一個 module。
 - Extension 不建立 process/network seam，也不自行重算 Git/source fingerprint；其 bootstrap、PreviewGate 與 Independent Review readiness 判定都是非權威 filesystem projection，但 host copy boundary 仍是 clipboard 安全的最終 enforcement point。
@@ -71,3 +72,4 @@ Control Center 的五個區域使用 tab/tabpanel `aria-controls`、`aria-labell
 - Lifecycle、legacy compatibility、source invalidation、bootstrap G1→G3、九種 scaffold、guard 與 seal 由 Python regression 覆蓋。
 - Extension intent parity、strict protocol、unknown state fail-closed、no-process/no-network、package 與 Extension Host activation 由 unit/security/typecheck/package/smoke 驗證。
 - Durable value 是語意判斷，machine 只能提供 coverage 與 affected-page obligation；最終由 Knowledge Review rationale 與 G3 人工核准承擔。Repository contract tests 可檢查政策存在，實際對話是否逐題等待仍需以運行時情境驗收。
+- Plan Mode native round-trip 與 ordinary/Skill tool visibility 必須以 host/manual evidence 驗證；目前 ordinary/Skill context 未暴露工具時，current result 是 unavailable compatibility，不可把 structured fallback 或 policy text 誤報成 native pass。

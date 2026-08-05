@@ -1,12 +1,12 @@
 ---
 title: DevWeave Codebase Overview
 type: overview
-sources: [.agents/skills, AGENTS.md, skills-lock.json, tests/test_repository_contract.py, vscode-extension/esbuild.mjs]
+sources: [.agents/skills, AGENTS.md, README.md, docs/使用手冊.md, tests/test_repository_contract.py]
 last_updated: 2026-08-05
 tags: [overview]
 status: active
-source_fingerprint: "sha256:73659abd2a990a8fa75a0352292e9b51b1cec70cd533d085dc437e830cb8c70e"
-verified_by: 20260805-081842-feature-skills-writing-great-skills
+source_fingerprint: "sha256:469e65b74bee6bc106127debdea25c80ec606cc02a24fe9672ee319b02498a81"
+verified_by: 20260805-094544-feature-plan-first
 ---
 
 # DevWeave Codebase Overview
@@ -17,8 +17,8 @@ DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router�
 
 1. `new|feature|refactor|bug` 建立一般 Work Item；`wiki bootstrap` 建立或續接 `kind: feature`、`knowledge_profile: bootstrap` 的一般生命週期。
 2. G1 先讀 `wiki/index.md`，再讀最多五個內容頁；只有先記錄 missing、placeholder、stale、矛盾或不足 gap，才回查最小必要 source。可由 repository 查出的事實由 router 自動整理，不重複問使用者。
-3. G1 需求階段使用 `grill-me`/`grilling`，一次只問一個會影響目標、範圍、介面、風險、相容性或驗收的決策；Codex host 可用時使用原生 question facility 提供推薦在前的互斥選項、trade-off 與 `Other`，不可用時使用相同結構的 numbered fallback。回答回流 `brief.md`/`requirements.md`，完成 `validate` 後展示摘要並等待明確 G1 approval。
-4. G2 使用 `codebase-design` 逐題確認重要設計取捨，採用同一套 native-first/fallback 問答規則；回答回流 `design.md`/`plan.md`，完成 `validate` 後展示方案、介面、失敗處理、回復方式與 task plan，等待明確 G2 approval。產品實作與 tracked tests 只在 current G2 後進行，Wiki 在 verification 前保持唯讀。
+3. G1 需求階段使用 `grill-me`/`grilling`，一次只問一個會影響目標、範圍、介面、風險、相容性或驗收的決策；Plan Mode 是目前正式入口，Codex host 可見時使用 canonical `request_user_input` 提供推薦在前的互斥選項、trade-off 與 `Other`，不可用時使用相同結構的 numbered fallback。回答回流 `brief.md`/`requirements.md`，完成 `validate` 後展示摘要並等待明確 G1 approval。
+4. G2 使用 `codebase-design` 在 Plan Mode 逐題確認重要設計取捨，採用同一套 native-first/fallback 問答規則；回答回流 `design.md`/`plan.md`，完成 `validate` 後展示方案、介面、失敗處理、回復方式與 task plan，等待明確 G2 approval。G2 前的普通/Skill context 若看不到工具，必須先回到 Plan Mode；G2 後普通模式只執行 approved tasks，新的 material decision 必須用 `revise` 回到最早受影響 phase。Wiki 在 verification 前保持唯讀。
 5. G3 驗證 current evidence、scope、baseline 與 Knowledge Review，確認實作符合已批准內容。新式 Work Item 必須選擇 `promote` 或 `no-update`；promote 最多變更五個內容頁並同步 index/log/seal。
 6. High-risk Work Item 在 final artifacts 穩定後由唯一 DevWeave router 啟動一個 isolated、read-only Independent Review Agent。Python engine 只接收 machine-only `review record`，保存 source-bound `kind: review` evidence、redacted report hash 與 provenance；standard/low risk 不啟動此 reviewer。
 7. 0.2.1 Windows 公開版交付 repository 與 VSIX，正式支援 Windows、VS Code 1.90+、Python 3.11+、Git 與 Codex；不包含 Marketplace 上架或 macOS/Linux 支援承諾。Control Center 的公開操作採 preview → 使用者確認複製 → Codex Chat handoff → Refresh，0.2.0 與 0.1.0 VSIX 保留作為回退。
@@ -31,11 +31,13 @@ Router 只把有實質影響的決策交給使用者：先提供已查證的 con
 
 原生 question facility 的題目包含兩至三個互斥選項，第一項標記 `(Recommended)`，並提供 host `Other` 自訂答案；host 不可用時，router 顯示相同的 structured numbered fallback。這只改變問答介面，不增加 question state、CLI、schema 或 ledger，Gate 仍由 explicit human approval 完成。
 
+Plan Mode 是 G1/G2/Gate material decision 的目前可保證 native entry；canonical host tool 是 `request_user_input`，一次只送一題並等待 answer round-trip。普通模式與 Skill context 的 tool visibility 是外部 Codex host capability：未暴露時不可把 policy 當成支援，pre-G2 必須停止並回到 Plan Mode，只有無法切換或明確選擇 compatibility 才能使用 structured fallback。取消、逾時、malformed 或 ambiguous result 不能猜答案、寫 artifact 或推進 Gate。
+
 Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-me`/`grilling` 負責 G1 問答，`codebase-design` 負責 G2 設計問答，`diagnosing-bugs` 與 `tdd` 仍受既有階段限制。Gate 是對已驗證 artifacts 的 Double Check；Gate 產生的新決策或使用者改變答案時，必須透過 `revise` 回到最早受影響階段。
 
 ## 架構
 
-- Python engine 是 workflow 與 knowledge policy 的權威來源；JSON/JSONL ledger 只能經 CLI 更新。互動式問答規則位於 router 與 phase guidance，並不新增 pending-question engine、CLI、schema 或第二套 ledger。
+- Python engine 是 workflow 與 knowledge policy 的權威來源；JSON/JSONL ledger 只能經 CLI 更新。互動式問答規則位於 router、shared native-question contract 與 phase guidance，host seam 由 Codex 注入；不新增 pending-question engine、CLI、schema、fake adapter 或第二套 ledger。
 - `knowledge_core.py` 負責 Wiki parser、source/content fingerprint、lint、coverage、reserved-starter preflight、bootstrap assessment、canonical scaffold 與 seal。`init` 先在 lock 外、再在 lock 內檢查 reserved paths，成功後才建立 `.devweave` control state。
 - `devweave_core.py` 負責 Work Item state、gate currentness、review/plan invalidation、G3 reconciliation 與 evidence。
 - High-risk G3 的 review result 分為 `passed`、`unavailable`、`critical`：unavailable/timeout/malformed fallback 與 advisory 是 warning，具名 critical security/data-loss/irreversible/scope finding 會阻擋 G3，只有 exact narrow `review-critical` waiver 可解除；human approval 仍是最後關卡。
@@ -62,5 +64,7 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 本 Work Item 將 Skill instructions 視為可治理的 repository policy overlay。`devweave` 是唯一 router；`codebase-design`、`diagnosing-bugs`、`grill-me`、`grilling`、`tdd` 是唯一五個 companion allowlist，提供目前 phase 的方法並把結果回流既有 artifact/evidence。`.agents/skills/writing-great-skills` 是 maintenance-only：它不進 companion allowlist、不進 Extension bootstrap bundle，也不建立工作流程。
 
 五個 companion 的 local optimization 保留 `skills-lock.json` 的 upstream source、skillPath 與 computed hash；local wording 是 overlay，不冒充 upstream release。Skill body 以 trigger branch、progressive disclosure、Wiki/phase precedence、停止條件與可檢查 completion criterion 組成；`grill-me` 維持 user-only invocation，`devweave` 維持 implicit invocation。這些修改沒有新增 CLI、JSON schema、router、state、ledger、branch、commit 或 PR 行為。
+
+需要使用者選擇的五個 companion 都遵循同一份 `native-question-contract.md`：Plan Mode/native `request_user_input`、一題／二至三選項／推薦第一項／host `Other`、等待與 result safety；普通 pre-G2 context 不能自行建立第二套問答 UI，新的 implementation decision 必須 `revise`。
 
 品質檢查包含 UTF-8 quick validation、repository contract 的 exact six-governed-Skill set、frontmatter/metadata/link/invocation policy、maintenance-only/bootstrap exclusion、隔離 forward-test，以及 Python/Extension full verification。validator 尚未支援的 `disable-model-invocation` 欄位由 repository contract 補驗，並保留 `grill-me` 的必要 policy。

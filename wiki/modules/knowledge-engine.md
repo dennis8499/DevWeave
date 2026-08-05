@@ -1,19 +1,19 @@
 ---
 title: Knowledge Engine
 type: module
-sources: [.agents/skills, .agents/skills/devweave/assets/wiki/templates, .agents/skills/devweave/scripts, tests/test_repository_contract.py, vscode-extension/esbuild.mjs]
+sources: [.agents/skills, .agents/skills/devweave/assets/wiki/templates, .agents/skills/devweave/scripts, AGENTS.md, tests/test_repository_contract.py]
 last_updated: 2026-08-05
 tags: [module]
 status: active
-source_fingerprint: "sha256:63cf5c851e6abf0720d8e749a1eea3455ddca3e1e3edb21c1a1bceefa584856a"
-verified_by: 20260805-081842-feature-skills-writing-great-skills
+source_fingerprint: "sha256:793f795c62a81a4faf52b4b0b037941443ffa6e41bcf6ace041e299d7bc3b51c"
+verified_by: 20260805-094544-feature-plan-first
 ---
 
 # Knowledge Engine
 
 ## Responsibility
 
-Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`knowledge_core.py` 提供純 Wiki/source 運算、reserved-starter preflight 與安全檔案操作；`devweave_core.py` 將這些能力綁定 Work Item phase、gate、review、plan、event 與 acceptance policy；`devweave.py` 暴露穩定 JSON machine commands。Engine 是 machine lifecycle 與 knowledge state 的權威；G1/G2 的逐題問答則由唯一 router 與 phase guidance 驅動，回答寫入既有 artifacts，不在 Engine 內維護 pending-question state。
+Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`knowledge_core.py` 提供純 Wiki/source 運算、reserved-starter preflight 與安全檔案操作；`devweave_core.py` 將這些能力綁定 Work Item phase、gate、review、plan、event 與 acceptance policy；`devweave.py` 暴露穩定 JSON machine commands。Engine 是 machine lifecycle 與 knowledge state 的權威；G1/G2 的逐題問答則由唯一 router 與 phase guidance 驅動，經 host canonical `request_user_input` seam 回答並寫入既有 artifacts，不在 Engine 內維護 pending-question state。
 
 ## Public Surface
 
@@ -31,7 +31,15 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 
 Release verification 將這個 boundary 綁到 current source fingerprint：Extension bounded walkthrough 需覆蓋 fresh/evolved/conflict/rollback 與 multi-work selection，Python targeted fixtures 需確認 conflict 保留 user bytes；high-risk review 仍只能由 router 透過 machine-only `review record` 記錄，不能由 engine 或 Extension 自行啟動。
 
-互動式決策不是新的 public machine command：G1 由 `grill-me`/`grilling` 協助確認 material requirements，G2 由 `codebase-design` 協助確認 material design；每次只處理一題並等待使用者回答。Gate 在 `validate` 後再做 Double Check，若答案或決策改變，沿既有 `revise` 使 Gate 與 artifacts 回到正確階段。
+互動式決策不是新的 public machine command：G1 由 `grill-me`/`grilling` 協助確認 material requirements，G2 由 `codebase-design` 協助確認 material design；Plan Mode 是目前正式入口，每次只處理一題並等待使用者回答。Gate 在 `validate` 後再做 Double Check，若答案或決策改變，沿既有 `revise` 使 Gate 與 artifacts 回到正確階段。
+
+## Native question contract
+
+- Canonical host tool 是 `request_user_input`；每次 request 只有一題，options 為二至三個互斥選項，第一項標記 `(Recommended)`，每個選項有 trade-off/description，host `Other` 保留自訂答案。
+- G1/G2/Gate 的 material decisions 在 Plan Mode 提問。普通或 Skill context 在 G2 前看不到工具時先停止並回到 Plan Mode；只有 host 無法切換或使用者明確選擇 compatibility 時，才使用同順序、同推薦、同 custom-answer 的 structured fallback。
+- G2 current 後，普通模式只執行 approved task；實作中新的 requirement/design/scope/task decision 必須停止並透過 `$devweave revise` 回到最早受影響 phase。
+- Host result 只可正規化為目前 question identity 與 valid selection/custom text；cancelled、timeout、malformed、empty 或 ambiguous result 不得寫 artifact、approve Gate 或猜答案。既有 validation 與 CLI `approve`/`revise` 仍是權威。
+- Tool visibility 是外部 host capability。Engine、Skill 與 VS Code Extension 不建立 `requestUserInput` alias、fake adapter、pending-question schema、CLI 或第二套 ledger。
 
 ## Dependencies
 
@@ -51,11 +59,12 @@ Release verification 將這個 boundary 綁到 current source fingerprint：Exte
 - Scaffold 採 no-overwrite create；seal 先完成所有候選 preflight，再以 per-file atomic replace 寫 provenance。多檔 I/O 仍是逐檔 atomic，最終完整性由 G3 reconciliation 保證。
 - Engine 不自動判斷每個 uncovered path 是否值得長期保存，也不強迫一檔一頁；這是刻意保留給 agent review 與人工 G3 的語意責任。
 - Engine 不判定沉默、模糊同意或 agent 推斷為 approval；explicit human approval 仍是 gate event 的必要條件。G3 只檢查實作對已批准內容的符合性，新需求必須經 `revise`，不能在驗證時默默補入。
+- Engine 不負責注入或檢測 host question UI；Plan Mode/native visibility、ordinary/Skill exposure、answer round-trip、cancel/timeout/malformed 是 router/host integration 的外部證據。Policy text 與 structured fallback 不可作為 ordinary native support 的證明。
 - G3 review validator 對 current `passed` 放行、對 unavailable/advisory 發 warning，對 critical finding 要求每個具名 `F-###` 有 acceptance-gate `review-critical` waiver；source fingerprint 改變會讓 review stale，legacy evidence 仍可讀但不能冒充 current independent review。
 
 ## Lifecycle boundary
 
-DevWeave 仍是唯一 router；Companion Skills 是階段內方法，不建立第二套 work-item lifecycle、artifact set 或 approval protocol。`diagnosing-bugs` 仍限於既有診斷階段，`tdd` 仍只能在 current G2 approval 後的 implementation 使用。此互動規則不新增 CLI、JSON schema、ledger 欄位或 VS Code UI。
+DevWeave 仍是唯一 router；Companion Skills 是階段內方法，不建立第二套 work-item lifecycle、artifact set 或 approval protocol。`diagnosing-bugs` 仍限於既有診斷階段，`tdd` 仍只能在 current G2 approval 後的 implementation 使用；若 implementation 發現新 material decision，必須停止並 `revise`。此互動規則不新增 CLI、JSON schema、ledger 欄位或 VS Code UI。
 
 ## Skill governance boundary
 
