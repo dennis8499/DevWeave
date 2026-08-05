@@ -22,6 +22,8 @@ DevWeave observes Git state but does not create branches, worktrees, commits, pu
 
 During G1/G2, ask only material requirements/design decisions. Prefer the Codex host's native question facility with two or three mutually exclusive options, the recommended option first marked `(Recommended)`, evidence/trade-off descriptions, and `Other` freeform. If native questions are unavailable, use the same structured numbered fallback with an explicit custom-answer entry. Ask one question at a time, wait for the answer, and return it to the current artifact; do not create a second question state or ledger.
 
+Initial Plan Mode preflight applies before every pre-G2 Work Item mutation: `new`, `feature`, `refactor`, `bug`, `wiki bootstrap`, and `revise` returning to G1/G2. The Router uses visible `request_user_input` as the only host capability evidence; if it is unavailable, stop before `start`, `bind`, `revise`, or bootstrap Work Item creation and ask the user to switch to Plan Mode. Only an explicit compatibility choice permits the structured numbered fallback. The Extension cannot inspect or switch host mode.
+
 Machine keys and protocols remain English. User-facing discovery, approvals, and acceptance reports use Traditional Chinese unless the user asks otherwise.
 
 ## Initialization order

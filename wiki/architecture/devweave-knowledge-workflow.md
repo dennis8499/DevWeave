@@ -5,15 +5,15 @@ sources: [.agents/skills, AGENTS.md, README.md, docs/使用手冊.md, tests/test
 last_updated: 2026-08-05
 tags: [architecture]
 status: active
-source_fingerprint: "sha256:37f5ae667a3939be59783dcdef09cee7b967ebeb9808f27f1427208a9f65eb85"
-verified_by: 20260805-150125-bug-codex-cli-pretooluse-hook-powershell-utf
+source_fingerprint: "sha256:632edba0c9b7356506c1d6c4202366e96bed57efe0ec55db435f9f4d240c91ef"
+verified_by: 20260805-184040-feature-plan-mode
 ---
 
 # DevWeave Knowledge Workflow
 
 ## Context
 
-DevWeave 將 Codebase Wiki 納入既有 Work Item lifecycle，而不是建立第二套 Wiki skill 或背景索引服務。Wiki 提供快速定位入口；source 與已核准 artifacts 仍是權威事實來源。G1/G2/Gate 的 material decision 問答採 Plan-first：canonical `request_user_input` 是 Codex host seam，router/phase guidance 只定義 payload 與 lifecycle，不新增另一個 lifecycle、engine state 或 UI。
+DevWeave 將 Codebase Wiki 納入既有 Work Item lifecycle，而不是建立第二套 Wiki skill 或背景索引服務。Wiki 提供快速定位入口；source 與已核准 artifacts 仍是權威事實來源。G1/G2/Gate 的 material decision 問答採 Plan-first：canonical `request_user_input` 是 Codex host seam，router/phase guidance 只定義 payload 與 lifecycle，不新增另一個 lifecycle、engine state 或 UI。所有 pre-G2 mutation entry 先經 Router preflight；host capability 不可見時，Router 在 Work Item mutation 前停止並提示切換 Plan Mode。
 
 ## Companion Skill routing and completion
 
@@ -36,12 +36,12 @@ Repository contract 以 exact six-governed-Skill set、frontmatter identity、re
 9. Verification 的 `knowledge review` 保存 disposition、rationale、affected/covered/uncovered paths 與 product change fingerprint。後續產品 fingerprint 改變會使 knowledge review、plan 與 source-bound review evidence invalid，並要求重新審查。
 10. `promote` 建立一至五個 content upsert/delete；新頁經 canonical scaffold 先成為 placeholder。完成 active 內容後同步 index、append-only log，再 seal source fingerprint 與 Work Item provenance。`no-update` 僅在非 bootstrap、無 affected page、無 Wiki diff 時成立。
 11. G3 重新比對完整 Wiki diff、affected pages、plan、coupling、log、seal、baseline、current evidence 與 Independent Review。`passed` 正常通過；unavailable/advisory 形成 warning；critical security/data-loss/irreversible/scope finding 只有 exact named `review-critical` acceptance waiver 可解除。它只驗證實作是否符合已批准內容，不默默補入新需求或設計。人工核准後才可 close。
-12. 0.2.1 Windows release verification 必須固定記錄 doctor、Extension tests/typecheck/package/smoke、98 項 Python release baseline、symlink 權限補驗、disposable walkthrough 與 `git diff --check`；VSIX verifier 只驗證 current 0.2.1，包含 58 個 bootstrap files、118 個 VSIX entries、source length/hash 與 artifact SHA-256。本 work item 在既有 baseline 上新增四項 hook regression，final Python run 為 102 tests。High-risk review 仍只由 router 啟動 exactly one isolated read-only reviewer；零失敗、零未補驗 skip、零 stale evidence 與 current `passed` review 才符合本次 G3 release bar。
+12. 0.2.2 Windows release verification 必須固定記錄 doctor、Extension tests/typecheck/package/smoke、Python release baseline、symlink 權限補驗、disposable walkthrough 與 `git diff --check`；VSIX verifier 只驗證 current 0.2.2，包含 58 個 bootstrap files、119 個 VSIX entries、source length/hash 與 artifact SHA-256，並保留 0.2.1 artifact。本 work item 的 Extension final run 為 77 tests。High-risk review 仍只由 router 啟動 exactly one isolated read-only reviewer；零失敗、零未補驗 skip、零 stale evidence 與 current `passed` review 才符合本次 G3 release bar。
 13. Windows Codex 的 PreToolUse launcher 是 bootstrap control contract：標準 `command` 使用 `powershell.exe -NoLogo -NoProfile -NonInteractive -Command`，以 `python.exe -X utf8 -B` 和 `(Join-Path (git rev-parse --show-toplevel) ...)` 從 Git root 執行 `guard.py`。它可由 `cmd.exe` 或 PowerShell 外層啟動；guard 以 UTF-8 bytes 解析/輸出，程序 exit 與 guard 的 `permissionDecision` JSON 是分離的結果，Extension 不會靜默覆寫既有 exact hook。
 
 ## VS Code Control Center integration
 
-VS Code Extension 是這條 lifecycle 的唯讀 projection client。Host 以 `WorkspaceSnapshotReader` 讀取 project、work item、Wiki、evidence 與 bootstrap completeness；它不執行 Python engine、shell、Git、network 或 Codex API。使用者確認初始化後，`BootstrapInstaller` 才能套用 0.2.1 allowlisted control bundle；project、三份 baseline 與三份 Wiki starter 依 shared semantic validator 採用合法 evolved bytes，其他 controls 仍以 exact policy 檢查，missing-only write 與 conflict/rollback 邊界不變。
+VS Code Extension 是這條 lifecycle 的唯讀 projection client。Host 以 `WorkspaceSnapshotReader` 讀取 project、work item、Wiki、evidence 與 bootstrap completeness；它不執行 Python engine、shell、Git、network 或 Codex API。使用者確認初始化後，`BootstrapInstaller` 才能套用 0.2.2 allowlisted control bundle；project、三份 baseline 與三份 Wiki starter 依 shared semantic validator 採用合法 evolved bytes，其他 controls 仍以 exact policy 檢查，missing-only write 與 conflict/rollback 邊界不變。
 
 Bootstrap bundle 內的 hook 來自根目錄 `.codex/hooks.json`，其 Windows launcher 經 `cmd.exe /d /s /c` 與 PowerShell outer runner 實際驗證，包含 raw UTF-8 payload 與 nested Git-root cwd；正常 DevWeave policy deny 仍輸出 `hookSpecificOutput.permissionDecision: deny` 且 process exit 0。這個 source-derived 行為由 package verifier 與 repository contract regression 固定檢查。
 
@@ -53,6 +53,8 @@ Preview safety 由 host `PreviewGate` 最終 enforcement：ticket 綁定 panel i
 
 Copy transaction 將 clipboard adapter failure 與成功後的 `copyResult`/native toast notification 分離：ticket 一旦被成功 consume 並寫入 clipboard，後續 notification transport failure 不得 restore，避免同一 preview 被重複複製；Python/Extension walkthrough markers 由 configured verification commands 留在 current raw logs。
 
+Plan Mode handoff 是非權威的 Extension guidance：no-active 或 pre-G2 snapshot 由 `SnapshotGuidance` 帶出 optional `PlanModeGuidance`，mutation preview 與 copied result 顯示「先切換 Plan Mode，再貼到 Codex Chat」。`PromptBundle.chatText` 仍是原本的 `$devweave ...` prompt，copy 仍可用；Extension 不讀取、切換或模擬 host mode，也不建立 host mode adapter。
+
 Control Center 的五個區域使用 tab/tabpanel `aria-controls`、`aria-labelledby`、roving tabindex、方向鍵/Home/End 與 focus restore；主要 CTA、native modal action、readiness、error 與 empty-state copy 使用繁體中文。錯誤的 user-facing status 先顯示繁中指引，原始技術訊息只放在可展開 detail，技術 command 名稱保留在 code/technical label。
 
 說明頁是 Extension bundle 內的 lazy local content，不寫入 target repository，也不需要網路。這些 UI／package 知識在 G3 promote 更新，若需求或設計改變仍須回到同一 Work Item 的 `revise` 與 Gate lifecycle。
@@ -63,8 +65,8 @@ Control Center 的五個區域使用 tab/tabpanel `aria-controls`、`aria-labell
 - `knowledge_core.inspect_wiki` 是 init 的 read-only reserved-starter seam；`devweave_core.init_project` 在 lock 外與 lock 內各檢查一次，只有 preflight 成功才建立 control bundle。
 - Guard 只允許 verification 中 knowledge plan 的 content paths，以及自動 coupling 的 `wiki/index.md`、`wiki/log.md`。
 - Review Agent 的啟動權只在既有 router；Python engine 只記錄 machine report，Extension 只投影 readiness，三者不產生第二個 lifecycle 或平行 ledger。
-- 互動式問答由 router/phase guidance 約束；不新增 pending-question state、CLI、JSON schema、VS Code UI 或第二套 question ledger。沉默與模糊同意不構成 approval，未回答的 material decision 會停在目前階段。
-- `request_user_input` 的可見性由 Codex host 決定；repository 不宣稱 ordinary/Skill native support，也不提供 fake alias 或 adapter。取消、逾時、malformed、空值與 ambiguous result 維持 pending，Gate 仍只接受 validation 後的既有 `approve`/`revise` CLI contract。
+- 互動式問答由 router/phase guidance 約束；`new`、`feature`、`refactor`、`bug`、`wiki bootstrap` 與回到 G1/G2 的 `revise` 在 `start`、`bind`、`revise` 或 bootstrap create 前完成 Plan Mode preflight。不新增 pending-question state、CLI、JSON schema、VS Code UI 或第二套 question ledger。沉默與模糊同意不構成 approval，未回答的 material decision 會停在目前階段。
+- `request_user_input` 的可見性由 Codex host 決定；repository 不宣稱 ordinary/Skill native support，也不提供 fake alias 或 adapter。Router 無 capability 證據時必須停止並提示切換 Plan Mode，只有使用者明確選擇 compatibility 才進入 structured fallback。取消、逾時、malformed、空值與 ambiguous result 維持 pending，Gate 仍只接受 validation 後的既有 `approve`/`revise` CLI contract。
 - 每頁最多五個 sources；每次 context 最多五個內容頁；每次 promotion 最多五個 content targets。
 - Bootstrap 不接受 repository 子路徑 scope，不修改產品 source，且需 promote overview、至少一個 architecture、至少一個 module。
 - Extension 不建立 process/network seam，也不自行重算 Git/source fingerprint；其 bootstrap、PreviewGate 與 Independent Review readiness 判定都是非權威 filesystem projection，但 host copy boundary 仍是 clipboard 安全的最終 enforcement point。

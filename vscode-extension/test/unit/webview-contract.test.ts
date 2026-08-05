@@ -42,6 +42,12 @@ test("Webview contract keeps preview metadata, stale reset, and accessible five-
   assert.match(source, /errorDetail = message\.detail/);
   assert.match(source, /查看 technical 詳情/);
   assert.match(source, /預覽公開操作/);
+  assert.match(source, /renderPlanModeHandoff/);
+  assert.match(source, /先切換 Plan Mode，再貼到 Codex Chat/);
+  assert.match(source, /bundle\.planModeGuidance\?\.required/);
+  assert.match(source, /message\.bundle\.planModeGuidance\?\.required/);
+  assert.match(source, /data-action="confirm-copy"/);
+  assert.doesNotMatch(source, /request_user_input|requestUserInput/);
   assert.doesNotMatch(source, /Preview public command/);
   assert.match(styles, /@media \(forced-colors: active\)/);
 

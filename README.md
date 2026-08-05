@@ -47,15 +47,15 @@ G3 功能驗收：acceptance、回歸測試、scope、Wiki／baseline
 DevWeave 不是 pip package，也沒有另一套安裝型 router。它由 repository 內的 skill、CLI、
 hook、project state、Wiki 與 baseline 一起運作。
 
-## Windows 公開版 0.2.1
+## Windows 公開版 0.2.2
 
-本次只提供 0.2.1 VSIX，交付檔為 `vscode-extension/devweave-control-center-0.2.1.vsix`。VSIX 可在 VS Code 的 Extensions 視窗使用「Install from VSIX…」安裝；安裝後開啟 DevWeave repository，即可從 Activity Bar 進入 Control Center。完整流程請看[繁體中文使用手冊](docs/使用手冊.md)與 [Control Center README](vscode-extension/README.md)。
+本次提供 0.2.2 VSIX，交付檔為 `vscode-extension/devweave-control-center-0.2.2.vsix`，並保留既有 0.2.1 artifact。VSIX 可在 VS Code 的 Extensions 視窗使用「Install from VSIX…」安裝；安裝後開啟 DevWeave repository，即可從 Activity Bar 進入 Control Center。完整流程請看[繁體中文使用手冊](docs/使用手冊.md)與 [Control Center README](vscode-extension/README.md)。
 
-本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；驗收基準為 Python full suite 98 項與 Extension unit tests 73 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻，不是本次已認證組合的宣告。這個 release 不包含 Marketplace 上架，也不對 macOS/Linux 做支援承諾。
+本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；驗收基準為 Python full suite 103 項與 Extension unit tests 77 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻，不是本次已認證組合的宣告。這個 release 不包含 Marketplace 上架，也不對 macOS/Linux 做支援承諾。
 
-若發生發布事故，處理方式是立即停止散布並停用或解除安裝 0.2.1；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。應保留 workspace snapshot 與 logs，以新版本修復，不覆寫已發布的 0.2.1 artifact。
+若發生發布事故，處理方式是立即停止散布並停用或解除安裝 0.2.2；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。應保留 workspace snapshot 與 logs，以新版本修復，並保留已發布的 0.2.1 artifact。
 
-Control Center 的公開操作都遵循「預覽 → 你確認複製 → Codex Chat 審閱並送出 → Refresh」；Refresh、切換 work 或 workspace snapshot 更新後，舊 prompt 必須重新預覽。`devweave.copyNextAction` 仍保留，但現在會開啟 Control Center；多個 active work 時必須先明確選取 work。
+Control Center 的公開操作都遵循「預覽 → 你確認複製 → Codex Chat 審閱並送出 → Refresh」；Refresh、切換 work 或 workspace snapshot 更新後，舊 prompt 必須重新預覽。若 mutation prompt 顯示 Plan Mode handoff，請先切換 Plan Mode，再貼到 Codex Chat；Extension 仍可複製 prompt，但不會嘗試切換 host mode。`devweave.copyNextAction` 仍保留，但現在會開啟 Control Center；多個 active work 時必須先明確選取 work。
 
 ## 快速開始
 
@@ -134,6 +134,13 @@ Plan Mode；Codex host 暴露 `request_user_input` 時，題目使用兩至三�
 `(Recommended)`、選項說明與 host `Other` 自訂答案。每次只問一題，等待使用者回答後才回流
 artifact；普通模式在 G2 前若看不到工具，先要求回到 Plan Mode，只有無法切換或明確選擇相容性時
 才使用同格式的 structured numbered fallback。可由 repository 查出的 facts 不重複詢問。
+
+所有會在 pre-G2 建立或修改 Work Item 的入口都有 initial Plan Mode preflight：`new`、`feature`、
+`refactor`、`bug`、`$devweave wiki bootstrap`，以及回到 G1/G2 的 `revise`。Router 會在
+`start`、`bind`、`revise` 或 bootstrap Work Item mutation 前確認 host 是否真的暴露
+`request_user_input`；看不到時只提示「請切換 Plan Mode」並停止，不會建立新的 Work Item。只有
+使用者明確選擇 compatibility，才會使用 shared contract 的 structured numbered fallback；Extension
+不會偽造或切換 host mode。
 
 G1 artifacts：
 

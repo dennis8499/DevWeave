@@ -139,6 +139,13 @@ function snapshotFixture(): WorkspaceSnapshot {
   };
 }
 
+function snapshotWithPhase(phase: string): WorkspaceSnapshot {
+  return {
+    ...snapshotFixture(),
+    workItems: [{ id: "demo", phase, status: "active" } as WorkspaceSnapshot["workItems"][number]]
+  };
+}
+
 test("snapshot reader projects array commands, placeholder Wiki, work state, and stale evidence", async () => {
   const reader = new WorkspaceSnapshotReader(new MemoryFileSystem(managedEntries()), {
     rootName: "fixture",
@@ -488,6 +495,42 @@ test("every public command produces the documented command text", () => {
     assert.equal(bundle.chatText.includes("--repo"), false, intent.type);
     assert.equal(bundle.chatText.includes("gate"), false, intent.type);
   }
+});
+
+test("mutation prompts expose initial Plan Mode guidance without changing chatText", () => {
+  const composer = new DevWeavePromptComposer();
+  const cases: Array<[PublicCommandIntent, string]> = [
+    [{ type: "new", goal: "建立第一個切片" }, "$devweave new 建立第一個切片"],
+    [{ type: "feature", request: "新增 CSV 匯出" }, "$devweave feature 新增 CSV 匯出"],
+    [{ type: "refactor", request: "整理 prompt seam" }, "$devweave refactor 整理 prompt seam"],
+    [{ type: "bug", symptom: "初始化失敗" }, "$devweave bug 初始化失敗"],
+    [{ type: "wikiBootstrap" }, "$devweave wiki bootstrap"]
+  ];
+
+  for (const [intent, expectedChatText] of cases) {
+    const bundle = composer.compose(intent, snapshotFixture());
+    assert.deepEqual(bundle.planModeGuidance, { required: true, stage: "initial" }, intent.type);
+    assert.equal(bundle.chatText, expectedChatText, intent.type);
+  }
+});
+
+test("revise and gate prompts map Plan Mode guidance to the current phase", () => {
+  const composer = new DevWeavePromptComposer();
+  const revise = (phase: string) => composer.compose(
+    { type: "revise", workId: "demo", change: "調整設計" },
+    snapshotWithPhase(phase)
+  );
+
+  assert.deepEqual(revise("requirements").planModeGuidance, { required: true, stage: "g1" });
+  assert.deepEqual(revise("scope_review").planModeGuidance, { required: true, stage: "g1" });
+  assert.deepEqual(revise("design").planModeGuidance, { required: true, stage: "g2" });
+  assert.deepEqual(revise("build_review").planModeGuidance, { required: true, stage: "g2" });
+  assert.deepEqual(revise("implementation").planModeGuidance, { required: false, stage: "post-g2" });
+  assert.deepEqual(
+    composer.compose({ type: "approve", workId: "demo" }, snapshotWithPhase("design")).planModeGuidance,
+    { required: true, stage: "g2" }
+  );
+  assert.equal(composer.compose({ type: "status" }, snapshotWithPhase("requirements")).planModeGuidance, undefined);
 });
 
 test("public Webview protocol accepts public intents and rejects machine actions", () => {

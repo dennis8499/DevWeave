@@ -2,15 +2,16 @@
 
 DevWeave Control Center 是以新手為先的 VS Code Extension。它把 DevWeave repository 的檔案狀態整理成五個區域：`總覽`、`工作項目`、`知識`、`驗證與稽核`、`說明`，讓你先知道目前狀態與下一步，再按需要查看治理細節。
 
-本頁對應 DevWeave 0.2.1 Windows 公開版；本次只提供 0.2.1 VSIX。本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；驗收基準為 Python full suite 98 項與 Extension unit tests 73 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。交付方式是 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。
+本頁對應 DevWeave 0.2.2 Windows 公開版；本次提供 0.2.2 VSIX，並保留 0.2.1 artifact。本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；驗收基準為 Python full suite 103 項與 Extension unit tests 77 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。交付方式是 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。
 
-若發生發布事故，立即停止散布並停用或解除安裝 0.2.1；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。保留 workspace snapshot 與 logs，修復後產生新版本。
+若發生發布事故，立即停止散布並停用或解除安裝 0.2.2；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。保留 workspace snapshot 與 logs，0.2.1 artifact 仍可作為回溯參考，修復後產生新版本。
 
 ## 先記住三件事
 
 - Dashboard 是 filesystem snapshot，不是 engine 的權威狀態。完成 Codex Chat 操作後，請回到 Extension 按「重新整理檔案快照」。
 - 初始化是唯一的 direct write：你在 modal 中確認後，Extension 才會套用固定 bootstrap bundle。它不覆寫衝突檔案，失敗時會 fail closed 或 rollback。
 - 其他 `$devweave` 操作都是 prompt handoff：Extension 只產生、預覽並複製 prompt；你要到 Codex Chat 貼上、審閱並送出。
+- 所有 pre-G2 mutation prompt 都有 Plan Mode preflight handoff：請先切換 Plan Mode，再貼到 Codex Chat；Extension 不會嘗試切換 host mode，也不會新增 checkbox 或 host command。
 
 ## 第一次使用
 
@@ -22,15 +23,17 @@ DevWeave Control Center 是以新手為先的 VS Code Extension。它把 DevWeav
 
 ## Windows 安裝 VSIX
 
-1. 從 repository 取得 `vscode-extension/devweave-control-center-0.2.1.vsix`。
+1. 從 repository 取得 `vscode-extension/devweave-control-center-0.2.2.vsix`。
 2. 在 VS Code 開啟 Extensions 視窗，按右上角 `...`，選擇「Install from VSIX…」，選取該檔案並等待安裝完成。
 3. 重新載入 VS Code（若畫面提示需要 reload），再開啟 DevWeave repository，從 Activity Bar 選擇 DevWeave Control Center。
 
-也可以在 Windows 終端執行 `code --install-extension vscode-extension/devweave-control-center-0.2.1.vsix`。本 release 不會自動從 Marketplace 更新。
+也可以在 Windows 終端執行 `code --install-extension vscode-extension/devweave-control-center-0.2.2.vsix`。本 release 不會自動從 Marketplace 更新。
 
 ## Preview、Codex handoff 與 Refresh
 
 公開操作固定遵循這個順序：在 Control Center 選擇 work 或 task →「預覽公開操作」→確認 prompt 的目的、邊界與下一步→「複製 prompt」→到 Codex Chat 貼上、審閱並送出→回到 Extension 按「重新整理檔案快照」。
+
+如果 preview 或 copied result 顯示 Plan Mode handoff，請先切換 Plan Mode，再貼到 Codex Chat；這是 Router 的 mutation 前置條件提示，仍可複製 prompt，Extension 不會讀取或切換 Codex host mode。
 
 Preview 綁定目前 panel、操作 intent 與 workspace snapshot revision。Refresh、切換 work、初始化結果或檔案 snapshot 更新後，舊 preview 會失效，必須重新預覽；因此不會把過期 prompt 複製出去。複製時若 Windows clipboard 暫時失敗，該次 preview 會保留一次重試機會，成功後即消耗。
 
@@ -90,8 +93,8 @@ npm run test:smoke
 npx --yes @vscode/vsce package --allow-missing-repository
 ```
 
-`npm run package` 會從 `package.json` 產生 0.2.1 production bundle、完整 bootstrap manifest 與 `devweave-control-center-0.2.1.vsix`；`npm run test:smoke` 會使用 VS Code Extension Host 驗證 activation、Activity Bar view 與公開 commands。Extension unit tests 73 項全部通過。
+`npm run package` 會從 `package.json` 產生 0.2.2 production bundle、完整 bootstrap manifest 與 `devweave-control-center-0.2.2.vsix`；`npm run test:smoke` 會使用 VS Code Extension Host 驗證 activation、Activity Bar view 與公開 commands。Extension unit tests 目前基線為 77 項，新增導流測試後以實際 package evidence 為準。
 
 ## 打包 VSIX
 
-Package verification 只處理 `devweave-control-center-0.2.1.vsix`，並檢查 package／bundle version、58 個 bootstrap files、118 個 VSIX entries、必要 entries、source byte length／SHA-256 與 current artifact SHA-256。其他 VSIX 不是本次封裝、驗收或回復條件。
+Package verification 只處理 current `devweave-control-center-0.2.2.vsix`，並檢查 package／bundle version、58 個 bootstrap files、119 個 VSIX entries、必要 entries、source byte length／SHA-256 與 current artifact SHA-256；既有 0.2.1 VSIX 保留但不作為 current package。其他 VSIX 不是本次封裝、驗收或回復條件。

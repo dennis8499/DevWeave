@@ -14,6 +14,7 @@ DevWeave 以單一 `$devweave` router，讓 Codex 在 repository 內以可追溯
 - Review result 的 `passed` 正常通過；`unavailable`、timeout、malformed fallback 與 advisory findings 是 warning；critical security、data-loss、不可回復性或 scope finding 只有具名、窄幅 `review-critical` acceptance waiver 可解除。
 - G1 採 Wiki-first：先讀 root `wiki/index.md`，再讀最多五個相關頁面，保存每頁 status、content hash 與 stored/computed source fingerprint；只有先記錄 gap 才回查最小必要 source。
 - G1/G2 的 material decisions 優先使用 Codex host 原生 question facility，以推薦在前的互斥選項、trade-off 與 `Other` 收集逐題回答；host 不可用時使用相同結構的 numbered fallback，不新增 question state 或改變 explicit Gate approval。
+- 所有 pre-G2 mutation entry（`new`、`feature`、`refactor`、`bug`、`wiki bootstrap` 與回到 G1/G2 的 `revise`）先完成 Plan Mode preflight；未見 `request_user_input` host capability 時只提示切換並在 Work Item mutation 前停止，只有使用者明確選擇 compatibility 才進入 structured fallback。`init` 的既有啟動例外保留，但 `start` 仍需先完成 preflight。
 - 每個新式 Work Item 在 G3 前必須完成 Knowledge Review：可重用知識採 `promote`，沒有 durable knowledge 時採有理由的 `no-update`，而不是強迫每次產生 Wiki diff。
 - G3 可將驗證後的 overview、architecture、module、entity、pattern、dependency、decision、guide 與 synthesis 知識提升到 root `wiki/`；affected pages、最多五個 content targets、index、append-only log 與 source provenance 由 engine 驗證。
 - `.devweave/baseline/` 保存 accepted governance truth；`wiki/` 保存細緻且 source-bound 的 codebase knowledge。
@@ -24,8 +25,8 @@ DevWeave 以單一 `$devweave` router，讓 Codex 在 repository 內以可追溯
 - Project initialization 在任何 `.devweave` control write 前完成 Wiki reserved-starter preflight；custom-only Wiki 會補齊缺少 starter，錯誤 reserved path 會回報 `knowledge_conflict` 且不留下 partial control bundle。
 - Extension 對 project、三份 baseline 與三份 Wiki starter 採 destination-specific semantic adoption；AGENTS、skills、hook、lock 與其他 policy controls 仍維持 exact bytes。
 - Extension 的公開下拉、Knowledge recommendation CTA 與 Command Palette `DevWeave: Bootstrap Codebase Wiki` 共用同一 prompt-only intent，精確產生 `$devweave wiki bootstrap`；Extension 不執行 CLI、不寫 live Wiki。
-- 本次只提供 `devweave-control-center-0.2.1.vsix`。認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；VS Code 1.90+、Python 3.11+ 是技術門檻，不代表其他組合已完成本次認證。發布事故時停止散布並停用或解除安裝 0.2.1，保留 `.devweave`、Wiki、workspace snapshot 與 logs，以新版本修復；不提供舊版 binary rollback。
-- Control Center 的 workflow mutation 永遠先 Preview，再由使用者確認複製到 Codex Chat；Refresh、初始化、work selection 或 snapshot revision 更新後，舊 prompt 必須重新預覽。`devweave.copyNextAction` 保留 command ID 但只開啟 Control Center，多 active work 必須明確選取，`status` 可查詢全部 active work。
+- 本次提供 `devweave-control-center-0.2.2.vsix` 並保留 `devweave-control-center-0.2.1.vsix`。認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；VS Code 1.90+、Python 3.11+ 是技術門檻，不代表其他組合已完成本次認證。發布事故時停止散布並停用或解除安裝 0.2.2，保留 `.devweave`、Wiki、workspace snapshot、logs 與 0.2.1 artifact，以新版本修復；不提供舊版 binary rollback。
+- Control Center 的 workflow mutation 永遠先 Preview，再由使用者確認複製到 Codex Chat；no-active/pre-G2 overview 與 mutation preview/copy result 顯示先切換 Plan Mode 的 handoff。`PromptBundle`／`SnapshotGuidance` 的 optional guidance metadata 不改變既有 `$devweave ...` `chatText`，Extension 不嘗試切換 host mode。Refresh、初始化、work selection 或 snapshot revision 更新後，舊 prompt 必須重新預覽。`devweave.copyNextAction` 保留 command ID 但只開啟 Control Center，多 active work 必須明確選取，`status` 可查詢全部 active work。
 - 首次初始化採使用者確認、non-overwrite、semantic adoption 與 fail-closed rollback；取消、conflict 或 write failure 不留下 partial control bundle。Control Center 提供 Wiki DOM 搜尋、ARIA/keyboard tabs、focus restore、繁中 primary UI 與 embedded Windows release help。
 
 ## Roadmap

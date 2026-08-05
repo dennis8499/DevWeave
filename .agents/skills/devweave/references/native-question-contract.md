@@ -39,10 +39,21 @@ The request contract is:
 - The router waits for the result before asking another question, changing an
   artifact, starting implementation, or invoking a Gate action.
 
+## Initial mutation preflight
+
+The initial preflight is an ordering contract owned by the single DevWeave Router. Before any Work Item can be created or modified, it applies to `$devweave new`, `$devweave feature`, `$devweave refactor`, `$devweave bug`, `$devweave wiki bootstrap`, and `revise` when the requested target returns the work to G1 or G2. The preflight must happen before `start`, `bind`, the mutating `revise`, or a bootstrap create/resume path.
+
+The Router treats only actual visibility of the canonical host tool `request_user_input` as evidence that the current host can provide native Plan Mode interaction. A policy statement, Skill invocation, Extension UI, or repository setting is not evidence. When the tool is visible, the Router continues with the existing work-item lifecycle and Gate contracts.
+
+When the tool is not visible in an ordinary context, the Router tells the user to switch to Plan Mode and stops before the mutation boundary. It must not resolve a mutable Work Item, bind a session, invoke `start`/`revise`, or create a bootstrap Work Item as part of that stopped path. The uninitialized `init` startup exception remains allowed, but `start` still requires this preflight.
+
+If the host cannot switch modes, or the user explicitly chooses compatibility, the Router may present the same decision as a structured numbered fallback. The user must explicitly select compatibility before that fallback is used; the fallback itself still follows the one-question contract below. No answer, cancellation, timeout, malformed result, empty answer, or ambiguity permits mutation or Gate progress. Read-only `status`/`next` inspection may explain the stop.
+
 ## Plan-first routing
 
-- Before current G2, use Plan Mode for G1/G2 material requirements and design
-  decisions and for Gate choices whenever the host exposes the native tool.
+- Before current G2, use Plan Mode for the initial mutation preflight, G1/G2
+  material requirements and design decisions, and Gate choices whenever the host
+  exposes the native tool.
 - If an ordinary-mode Skill needs a material decision before G2 and the native tool
   is not visible, stop and ask the user to return to Plan Mode.
 - If the host cannot switch modes or the user explicitly chooses compatibility

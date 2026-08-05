@@ -327,6 +327,41 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertNotIn("request_user_input", path.read_text(encoding="utf-8"), path)
             self.assertNotIn("requestUserInput", path.read_text(encoding="utf-8"), path)
 
+    def test_initial_plan_mode_preflight_and_control_center_handoff_are_documented(
+        self,
+    ) -> None:
+        agents = (REPOSITORY_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        router = (REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "SKILL.md").read_text(encoding="utf-8")
+        contract = (
+            REPOSITORY_ROOT
+            / ".agents"
+            / "skills"
+            / "devweave"
+            / "references"
+            / "native-question-contract.md"
+        ).read_text(encoding="utf-8")
+        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+        manual = (REPOSITORY_ROOT / "docs" / "使用手冊.md").read_text(encoding="utf-8")
+        extension_readme = (REPOSITORY_ROOT / "vscode-extension" / "README.md").read_text(encoding="utf-8")
+        bootstrap_agents = (
+            REPOSITORY_ROOT / "vscode-extension" / "assets" / "bootstrap" / "AGENTS.md"
+        ).read_text(encoding="utf-8")
+
+        for source in (agents, router, contract):
+            self.assertIn("request_user_input", source)
+            self.assertIn("explicitly chooses compatibility", source)
+            self.assertIn("start", source)
+            self.assertIn("bind", source)
+
+        self.assertIn("Initial Plan Mode preflight", router)
+        self.assertIn("## Initial mutation preflight", contract)
+        self.assertIn("Plan Mode preflight", agents)
+        self.assertIn("Plan Mode preflight", readme)
+        self.assertIn("Plan Mode preflight", manual)
+        self.assertIn("Plan Mode preflight", bootstrap_agents)
+        self.assertIn("先切換 Plan Mode，再貼到 Codex Chat", extension_readme)
+        self.assertIn("不會嘗試切換 host mode", extension_readme)
+
     def test_runtime_has_no_openspec_or_third_party_imports(self) -> None:
         for path in SCRIPT_ROOT.glob("*.py"):
             source = path.read_text(encoding="utf-8")
@@ -591,7 +626,7 @@ class RepositoryContractTests(unittest.TestCase):
             "vscode-extension/webview/help-content.ts",
         )
         release_contract = (
-            "本次只提供 0.2.1 VSIX",
+            "本次提供 0.2.2 VSIX",
             "本次認證環境",
             "Windows x64 build 10.0.26200／25H2",
             "VS Code 1.131.0",
@@ -599,10 +634,10 @@ class RepositoryContractTests(unittest.TestCase):
             "Git 2.51.0.windows.1",
             "目前 Codex host",
             "技術門檻",
-            "Python full suite 98 項",
-            "Extension unit tests 73 項",
+            "Python full suite 103 項",
+            "Extension unit tests 77 項",
             "停止散布",
-            "停用或解除安裝 0.2.1",
+            "停用或解除安裝 0.2.2",
             "不會自動刪除 `.devweave`、Wiki 或 workspace 資料",
         )
         for relative in release_surfaces:

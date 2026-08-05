@@ -1,0 +1,53 @@
+{
+  "argv": [
+    "python",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-v"
+  ],
+  "binds_current_source": true,
+  "command_id": "unit-tests",
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009"
+  ],
+  "created_at": "2026-08-05T12:40:54+00:00",
+  "cwd": ".",
+  "execution_error": null,
+  "exit_code": 1,
+  "expectation": "zero",
+  "git_head": "248814fc01f0d0c76988efcf85c6b4a5711a0fbc",
+  "id": "EVID-017",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "failure",
+  "raw_log": ".devweave/cache/logs/20260805-184040-feature-plan-mode/EVID-017.log",
+  "schema_version": 1,
+  "source_fingerprint": "d04b195b3a0b5c0f104c1301e3160f26adf2ba27dc65b092d33b7750762065af",
+  "stale": false,
+  "started_at": "2026-08-05T12:30:48+00:00",
+  "status": "failed",
+  "summary": "otstrap work item�A�u�� G1/G2/G3�CBootstrap ������� repository�A�������l���| scope�A�]���קﲣ�~�{���X�C\\n\\nG2 �P implementation ���� Wiki ��Ū�F�b verification�G\\n\\n1. ���� `knowledge status --work <work-id>` ��X affected pages�C\\n2. �C�ӷs�� work item ���� Knowledge Review�G`promote` �� `no-update`�A�ïd�U rationale�C\\n3. `promote` �H�@�� plan �ŧi 1�V5 �Ӥ��e���F�s���i�ѤE�� canonical template scaffold�A�����s���אּ active�C\\n4. `no-update` �u�A�Ω�D bootstrap�B�S�� affected page�B�S�� Wiki diff �����p�A�ӥB���إ� plan�C\\n5. ��s�ŧi�����P�۰� coupled �� `wiki/index.md`�B`wiki/log.md`�A�A�H `knowledge seal` �ʦs�C\\n6. G3 �ˬd append-only promotion log�Bsource fingerprint�Bcoverage�Breview currentness�Bindex �P lint�Fplaceholder �Υ����� token ���� seal�C\\n\\n�u�C�� Work Item ��s Wiki�v���C������ Knowledge Review�A���N���C���j������ Wiki diff�C��l�X�P�֭� artifacts ���O�̲רƹ�ӷ��F���\\�ण�ϥΦV�q��Ʈw�B������ީκ�T Token �p�q�C\\n\\n## Repository ���c\\n\\n```text\\n.agents/skills/devweave/       DevWeave router�Bengine�Breferences�Btemplates\\n.agents/skills/<companion>/    project-local engineering methods\\n.codex/hooks.json              Codex PreToolUse guard\\n.devweave/project.json         locale�Bverification commands�Bknowledge policy\\n.devweave/work-items/<id>/     artifacts�Bstate�Bevents�Bevidence\\n.devweave/baseline/            accepted product�Barchitecture�Bquality truth\\n.devweave/cache/               session bindings �P raw verification logs�]gitignored�^\\nwiki/                          source-bound codebase knowledge�Bindex�Bpromotion log\\ntests/                         Python unittest �P repository contract tests\\nfixtures/devweave/             new�Bfeature�Brefactor�Bbug fixture scenarios\\nAGENTS.md                      repository precedence �P side-effect policy\\nskills-lock.json               companion skill provenance �P hashes\\nREADME.md                      �M�פJ�f\\ndocs/�ϥΤ�U.md                �Բ��c�餤��ާ@��U\\n```\\n\\n## Companion Skills\\n\\n�� repository �� project-local companions �O�G\\n\\n- `grill-me`��`grilling`�GG1 material requirements interview�FPlan Mode �ϥ� `request_user_input`�A�_�h�� shared contract structured fallback�A�@���@�D�õ��ݨϥΪ̦^���C\\n- `codebase-design`�GG2 Plan Mode �� module�Binterface�Bseam �P adapter �]�p�A�@���@�D�T�{ material trade-off�C\\n- `diagnosing-bugs`�Gbug discovery �P�i���{ feedback loop�C\\n- `tdd`�GG2 �� implementation �� red �� green slice�C\\n\\n���̤���إ߲ĤG�M work-item lifecycle�A�]���ઽ���ާ@ machine ledger�BGit �� remote tracker�C\\n��s companion Skills �����إ߷s�� DevWeave feature work item�A�˾\\ upstream diff �P\\n`skills-lock.json`�A�A���� repository verification�C\\n\\n## ���һP����\\n\\n������եu�ϥ� Python standard library�G\\n\\n```powershell\\npython -B -m unittest discover -s tests -v\\n```\\n\\n��L�`���ˬd�G\\n\\n```powershell\\npython -B .agents\\\\skills\\\\devweave\\\\scripts\\\\devweave.py --repo . doctor\\npython -B .agents\\\\skills\\\\devweave\\\\scripts\\\\devweave.py --repo . project\\npython -B .agents\\\\skills\\\\devweave\\\\scripts\\\\devweave.py --repo . command list\\ngit diff --check\\n```\\n\\n���@�̭Y�ݭn���� skill package�A�i�ϥ� skill-creator ���Ѫ� `quick_validate.py`�F�w�˩�\\n��s companion Skills �~�ݭn Node.js��npx �P network�ADevWeave runtime ���̿०�̡C\\n\\n## �����\\Ū\\n\\n- [����ϥΤ�U](docs/�ϥΤ�U.md)\\n- [Repository policy](AGENTS.md)\\n- [DevWeave contracts](.agents/skills/devweave/references/contracts.md)\\n- [Requirements phase](.agents/skills/devweave/references/requirements-phase.md)\\n- [Design phase](.agents/skills/devweave/references/design-phase.md)\\n- [Implementation phase](.agents/skills/devweave/references/implementation-phase.md)\\n- [Verification phase](.agents/skills/devweave/references/verification-phase.md)\\n- [Companion skill provenance](skills-lock.json)\\n' : README.md: Python full suite 98 ��\r\n\r\n----------------------------------------------------------------------\r\nRan 103 tests in 599.621s\r\n\r\nFAILED (failures=1, skipped=1)",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006",
+    "TASK-007",
+    "TASK-008"
+  ],
+  "timed_out": false
+}

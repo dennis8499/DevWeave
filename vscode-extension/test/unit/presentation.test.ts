@@ -139,7 +139,25 @@ test("snapshot guidance handles an empty active-work state without selecting clo
   assert.equal(guidance.authoritative, false);
   assert.equal(guidance.command, "new");
   assert.equal(guidance.workId, undefined);
+  assert.deepEqual(guidance.planModeGuidance, { required: true, stage: "initial" });
   assert.match(guidance.detail, /active|新工作|new/i);
+});
+
+test("snapshot guidance marks G1 and G2 work with a required Plan Mode stage", () => {
+  const g1 = work({ phase: "requirements" });
+  const g2 = work({ phase: "design" });
+
+  assert.deepEqual(buildSnapshotGuidance(snapshot([g1]), g1).planModeGuidance, { required: true, stage: "g1" });
+  assert.deepEqual(buildSnapshotGuidance(snapshot([g2]), g2).planModeGuidance, { required: true, stage: "g2" });
+});
+
+test("snapshot guidance does not block post-G2 work with an initial Plan Mode prompt", () => {
+  const current = work({ phase: "implementation" });
+  const guidance = buildSnapshotGuidance(snapshot([current]), current);
+
+  assert.equal(guidance.kind, "next");
+  assert.deepEqual(guidance.planModeGuidance, { required: false, stage: "post-g2" });
+  assert.match(guidance.detail, /Codex Chat|Refresh/);
 });
 
 test("snapshot guidance makes initialization and bootstrap write boundary explicit", () => {

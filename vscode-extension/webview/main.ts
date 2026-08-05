@@ -109,7 +109,9 @@ window.addEventListener("message", (event) => {
       pendingIntent = null;
       previewRevision = null;
       previewBundle = null;
-      statusMessage = "prompt 已複製；請到 Codex Chat 貼上並送出，完成後回來 Refresh。";
+      statusMessage = message.bundle.planModeGuidance?.required
+        ? "prompt 已複製；請先切換 Plan Mode，再貼到 Codex Chat 並送出，完成後回來 Refresh。"
+        : "prompt 已複製；請到 Codex Chat 貼上並送出，完成後回來 Refresh。";
       statusError = false;
       errorDetail = null;
     } else {
@@ -411,7 +413,7 @@ function renderGuidance(guidance: SnapshotGuidance): string {
   const action = guidance.command
     ? `<button class="primary" data-action="select-command" data-command="${guidance.command}">準備 ${escapeHtml(commandLabel(guidance.command))}</button>`
     : "";
-  return `<section class="next-action" aria-label="下一步提示"><div><p class="eyebrow">檔案快照提示</p><h2>${escapeHtml(guidance.title)}</h2><p class="muted">${escapeHtml(guidance.detail)}</p></div><div class="guidance-actions"><span class="pill info">非 engine 權威結果</span>${action}</div></section>`;
+  return `<section class="next-action" aria-label="下一步提示">${guidance.planModeGuidance?.required ? renderPlanModeHandoff(guidance.planModeGuidance) : ""}<div><p class="eyebrow">檔案快照提示</p><h2>${escapeHtml(guidance.title)}</h2><p class="muted">${escapeHtml(guidance.detail)}</p></div><div class="guidance-actions"><span class="pill info">非 engine 權威結果</span>${action}</div></section>`;
 }
 
 function renderSnapshotMetadata(current: WorkspaceSnapshot, work: WorkItemProjection | null): string {
@@ -638,6 +640,11 @@ function renderResultPanel(): string {
   return "";
 }
 
+function renderPlanModeHandoff(guidance: SnapshotGuidance["planModeGuidance"]): string {
+  if (!guidance?.required) return "";
+  return `<div class="notice warning plan-mode-handoff" role="status" aria-label="Plan Mode 導流"><span class="status-icon">!</span><div><strong>先切換 Plan Mode</strong><p>先切換 Plan Mode，再貼到 Codex Chat；Extension 不會嘗試切換 host mode。</p></div></div>`;
+}
+
 function renderActionPreview(bundle: PromptBundle): string {
   const presentation = commandPresentations().find((item) => item.name === bundle.command);
   const work = selectedWork();
@@ -645,11 +652,11 @@ function renderActionPreview(bundle: PromptBundle): string {
   const willNot = bundle.mutation
     ? "不會在 Extension 直接執行 CLI、寫入一般 workspace，或代替你送出 Codex Chat。"
     : "不會修改 repository，也不會把檔案 snapshot 當成 engine 權威結果。";
-  return `<section id="result-panel" class="preview" aria-labelledby="preview-title"><div class="preview-heading"><div><p class="eyebrow">公開操作預覽</p><h2 id="preview-title">先確認再複製</h2></div><span class="pill ${bundle.mutation ? "warning" : "info"}">${bundle.mutation ? "需要你手動送出" : "唯讀查詢"}</span></div><div class="two-column"><div><h3>這個操作會做什麼</h3><p>${escapeHtml(presentation?.description ?? "準備一個公開 DevWeave prompt。")}</p></div><div><h3>不會做什麼</h3><p>${escapeHtml(willNot)}</p></div></div><div class="notice info"><span class="status-icon">i</span><div><strong>目前操作脈絡</strong><p>${work ? `work：${escapeHtml(work.id)} · 目前 gate：${escapeHtml(presentGate(gate))}` : "目前沒有帶入 work ID"} · snapshot 只供參考。</p></div></div><h3>要貼到 Codex Chat 的內容</h3><pre>${escapeHtml(bundle.chatText)}</pre>${bundle.warnings.length ? `<div class="notice warning"><strong>送出前請留意</strong><ul>${bundle.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul></div>` : ""}<div class="handoff-steps"><h3>複製後</h3><p>到 Codex Chat 貼上並送出；engine 完成後回到這裡按 Refresh，才能看到新的檔案投影。</p></div><div class="action-row"><button class="primary" data-action="confirm-copy" ${busyAction ? "disabled" : ""}>確認並複製 prompt</button><button class="secondary" data-action="cancel-preview" ${busyAction ? "disabled" : ""}>取消</button></div></section>`;
+  return `<section id="result-panel" class="preview" aria-labelledby="preview-title"><div class="preview-heading"><div><p class="eyebrow">公開操作預覽</p><h2 id="preview-title">先確認再複製</h2></div><span class="pill ${bundle.mutation ? "warning" : "info"}">${bundle.mutation ? "需要你手動送出" : "唯讀查詢"}</span></div><div class="two-column"><div><h3>這個操作會做什麼</h3><p>${escapeHtml(presentation?.description ?? "準備一個公開 DevWeave prompt。")}</p></div><div><h3>不會做什麼</h3><p>${escapeHtml(willNot)}</p></div></div><div class="notice info"><span class="status-icon">i</span><div><strong>目前操作脈絡</strong><p>${work ? `work：${escapeHtml(work.id)} · 目前 gate：${escapeHtml(presentGate(gate))}` : "目前沒有帶入 work ID"} · snapshot 只供參考。</p></div></div>${bundle.planModeGuidance?.required ? renderPlanModeHandoff(bundle.planModeGuidance) : ""}<h3>要貼到 Codex Chat 的內容</h3><pre>${escapeHtml(bundle.chatText)}</pre>${bundle.warnings.length ? `<div class="notice warning"><strong>送出前請留意</strong><ul>${bundle.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul></div>` : ""}<div class="handoff-steps"><h3>複製後</h3><p>到 Codex Chat 貼上並送出；engine 完成後回到這裡按 Refresh，才能看到新的檔案投影。</p></div><div class="action-row"><button class="primary" data-action="confirm-copy" ${busyAction ? "disabled" : ""}>確認並複製 prompt</button><button class="secondary" data-action="cancel-preview" ${busyAction ? "disabled" : ""}>取消</button></div></section>`;
 }
 
 function renderCopiedResult(bundle: PromptBundle): string {
-  return `<section id="result-panel" class="preview" aria-labelledby="copied-title"><div class="preview-heading"><div><p class="eyebrow">Codex Chat 交接</p><h2 id="copied-title">prompt 已複製</h2></div><span class="pill success">已交給你送出</span></div><p>請到 Codex Chat 貼上並送出；Extension 不會自行執行。完成後回來按 Refresh，重新讀取檔案 snapshot。</p><details class="raw-details"><summary>查看已複製的 prompt</summary><pre>${escapeHtml(bundle.chatText)}</pre></details></section>`;
+  return `<section id="result-panel" class="preview" aria-labelledby="copied-title"><div class="preview-heading"><div><p class="eyebrow">Codex Chat 交接</p><h2 id="copied-title">prompt 已複製</h2></div><span class="pill success">已交給你送出</span></div>${bundle.planModeGuidance?.required ? renderPlanModeHandoff(bundle.planModeGuidance) : ""}<p>請到 Codex Chat 貼上並送出；Extension 不會自行執行。完成後回來按 Refresh，重新讀取檔案 snapshot。</p><details class="raw-details"><summary>查看已複製的 prompt</summary><pre>${escapeHtml(bundle.chatText)}</pre></details></section>`;
 }
 
 function renderBootstrapResult(report: BootstrapReport): string {

@@ -32,7 +32,17 @@ not create a second lifecycle, router, or orchestrator.
 
 Translate those intents into engine commands. Never edit `state.json`, `events.jsonl`, evidence summaries, or project machine state directly.
 
+## Initial Plan Mode preflight
+
+Every pre-G2 mutation entry must complete a Plan Mode preflight before it creates or modifies a Work Item. This applies to `$devweave new`, `$devweave feature`, `$devweave refactor`, `$devweave bug`, `$devweave wiki bootstrap`, and `revise` when the requested change returns a Work Item to G1/requirements or G2/design. The preflight is also the ordering rule for the corresponding `start`, `bind`, `revise`, and bootstrap Work Item paths: none of those mutations may run before the preflight passes.
+
+The only repository-visible evidence of native host support is whether the Codex host exposes `request_user_input`. If it is visible, continue through the existing G1/G2 lifecycle. If it is not visible, tell the user to switch to Plan Mode and stop before resolving or creating the Work Item, binding the session, revising the work, or creating a bootstrap Work Item. The Router must not claim that it can inspect or switch the host mode.
+
+If the host cannot switch modes, or the user explicitly chooses compatibility, use the same one-question-at-a-time structured numbered fallback defined by [native-question-contract.md](references/native-question-contract.md). A compatibility choice must be explicit; cancellation, silence, timeout, malformed input, or ambiguity stops the command without artifact, Work Item, binding, or Gate mutation. Read-only inspection such as `status` and `next` remains available.
+
 For an explicit `new`, `feature`, `refactor`, or `bug` request in an uninitialized repository, the startup order is an exception to the normal continuation protocol: run `init`, configure proposed commands, and run `start` before the first `status`. Do not treat the expected absence of a work item before `start` as a blocker.
+
+The uninitialized startup exception does not bypass the initial Plan Mode preflight: `init` and command configuration may complete as the existing startup exception requires, but the preflight must pass before `start` or its binding path runs.
 
 `init` performs a read-only Wiki preflight before acquiring the project lock or creating `.devweave` control state, then repeats the inspection inside the lock before writing anything. A missing, empty, or custom-only `wiki/` is compatible: starter files and typed directories are created only when absent. Existing `index.md`, `overview.md`, `log.md`, or starter directories are checked as reserved paths; wrong filesystem types or frontmatter return `knowledge_conflict` while preserving all existing bytes and leaving no partial control bundle from that call.
 
@@ -40,7 +50,7 @@ For `$devweave wiki bootstrap`, run `knowledge bootstrap` without a scope argume
 
 ## Operating sequence
 
-For every active turn, resolve the work item, bind the session, read the single phase reference returned by `instructions`, complete that phase's artifact and CLI state, run its validation, and stop at the next human Gate. Treat a turn as complete only when the phase reference's completion criterion passes and the next action is either an approved Gate or an explicit stop for human input.
+For every active turn, first apply the initial Plan Mode preflight when the intent is a listed pre-G2 mutation entry. Only after that preflight passes may the Router resolve the work item, bind the session, read the single phase reference returned by `instructions`, complete that phase's artifact and CLI state, run its validation, and stop at the next human Gate. Treat a turn as complete only when the phase reference's completion criterion passes and the next action is either an approved Gate or an explicit stop for human input.
 
 ## Engine protocol
 
@@ -54,11 +64,12 @@ Every engine response is JSON. Treat a nonzero exit code or `"ok": false` as a b
 
 For every active turn:
 
-1. Resolve with `status --work <id>` or `status`. If several candidates remain, show their IDs, titles, kinds, phases, and statuses and ask the user to choose.
-2. Run `bind --work <id>` and never fabricate a session ID. Treat the session as trusted only when the PreToolUse hook confirms the work ID; `awaiting_hook` means the guard may be untrusted.
-3. Run `instructions --work <id>` and read only its returned `reference`. Read [profiles.md](references/profiles.md) only when profile or risk rules are needed.
-4. Complete the phase artifact and CLI state/evidence, then run `validate --work <id>` before presenting an approval summary.
-5. Stop for explicit human approval at G1, G2, and G3. Run `approve` only after the user clearly approves the current gate.
+1. For a listed pre-G2 mutation entry, complete the initial Plan Mode preflight before `status` is used to resolve a mutable Work Item or before any command that can create/resume one. Read-only status used to explain the stop is allowed.
+2. Resolve with `status --work <id>` or `status`. If several candidates remain, show their IDs, titles, kinds, phases, and statuses and ask the user to choose.
+3. Run `bind --work <id>` and never fabricate a session ID. Treat the session as trusted only when the PreToolUse hook confirms the work ID; `awaiting_hook` means the guard may be untrusted.
+4. Run `instructions --work <id>` and read only its returned `reference`. Read [profiles.md](references/profiles.md) only when profile or risk rules are needed.
+5. Complete the phase artifact and CLI state/evidence, then run `validate --work <id>` before presenting an approval summary.
+6. Stop for explicit human approval at G1, G2, and G3. Run `approve` only after the user clearly approves the current gate.
 
 ## Phase routing
 

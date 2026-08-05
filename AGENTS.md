@@ -18,6 +18,13 @@ For managed changes:
 8. Do not close until G1, G2, and G3 are approved and current.
 9. Never edit DevWeave JSON state, event, or evidence ledgers directly.
 
+Initial Plan Mode preflight:
+
+- Every pre-G2 mutation must complete Plan Mode preflight before creating or modifying a Work Item. This covers `new`, `feature`, `refactor`, `bug`, `wiki bootstrap`, and `revise` when it returns to G1/G2.
+- The only evidence of native host support is visible `request_user_input`. If it is not visible, stop before `start`, `bind`, `revise`, or bootstrap Work Item creation and tell the user to switch to Plan Mode. Repository policy, Skills, and the Extension cannot inspect or switch host mode.
+- Only an explicit user choice of compatibility permits the shared structured numbered fallback. Cancellation, silence, timeout, malformed, or ambiguous answers do not permit mutation or Gate progress.
+- The existing uninitialized `init` startup exception remains; `start` still requires this preflight.
+
 High-risk G3 review contract:
 
 - After final product/Wiki/baseline/diff/scope/evidence stabilization, the single DevWeave router starts exactly one isolated, read-only Independent Review Agent. Standard and low-risk G3 do not start it; G2 `Design It Twice` remains the separate conditional 3+ sub-agent design comparison.

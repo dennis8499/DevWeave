@@ -4,7 +4,7 @@
 
 ## System Context
 
-Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；`devweave.py` 提供 JSON machine CLI；`devweave_core.py` 擁有 work locks、state、events、evidence、gate、bootstrap profile 與 Knowledge Review/plan currentness；`knowledge_core.py` 以 Python standard library 提供 Wiki reserved-starter preflight/bootstrap assessment、frontmatter、context records、coverage、canonical scaffold、source fingerprint、lint、snapshot 與 seal。單一 `.codex/hooks.json` PreToolUse hook 呼叫 `guard.py`。五個 `.agents/skills/<companion>/` 目錄提供階段內工程方法，root `AGENTS.md` 是它們與唯一 DevWeave router 之間的 precedence interface。
+Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；Router 在 pre-G2 mutation entry 的 `start`、`bind`、`revise` 或 bootstrap create 前確認 `request_user_input` host capability，未取得 capability 時停止並提示 Plan Mode，compatibility fallback 必須由使用者明確選擇。`devweave.py` 提供 JSON machine CLI；`devweave_core.py` 擁有 work locks、state、events、evidence、gate、bootstrap profile 與 Knowledge Review/plan currentness；`knowledge_core.py` 以 Python standard library 提供 Wiki reserved-starter preflight/bootstrap assessment、frontmatter、context records、coverage、canonical scaffold、source fingerprint、lint、snapshot 與 seal。單一 `.codex/hooks.json` PreToolUse hook 呼叫 `guard.py`。五個 `.agents/skills/<companion>/` 目錄提供階段內工程方法，root `AGENTS.md` 是它們與唯一 DevWeave router 之間的 precedence interface。
 
 ## Boundaries and Interfaces
 
@@ -40,13 +40,13 @@ Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；`devweave.p
 - `bootstrap-compat.ts` 是 project/baseline/Wiki semantic contract 的單一 deep module；`BootstrapInstaller` 與 `WorkspaceSnapshotReader` 共用 normalized `existingPolicy`/`compatibility` metadata 與 validator，避免 Extension 顯示與實際寫入結果分歧。
 - `VscodeBootstrapWorkspace` 僅透過 VS Code `workspace.fs` 寫入固定 manifest destinations；`ExtensionController` 只負責 workspace root、native modal confirmation、installer invocation、snapshot refresh 與 result reporting。既有合法 `project.json` 或 critical diagnostic 不會觸發自動重建。
 - `esbuild.mjs` 從 repository 的 DevWeave skill、hook 與 starter templates 產生 VSIX 內 `dist/bootstrap/manifest.json`，bundle version 直接讀取 `package.json`；每個 source 都有 byte length/SHA-256，七個資料型 bootstrap destinations 明確宣告 semantic compatibility，其餘 controls 維持 exact。Runtime 不下載、不執行 source，也不依賴 Codex Chat、Python、shell、Git 或 network 完成 bootstrap。
-- `PromptComposer` 是唯一 action seam，將 `ActionIntent` 轉成 deterministic、repo-relative、sanitized `PromptBundle`；Webview 只能經 `previewAction` 顯示預覽，再由使用者確認 `copyAction` 到 Codex Chat。Extension 不直接執行 mutation。
+- `PromptComposer` 是唯一 action seam，將 `ActionIntent` 轉成 deterministic、repo-relative、sanitized `PromptBundle`；optional `PlanModeGuidance` 只含 `required` 與 `stage`，不改變 `chatText`。Webview 只能經 `previewAction` 顯示預覽，再由使用者確認 `copyAction` 到 Codex Chat。Extension 不直接執行 mutation，也不提供 host mode adapter。
 - `PreviewGate` 是純 Extension host module；copy ticket 綁定 panel identity、typed intent、prompt bundle、snapshot revision 與一次性 consume。Host 只接受 matching current ticket，Refresh、selection、initialization 或 snapshot update invalidate stale tickets；clipboard failure 只允許同一 ticket safe retry 一次。Host-launched `actionPreview` 傳回相同 intent/bundle/revision，`copyNextAction` 不得 bypass preview。
 - Control Center 的 Wiki scheduler 將 query/type/show-all 結果實際 mount 到 `#wiki-results`；五個區域以 tab/tabpanel `aria-controls`/`aria-labelledby`、roving tabindex、方向鍵/Home/End 與 focus restore 實作。主要 CTA、native modal action、error、readiness 與 empty-state 使用繁體中文，technical command names 保留於 code label。
 - Control Center 對 high-risk acceptance 投影 `Independent Review` readiness：missing/unavailable/advisory 為 attention，critical 為 not-ready，passed 且 source current 才為 ready；Extension 不啟動 Agent、engine、shell、Git、network 或 lifecycle mutation。
 - Activity Bar TreeView 提供 repository/work-item navigation；Dashboard/Webview 提供 welcome、doctor、phase/gate、task/evidence、Wiki-first、acceptance 與唯讀 audit projection。多 work item 必須明確選取，不以第一筆資料默選。
 - UI 使用 VS Code theme tokens、Codicons、CSP、ARIA/focus、high-contrast、reduced-motion 與非色彩單獨狀態表達；主要內容保持不透明，僅在控制項使用輕微透明效果。
-- `extension-typecheck`、`extension-tests`、`extension-package` 與 `extension-smoke` 透過 DevWeave command profiles 管理；Extension 不提供 branch、commit、push、PR、Marketplace release、版本比較或還原。0.2.1 package verifier 只讀取 current VSIX，並對 package／bundle version、58 個 bootstrap files、118 個 VSIX entries、required entries、每個 bundled source 的 byte length／SHA-256 及 current artifact SHA-256 fail closed；其他 VSIX 不屬於輸入或回復條件。
+- `extension-typecheck`、`extension-tests`、`extension-package` 與 `extension-smoke` 透過 DevWeave command profiles 管理；Extension 不提供 branch、commit、push、PR、Marketplace release、版本比較或還原。0.2.2 package verifier 只讀取 current VSIX，並對 package／bundle version、58 個 bootstrap files、119 個 VSIX entries、required entries、每個 bundled source 的 byte length／SHA-256 及 current artifact SHA-256 fail closed；既有 0.2.1 artifact 保留，其他 VSIX 不屬於輸入或回復條件。
 
 Provenance: `20260802-200224-feature-wiki-first`（待 G3 核准）。
 

@@ -1,4 +1,5 @@
 import { PublicCommandIntent, PublicCommandName, PromptBundle, WorkspaceSnapshot } from "./model";
+import { planModeGuidanceForIntent } from "./plan-mode";
 
 export interface PromptComposer {
   compose(intent: PublicCommandIntent, snapshot: WorkspaceSnapshot): PromptBundle;
@@ -33,12 +34,14 @@ export class DevWeavePromptComposer implements PromptComposer {
 
     const chatText = this.commandFor(intent);
     const workId = "workId" in intent ? intent.workId : undefined;
+    const planModeGuidance = planModeGuidanceForIntent(intent, snapshot);
     return {
       chatText,
       command: intent.type,
       ...(workId === undefined ? {} : { workId }),
       warnings,
-      mutation
+      mutation,
+      ...(planModeGuidance === undefined ? {} : { planModeGuidance })
     };
   }
 

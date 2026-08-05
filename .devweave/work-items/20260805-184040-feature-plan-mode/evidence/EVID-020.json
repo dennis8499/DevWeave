@@ -1,0 +1,41 @@
+{
+  "argv": [
+    "npm.cmd",
+    "run",
+    "typecheck"
+  ],
+  "binds_current_source": true,
+  "command_id": "extension-typecheck",
+  "covers": [
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-009"
+  ],
+  "created_at": "2026-08-05T12:52:15+00:00",
+  "cwd": "vscode-extension",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "git_head": "248814fc01f0d0c76988efcf85c6b4a5711a0fbc",
+  "id": "EVID-020",
+  "kind": "regression",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260805-184040-feature-plan-mode/EVID-020.log",
+  "schema_version": 1,
+  "source_fingerprint": "1c6fe9728f1d0703e8bb1ffe71a8de6e80d15bda54df5953764326486fe69e8a",
+  "stale": false,
+  "started_at": "2026-08-05T12:52:05+00:00",
+  "status": "passed",
+  "summary": "> devweave-control-center@0.2.2 typecheck\n> tsc --noEmit",
+  "tasks": [
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-006",
+    "TASK-008"
+  ],
+  "timed_out": false
+}

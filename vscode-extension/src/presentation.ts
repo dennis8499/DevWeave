@@ -10,6 +10,7 @@ import {
   WorkItemProjection,
   WorkspaceSnapshot
 } from "./model";
+import { planModeGuidanceForPhase } from "./plan-mode";
 
 const COMMANDS: readonly CommandPresentation[] = [
   {
@@ -127,6 +128,7 @@ export function buildSnapshotGuidance(snapshot: WorkspaceSnapshot, selectedWork:
         title: "開始一個新工作",
         detail: "目前沒有進行中的 work；可從開始新工作、回報問題或新增功能開始，不會自動把 closed history 當成目前工作。",
         command: "new",
+        planModeGuidance: { required: true, stage: "initial" },
         authoritative: false
       };
     }
@@ -156,16 +158,19 @@ export function buildSnapshotGuidance(snapshot: WorkspaceSnapshot, selectedWork:
       detail: `${selectedWork.blocker.task ?? "目前 task"}：${selectedWork.blocker.reason ?? "請在 Codex Chat 查看阻塞原因。"} Extension 只提供檔案快照提示；請用 next/status 取得 engine 判定。`,
       command: "next",
       workId: selectedWork.id,
+      ...(planModeGuidanceForPhase(selectedWork.phase) === undefined ? {} : { planModeGuidance: planModeGuidanceForPhase(selectedWork.phase) }),
       authoritative: false
     };
   }
 
+  const planModeGuidance = planModeGuidanceForPhase(selectedWork.phase);
   return {
     kind: "next",
     title: "詢問這個 work 的權威下一步",
     detail: "以下只是根據檔案快照的建議；複製 $devweave next 後到 Codex Chat 送出，完成後回到 Extension Refresh。",
     command: "next",
     workId: selectedWork.id,
+    ...(planModeGuidance === undefined ? {} : { planModeGuidance }),
     authoritative: false
   };
 }

@@ -8,7 +8,7 @@ import { join } from "node:path";
 const extensionRoot = fileURLToPath(new URL("../", import.meta.url));
 const packageJson = JSON.parse(await readFile(join(extensionRoot, "package.json"), "utf8"));
 const version = packageJson.version;
-assert.equal(version, "0.2.1", "package version must be 0.2.1");
+assert.equal(version, "0.2.2", "package version must be 0.2.2");
 
 const bootstrapRoot = join(extensionRoot, "dist", "bootstrap");
 const manifest = JSON.parse(await readFile(join(bootstrapRoot, "manifest.json"), "utf8"));
@@ -74,7 +74,7 @@ assert.ok(vsixInfo.size > 0, "the current VSIX must be non-empty");
 const vsixBytes = await readFile(vsixPath);
 const vsixSha256 = createHash("sha256").update(vsixBytes).digest("hex");
 const vsixEntries = readZipEntries(vsixBytes);
-assert.equal(vsixEntries.size, 118, "VSIX must contain the certified 118 entries");
+assert.equal(vsixEntries.size, 119, "VSIX must contain the certified 119 entries");
 const packageEntry = JSON.parse(vsixEntries.get("extension/package.json").toString("utf8"));
 assert.equal(packageEntry.version, version, "VSIX package metadata version mismatch");
 const vsixManifest = vsixEntries.get("extension.vsixmanifest").toString("utf8");

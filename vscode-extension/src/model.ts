@@ -228,12 +228,20 @@ export interface CommandPresentation {
 
 export type SnapshotGuidanceKind = "initialize" | "setup" | "start" | "select" | "next" | "blocker" | "review" | "closed";
 
+export type PlanModeStage = "initial" | "g1" | "g2" | "post-g2";
+
+export interface PlanModeGuidance {
+  required: boolean;
+  stage: PlanModeStage;
+}
+
 export interface SnapshotGuidance {
   kind: SnapshotGuidanceKind;
   title: string;
   detail: string;
   command?: PublicCommandName;
   workId?: string;
+  planModeGuidance?: PlanModeGuidance;
   authoritative: false;
 }
 
@@ -291,4 +299,5 @@ export interface PromptBundle {
   workId?: string;
   warnings: string[];
   mutation: boolean;
+  planModeGuidance?: PlanModeGuidance;
 }

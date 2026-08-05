@@ -1,0 +1,25 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-003"
+  ],
+  "created_at": "2026-08-05T11:26:26+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "248814fc01f0d0c76988efcf85c6b4a5711a0fbc",
+  "id": "EVID-001",
+  "kind": "test",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "dc009963e3f43c34da77236a1d8605092c55a730be9907fe97e4d0aae8709218",
+  "stale": false,
+  "status": "passed",
+  "summary": "Repository interactive policy contract and Plan Mode preflight ordering checks pass.",
+  "tasks": [
+    "TASK-001"
+  ]
+}

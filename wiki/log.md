@@ -6,7 +6,7 @@ last_updated: 2026-08-05
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260805-150125-bug-codex-cli-pretooluse-hook-powershell-utf
+verified_by: 20260805-184040-feature-plan-mode
 ---
 
 # Activity Log
@@ -81,3 +81,9 @@ verified_by: 20260805-150125-bug-codex-cli-pretooluse-hook-powershell-utf
 - Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，記錄 Windows Codex hook 的 shell-neutral Git-root launcher、`powershell.exe -NoLogo -NoProfile -NonInteractive`、`python.exe -X utf8 -B` 與 no-`commandWindows` contract。
 - 提升 guard 直接以 UTF-8 bytes 讀寫 hook JSON、policy deny 維持 process exit 0、PowerShell/cmd runner compatibility、nested cwd、malformed input 與 read-only silence 的 process-level regression；source-derived 0.2.1 package verifier 同步檢查相同語意。
 - 本 Work Item 新增四項 hook regression，Python final run 為 102 tests；Extension tests 73、bootstrap files 58、VSIX entries 118 維持既有 release contract。
+
+## [2026-08-05] promote | 20260805-184040-feature-plan-mode
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，記錄所有 pre-G2 mutation entry 的 Plan Mode preflight、未具 host capability 時在 Work Item mutation 前停止，以及僅明確 compatibility 才使用 structured fallback。
+- 提升 `PlanModeGuidance` optional metadata、`chatText` 相容性、Control Center overview/preview/copy 的 Plan Mode handoff 與 Extension 不提供 host mode adapter 的邊界。
+- 同步 0.2.2 current package、58 個 bootstrap files、119 個 VSIX entries 與保留 0.2.1 artifact。
