@@ -351,8 +351,13 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("Bash", group["matcher"])
         self.assertIn("apply_patch", group["matcher"])
         command = group["hooks"][0]
-        self.assertIn("powershell -NoProfile -Command", command["command"])
+        self.assertIn(
+            "powershell.exe -NoLogo -NoProfile -NonInteractive -Command",
+            command["command"],
+        )
+        self.assertIn("python.exe -X utf8 -B", command["command"])
         self.assertIn("git rev-parse --show-toplevel", command["command"])
+        self.assertNotIn("$repo", command["command"])
         self.assertNotIn("commandWindows", command)
 
     def test_hook_launcher_runs_through_windows_cmd_and_preserves_deny_json(self) -> None:
@@ -373,18 +378,137 @@ class RepositoryContractTests(unittest.TestCase):
         result = subprocess.run(
             f'cmd.exe /d /s /c "{command}"',
             cwd=REPOSITORY_ROOT,
-            input=json.dumps(payload, ensure_ascii=True),
-            text=True,
+            input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
             capture_output=True,
             shell=True,
             check=False,
         )
-        self.assertEqual(0, result.returncode, result.stderr)
-        output = json.loads(result.stdout)
+        self.assertEqual(
+            0,
+            result.returncode,
+            result.stderr.decode("utf-8", errors="replace"),
+        )
+        output = json.loads(result.stdout.decode("utf-8"))
         specific = output["hookSpecificOutput"]
         self.assertEqual("PreToolUse", specific["hookEventName"])
         self.assertEqual("deny", specific["permissionDecision"])
         self.assertIn("active work item", specific["permissionDecisionReason"])
+
+    def test_hook_launcher_runs_through_powershell_with_raw_utf8_deny_json(self) -> None:
+        hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
+        hook = json.loads(hook_path.read_text(encoding="utf-8"))
+        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+        payload = {
+            "cwd": str(REPOSITORY_ROOT),
+            "session_id": "",
+            "tool_name": "Write",
+            "tool_input": {
+                "command": "*** 更新檔案：src/應用程式.txt\n@@\n-舊\n+新"
+            },
+        }
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                command,
+            ],
+            cwd=REPOSITORY_ROOT,
+            input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            capture_output=True,
+            shell=False,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
+        output = json.loads(result.stdout.decode("utf-8"))
+        specific = output["hookSpecificOutput"]
+        self.assertEqual("PreToolUse", specific["hookEventName"])
+        self.assertEqual("deny", specific["permissionDecision"])
+        self.assertIn("active work item", specific["permissionDecisionReason"])
+
+    def test_hook_launcher_resolves_git_root_from_nested_cwd(self) -> None:
+        hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
+        hook = json.loads(hook_path.read_text(encoding="utf-8"))
+        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+        nested_cwd = REPOSITORY_ROOT / "vscode-extension"
+        payload = {
+            "cwd": str(nested_cwd),
+            "session_id": "",
+            "tool_name": "Write",
+            "tool_input": {"command": "*** Update File: nested.txt\n@@\n-old\n+new"},
+        }
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                command,
+            ],
+            cwd=nested_cwd,
+            input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
+        output = json.loads(result.stdout.decode("utf-8"))
+        specific = output["hookSpecificOutput"]
+        self.assertEqual("deny", specific["permissionDecision"])
+        self.assertIn("active work item", specific["permissionDecisionReason"])
+
+    def test_hook_launcher_returns_valid_deny_json_for_malformed_utf8_json(self) -> None:
+        hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
+        hook = json.loads(hook_path.read_text(encoding="utf-8"))
+        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                command,
+            ],
+            cwd=REPOSITORY_ROOT,
+            input=b'{"cwd":',
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
+        output = json.loads(result.stdout.decode("utf-8"))
+        specific = output["hookSpecificOutput"]
+        self.assertEqual("deny", specific["permissionDecision"])
+        self.assertIn("無法解析 hook input", specific["permissionDecisionReason"])
+
+    def test_hook_launcher_keeps_read_only_bash_silent(self) -> None:
+        hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
+        hook = json.loads(hook_path.read_text(encoding="utf-8"))
+        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+        payload = {
+            "cwd": str(REPOSITORY_ROOT),
+            "session_id": "",
+            "tool_name": "Bash",
+            "tool_input": {"command": "git status --short"},
+        }
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                command,
+            ],
+            cwd=REPOSITORY_ROOT,
+            input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
+        self.assertEqual(b"", result.stdout)
 
     def test_doctor_passes_for_an_initialized_fixture_with_hook(self) -> None:
         with RepositoryHarness() as harness:

@@ -5,8 +5,8 @@ sources: [.agents/skills, .agents/skills/devweave/assets/wiki/templates, .agents
 last_updated: 2026-08-05
 tags: [module]
 status: active
-source_fingerprint: "sha256:604c782de6c4739f7684d56e57222e23d879c1a366784d3564eda88ba4707144"
-verified_by: 20260805-120943-feature-devweave-0-2-1-current-version-only-rele
+source_fingerprint: "sha256:a57e409675396fa3e5e332d07f62b1235623b97ff2b7abd46938b59a501a1f91"
+verified_by: 20260805-150125-bug-codex-cli-pretooluse-hook-powershell-utf
 ---
 
 # Knowledge Engine
@@ -27,7 +27,7 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 - `init/start`：在 project lock 外與 lock 內做 Wiki reserved-starter preflight；missing、empty、custom-only root 可補 starter，reserved type/frontmatter conflict 以 `knowledge_conflict` fail closed，且不留下 partial `.devweave` control state。
 - machine-only `review record`：由既有 router 傳入固定 reviewer JSON report 與 opaque reviewer ID；只接受 high-risk G3 的 isolated/read-only review，產生 source-bound `kind: review` evidence 與 redacted report provenance，不是新的 public chat verb。
 
-0.2.1 current-version-only release 不新增 Python public command、CLI schema 或 engine lifecycle。Repository contract 以既有 test surface 機械檢查 README、使用手冊、Extension README 與內嵌 Help 的單一 0.2.1 交付、限定認證環境、98 項 Python suite、73 項 Extension tests 與 data-preserving incident response；Extension 的 PreviewGate、`actionPreview` protocol、legacy `copyNextAction` 與 Wiki DOM mount 都是 projection/client-side seams。Python engine 仍是 work state、multi-work `next/status --all`、bootstrap cancel/failure 與 gate/evidence 的權威來源。
+0.2.1 current-version-only release 不新增 Python public command、CLI schema 或 engine lifecycle。Repository contract 以既有 test surface 機械檢查 README、使用手冊、Extension README 與內嵌 Help 的單一 0.2.1 交付、限定認證環境、98 項 release baseline、73 項 Extension tests 與 data-preserving incident response；本次 hook hardening 另以四項 regression 形成 102 tests 的 current run。Extension 的 PreviewGate、`actionPreview` protocol、legacy `copyNextAction` 與 Wiki DOM mount 都是 projection/client-side seams。Python engine 仍是 work state、multi-work `next/status --all`、bootstrap cancel/failure 與 gate/evidence 的權威來源。
 
 Release verification 將這個 boundary 綁到 current source fingerprint：Extension bounded walkthrough 需覆蓋 fresh/evolved/conflict/rollback 與 multi-work selection，Python targeted fixtures 需確認 conflict 保留 user bytes；high-risk review 仍只能由 router 透過 machine-only `review record` 記錄，不能由 engine 或 Extension 自行啟動。
 
@@ -54,7 +54,7 @@ Release verification 將這個 boundary 綁到 current source fingerprint：Exte
 - Bootstrap readiness 要求無 critical lint，且 overview、architecture、module 皆 active、sourced、current 並有 `verified_by`；既有 Wiki 超過五頁仍可視為完成。
 - Wiki bootstrap skeleton 的 compatibility 只檢查保留 starter files/directories；非保留自訂內容不會因缺少 `index.md` 被誤判 conflict。`init_project()` 成功完成 Wiki preflight 後才建立 project、baseline、cache 與 work-item directories。
 - `affected_pages` 依 Work Item 起始 Wiki source overlap 計算；既有 affected page 在 G3 必須 refresh/seal 或 delete。Coverage 將 current active pages 的 source overlap 投影成 covered/uncovered，供 durable-value review 判斷。
-- Codex PreToolUse 的 process 與 policy 是兩個 boundary：Windows runner 以標準 `command` 經 `cmd.exe` 啟動 PowerShell，PowerShell 從 Git root 執行 `python -B` 的 `guard.py`；guard 的 deny JSON 仍以 process exit 0 結束。這不改變 guard decision schema，也不把 `commandWindows` 當成平行設定。
+- Codex PreToolUse 的 process 與 policy 是兩個 boundary：Windows runner 以標準 `command` 經 `cmd.exe` 或 PowerShell 啟動 `powershell.exe -NoLogo -NoProfile -NonInteractive`，再以 `python.exe -X utf8 -B` 從 Git root 執行 `guard.py`；guard 直接讀寫 UTF-8 bytes，deny JSON 仍以 process exit 0 結束。這不改變 guard decision schema，也不把 `commandWindows` 當成平行設定。
 - Knowledge Engine 不替 agent 判斷哪些 repository facts 應詢問使用者；可由 Wiki/source/artifacts 查出的事實由流程自動整理，只有會改變目標、範圍、介面、風險、相容性或驗收的 material decision 進入對話。這是 router policy，不是 engine 自動決策。
 - 新式 state 以 `knowledge_review_required: true` 啟用完整 contract；缺少 marker 的 schema-v1 Work Item 維持 legacy compatibility，不追溯阻擋。
 - Scaffold 採 no-overwrite create；seal 先完成所有候選 preflight，再以 per-file atomic replace 寫 provenance。多檔 I/O 仍是逐檔 atomic，最終完整性由 G3 reconciliation 保證。
@@ -91,7 +91,7 @@ Watcher refresh 與手動 refresh 共用 `RefreshCoordinator`。Coordinator 一�
 
 Bootstrap bundle 的來源與目的地由 build-time manifest 固定，版本從 package version 產生：`devweave` 加上五個核准 companion skills、通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。`existingPolicy` 缺少時安全預設 `exact`；只有 project、三份 baseline、三份 Wiki starter 宣告 `adopt-compatible` 與固定 compatibility kind。`BootstrapInstaller.inspect()` 與 snapshot 先做 read-only integrity/path preflight，再以 shared validator 判定 evolved bytes；install 只建立 missing paths，寫入失敗則 rollback 本輪建立的檔案。Dashboard 以 completeness projection 提供初始化／補齊入口。
 
-Codex hook bootstrap 來源是根目錄 `.codex/hooks.json` 的標準 `command`。Windows runner 透過 `cmd.exe` 啟動 PowerShell，再由 Git root 導向 `.agents\skills\devweave\scripts\guard.py`；0.2.1 manifest 與 VSIX 內嵌相同 launcher，verifier 會拒絕缺少 `python -B` 或仍依賴 `commandWindows` 的 bundle。既有 workspace 的 exact hook 需要使用者確認後更新，Extension 不會靜默覆寫。
+Codex hook bootstrap 來源是根目錄 `.codex/hooks.json` 的標準 `command`。Windows runner 透過 `cmd.exe` 或 PowerShell 啟動 `powershell.exe -NoLogo -NoProfile -NonInteractive`，再以 `python.exe -X utf8 -B` 和 Git-root expression 導向 `.agents\skills\devweave\scripts\guard.py`；0.2.1 manifest 與 VSIX 內嵌相同 launcher，verifier 會拒絕缺少 explicit UTF-8/`python -B` contract、使用 `$repo` 或仍依賴 `commandWindows` 的 bundle。既有 workspace 的 exact hook 需要使用者確認後更新，Extension 不會靜默覆寫。
 
 `vscode-extension/src/preview-gate.ts` 是純 host-side ticket seam；它只接受同一 panel、typed intent、snapshot revision 的 preview bundle，intent 以欄位結構比較避免 delimiter collision，protocol 拒絕危險控制字元，one-shot consume 後才交給 clipboard adapter，revision/selection/refresh 更新會使 ticket stale，clipboard failure 只允許同一 current ticket retry 一次。0.2.1 的 public command handoff 維持原有 `$devweave` command text 與 Python schema：Extension 先預覽、由使用者確認複製到 Codex Chat，完成後 Refresh 取得新 snapshot；多 active work 的 `next` 要求明確 selection，未指定 work 的 `status` 產生 `$devweave status --all`，`copyNextAction` 只開啟 Control Center。
 

@@ -1,0 +1,22 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-002"
+  ],
+  "created_at": "2026-08-05T07:08:56+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "745e54445e6ef50a6a261e296cfe243324fcda3a",
+  "id": "EVID-004",
+  "kind": "reproduction",
+  "log_truncated": false,
+  "observed_result": "failure",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "9812389d2fcd41f8ceeedc83652ccf5731fedac98f3de6dc02d6eb44929535da",
+  "stale": false,
+  "status": "passed",
+  "summary": "Failing reproduction probe completed against current source: raw UTF-8 JSON containing the Chinese repository path is read through cp950 sys.stdin and json.load fails; ASCII-escaped JSON passes. The observed encoding bug is deterministic.",
+  "tasks": []
+}

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -Command \"$repo = git rev-parse --show-toplevel; python -B (Join-Path $repo '.agents\\skills\\devweave\\scripts\\guard.py')\"",
+            "command": "powershell.exe -NoLogo -NoProfile -NonInteractive -Command \"python.exe -X utf8 -B (Join-Path (git rev-parse --show-toplevel) '.agents\\skills\\devweave\\scripts\\guard.py')\"",
             "statusMessage": "Checking DevWeave gates"
           }
         ]

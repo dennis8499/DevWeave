@@ -5,8 +5,8 @@ sources: [.agents/skills, AGENTS.md, README.md, docs/使用手冊.md, tests/test
 last_updated: 2026-08-05
 tags: [overview]
 status: active
-source_fingerprint: "sha256:a2e67e3f7f0f6ffb73647a34ba487f7389953b8850876df90df9eb8b7986af80"
-verified_by: 20260805-120943-feature-devweave-0-2-1-current-version-only-rele
+source_fingerprint: "sha256:37f5ae667a3939be59783dcdef09cee7b967ebeb9808f27f1427208a9f65eb85"
+verified_by: 20260805-150125-bug-codex-cli-pretooluse-hook-powershell-utf
 ---
 
 # DevWeave Codebase Overview
@@ -25,7 +25,7 @@ DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router�
 
 本次 release hardening 另固定幾個容易被使用者誤解的邊界：`devweave.wikiBootstrap` 與 legacy `devweave.copyNextAction` 都只開啟 Control Center 的 preview flow，host 的 `PreviewGate` 仍是最後 copy gate；多 active work 的 `next` 必須明確選取，未指定 work 的 `status` 明確交給 `$devweave status --all`；五個 section 的 tab/tabpanel 關聯在 inactive 狀態也保持有效 target，方向鍵/Home/End、focus restore 與 forced-colors contract 由 Extension-local seam 驗證。
 
-Windows Codex hook 也有明確的兩層契約：`.codex/hooks.json` 的標準 `command` 讓 Codex 的 `cmd.exe` 啟動 PowerShell，PowerShell 從 Git root 以 `python -B` 執行 `guard.py`；launcher process failure 與 guard 回傳的 JSON `permissionDecision: deny` 不同，後者仍是正常 process exit 0 的 DevWeave policy result。Extension bootstrap 只產生來源一致的 hook；既有 workspace 的 exact hook 不會被 Extension 靜默覆寫。
+Windows Codex hook 也有明確的兩層契約：`.codex/hooks.json` 的標準 `command` 使用 `powershell.exe -NoLogo -NoProfile -NonInteractive`，以 `python.exe -X utf8 -B` 和不含 shell variable 的 `(Join-Path (git rev-parse --show-toplevel) ...)` 從 Git root 執行 `guard.py`。同一 command 可由 Codex 的 `cmd.exe` 或 PowerShell 外層啟動；guard 直接以 UTF-8 bytes 讀寫 payload。launcher process failure 與 guard 回傳的 JSON `permissionDecision: deny` 不同，後者仍是正常 process exit 0 的 DevWeave policy result。Extension bootstrap 只產生來源一致的 hook；既有 workspace 的 exact hook 不會被 Extension 靜默覆寫。
 
 ## 互動式決策與 Gate
 
@@ -48,7 +48,7 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 - Extension 的 Wiki 搜尋以 Enter 套用大小寫不敏感的 title/path/body-preview 包含式查詢；輸入期間保留同一個 input DOM，結果與 metrics 真實 mount 到 `#wiki-results`。五個 tab/tabpanel 使用完整 ARIA 關聯、方向鍵/Home/End 與 focus restore；Watcher 由 debounce 與 single-flight refresh coordinator 合併，snapshot 的獨立讀取平行化後仍依固定順序輸出。
 - Copy 成功後的 Webview `copyResult` 通知與 Extension-native success toast 不再共享 clipboard failure restore path；host 只在 clipboard adapter 失敗時恢復 ticket，walkthrough 的 bounded labels 則保留在 configured Extension/Python raw logs。
 - 0.2.1 bootstrap bundle 的 version 從 package version 產生，提供完整控制面：六組核准 skills、通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。Project、baseline 與三份 Wiki starter 以明確 semantic contract 採用合法 evolved bytes；AGENTS、skills、hook、lock 與其他 controls 維持 exact，初始化只建立缺少且無衝突的檔案，失敗或取消不留下 partial control bundle，說明手冊留在 Extension 內，不落地到 target repository。
-- Windows 的 PreToolUse hook 使用上述標準 `command`，不依賴 Codex 不採用的 `commandWindows` 平行欄位；未綁定或未通過 G2 的寫入仍由 guard 以 deny JSON 表達，而不是把 policy deny 變成 hook process failure。
+- Windows 的 PreToolUse hook 使用上述標準 `command`，不依賴 Codex 不採用的 `commandWindows` 平行欄位；未綁定或未通過 G2 的寫入仍由 guard 以 deny JSON 表達，而不是把 policy deny 變成 hook process failure。這個邊界由 cmd/PowerShell、root/nested cwd、raw UTF-8、malformed input 與 read-only silence 的真實 child-process regression 覆蓋。
 
 ## 關鍵模組
 
@@ -70,4 +70,4 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 
 需要使用者選擇的五個 companion 都遵循同一份 `native-question-contract.md`：Plan Mode/native `request_user_input`、一題／二至三選項／推薦第一項／host `Other`、等待與 result safety；普通 pre-G2 context 不能自行建立第二套問答 UI，新的 implementation decision 必須 `revise`。
 
-品質檢查包含 UTF-8 quick validation、repository contract 的 exact six-governed-Skill set、frontmatter/metadata/link/invocation policy、maintenance-only/bootstrap exclusion、隔離 forward-test，以及 Python/Extension full verification。validator 尚未支援的 `disable-model-invocation` 欄位由 repository contract 補驗，並保留 `grill-me` 的必要 policy。
+品質檢查包含 UTF-8 quick validation、repository contract 的 exact six-governed-Skill set、frontmatter/metadata/link/invocation policy、maintenance-only/bootstrap exclusion、隔離 forward-test，以及 Python/Extension full verification。Hook hardening 的 repository contract 現在包含 17 項測試；本 work item 的 Python final run 為 102 tests，另維持 73 項 Extension tests、58 個 bootstrap files 與 118 個 VSIX entries。validator 尚未支援的 `disable-model-invocation` 欄位由 repository contract 補驗，並保留 `grill-me` 的必要 policy。

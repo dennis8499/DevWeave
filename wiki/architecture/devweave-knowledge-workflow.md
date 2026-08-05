@@ -5,8 +5,8 @@ sources: [.agents/skills, AGENTS.md, README.md, docs/使用手冊.md, tests/test
 last_updated: 2026-08-05
 tags: [architecture]
 status: active
-source_fingerprint: "sha256:a2e67e3f7f0f6ffb73647a34ba487f7389953b8850876df90df9eb8b7986af80"
-verified_by: 20260805-120943-feature-devweave-0-2-1-current-version-only-rele
+source_fingerprint: "sha256:37f5ae667a3939be59783dcdef09cee7b967ebeb9808f27f1427208a9f65eb85"
+verified_by: 20260805-150125-bug-codex-cli-pretooluse-hook-powershell-utf
 ---
 
 # DevWeave Knowledge Workflow
@@ -36,14 +36,14 @@ Repository contract 以 exact six-governed-Skill set、frontmatter identity、re
 9. Verification 的 `knowledge review` 保存 disposition、rationale、affected/covered/uncovered paths 與 product change fingerprint。後續產品 fingerprint 改變會使 knowledge review、plan 與 source-bound review evidence invalid，並要求重新審查。
 10. `promote` 建立一至五個 content upsert/delete；新頁經 canonical scaffold 先成為 placeholder。完成 active 內容後同步 index、append-only log，再 seal source fingerprint 與 Work Item provenance。`no-update` 僅在非 bootstrap、無 affected page、無 Wiki diff 時成立。
 11. G3 重新比對完整 Wiki diff、affected pages、plan、coupling、log、seal、baseline、current evidence 與 Independent Review。`passed` 正常通過；unavailable/advisory 形成 warning；critical security/data-loss/irreversible/scope finding 只有 exact named `review-critical` acceptance waiver 可解除。它只驗證實作是否符合已批准內容，不默默補入新需求或設計。人工核准後才可 close。
-12. 0.2.1 Windows release verification 必須固定記錄 doctor、Extension tests/typecheck/package/smoke、98 項 Python full suite、symlink 權限補驗、disposable walkthrough 與 `git diff --check`；VSIX verifier 只驗證 current 0.2.1，包含 58 個 bootstrap files、118 個 VSIX entries、source length/hash 與 artifact SHA-256。High-risk review 仍只由 router啟動 exactly one isolated read-only reviewer；零失敗、零未補驗 skip、零 stale evidence 與 current `passed` review 才符合本次 G3 release bar。
-13. Windows Codex 的 PreToolUse launcher 是 bootstrap control contract：標準 `command` 由 Codex 的 `cmd.exe` 啟動 PowerShell，再從 Git root 以 `python -B` 執行 `guard.py`；程序 exit 與 guard 的 `permissionDecision` JSON 是分離的結果，Extension 不會靜默覆寫既有 exact hook。
+12. 0.2.1 Windows release verification 必須固定記錄 doctor、Extension tests/typecheck/package/smoke、98 項 Python release baseline、symlink 權限補驗、disposable walkthrough 與 `git diff --check`；VSIX verifier 只驗證 current 0.2.1，包含 58 個 bootstrap files、118 個 VSIX entries、source length/hash 與 artifact SHA-256。本 work item 在既有 baseline 上新增四項 hook regression，final Python run 為 102 tests。High-risk review 仍只由 router 啟動 exactly one isolated read-only reviewer；零失敗、零未補驗 skip、零 stale evidence 與 current `passed` review 才符合本次 G3 release bar。
+13. Windows Codex 的 PreToolUse launcher 是 bootstrap control contract：標準 `command` 使用 `powershell.exe -NoLogo -NoProfile -NonInteractive -Command`，以 `python.exe -X utf8 -B` 和 `(Join-Path (git rev-parse --show-toplevel) ...)` 從 Git root 執行 `guard.py`。它可由 `cmd.exe` 或 PowerShell 外層啟動；guard 以 UTF-8 bytes 解析/輸出，程序 exit 與 guard 的 `permissionDecision` JSON 是分離的結果，Extension 不會靜默覆寫既有 exact hook。
 
 ## VS Code Control Center integration
 
 VS Code Extension 是這條 lifecycle 的唯讀 projection client。Host 以 `WorkspaceSnapshotReader` 讀取 project、work item、Wiki、evidence 與 bootstrap completeness；它不執行 Python engine、shell、Git、network 或 Codex API。使用者確認初始化後，`BootstrapInstaller` 才能套用 0.2.1 allowlisted control bundle；project、三份 baseline 與三份 Wiki starter 依 shared semantic validator 採用合法 evolved bytes，其他 controls 仍以 exact policy 檢查，missing-only write 與 conflict/rollback 邊界不變。
 
-Bootstrap bundle 內的 hook 來自根目錄 `.codex/hooks.json`，其 Windows launcher 經 `cmd.exe /d /s /c` 實際驗證；正常 DevWeave policy deny 仍輸出 `hookSpecificOutput.permissionDecision: deny` 且 process exit 0。這個 source-derived 行為由 package verifier 與 repository contract regression 固定檢查。
+Bootstrap bundle 內的 hook 來自根目錄 `.codex/hooks.json`，其 Windows launcher 經 `cmd.exe /d /s /c` 與 PowerShell outer runner 實際驗證，包含 raw UTF-8 payload 與 nested Git-root cwd；正常 DevWeave policy deny 仍輸出 `hookSpecificOutput.permissionDecision: deny` 且 process exit 0。這個 source-derived 行為由 package verifier 與 repository contract regression 固定檢查。
 
 Knowledge section 的查詢是 Extension-local 行為，不會改寫 G1 context 或 Wiki：`WikiSearchModel` 保留 draft/applied query，按 Enter 後才以 case-insensitive contains 搜尋 title、path 與 body preview；type filter 是精確匹配，結果與 metric 真實 mount 到 `#wiki-results`。檔案 watcher 仍自動 refresh，但由 250ms debounce、single-flight 與 latest-pending coordinator 合併 burst，snapshot 的平行讀取最後以 deterministic order 合併。
 

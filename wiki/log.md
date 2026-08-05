@@ -6,7 +6,7 @@ last_updated: 2026-08-05
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260805-120943-feature-devweave-0-2-1-current-version-only-rele
+verified_by: 20260805-150125-bug-codex-cli-pretooluse-hook-powershell-utf
 ---
 
 # Activity Log
@@ -75,3 +75,9 @@ verified_by: 20260805-120943-feature-devweave-0-2-1-current-version-only-rele
 
 - Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，將 0.2.1 release contract 統一為 current-version-only，並限定本次 Windows x64／VS Code／Python／Git／Codex 認證環境。
 - 記錄 98 項 Python suite、73 項 Extension tests、58 個 bootstrap files、118 個 VSIX entries、current artifact SHA-256 與無舊版 binary rollback 的資料保留事故處理。
+
+## [2026-08-05] promote | 20260805-150125-bug-codex-cli-pretooluse-hook-powershell-utf
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，記錄 Windows Codex hook 的 shell-neutral Git-root launcher、`powershell.exe -NoLogo -NoProfile -NonInteractive`、`python.exe -X utf8 -B` 與 no-`commandWindows` contract。
+- 提升 guard 直接以 UTF-8 bytes 讀寫 hook JSON、policy deny 維持 process exit 0、PowerShell/cmd runner compatibility、nested cwd、malformed input 與 read-only silence 的 process-level regression；source-derived 0.2.1 package verifier 同步檢查相同語意。
+- 本 Work Item 新增四項 hook regression，Python final run 為 102 tests；Extension tests 73、bootstrap files 58、VSIX entries 118 維持既有 release contract。

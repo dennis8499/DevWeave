@@ -307,18 +307,29 @@ def handle_hook(payload: dict[str, Any], repo: Path | None = None) -> dict[str, 
     return None
 
 
+def _read_hook_payload() -> dict[str, Any]:
+    raw = sys.stdin.buffer.read()
+    return json.loads(raw.decode("utf-8"))
+
+
+def _write_hook_json(value: dict[str, Any]) -> None:
+    encoded = (json.dumps(value, ensure_ascii=False) + "\n").encode("utf-8")
+    sys.stdout.buffer.write(encoded)
+    sys.stdout.buffer.flush()
+
+
 def main() -> int:
     try:
-        payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, OSError) as exc:
-        print(json.dumps(deny(f"DevWeave guard 無法解析 hook input：{exc}"), ensure_ascii=False))
+        payload = _read_hook_payload()
+    except (AttributeError, UnicodeDecodeError, json.JSONDecodeError, OSError) as exc:
+        _write_hook_json(deny(f"DevWeave guard 無法解析 hook input：{exc}"))
         return 0
     try:
         result = handle_hook(payload)
     except Exception as exc:
         result = deny(f"DevWeave guard 執行失敗並採取 fail-closed：{type(exc).__name__}: {exc}")
     if result is not None:
-        print(json.dumps(result, ensure_ascii=False))
+        _write_hook_json(result)
     return 0
 
 

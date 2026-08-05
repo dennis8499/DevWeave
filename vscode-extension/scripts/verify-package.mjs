@@ -17,8 +17,10 @@ assert.equal(manifest.files.length, 58, "bootstrap manifest must contain the cer
 const bootstrapHook = JSON.parse(await readFile(join(bootstrapRoot, "hooks.json"), "utf8"));
 const bootstrapHookCommand = bootstrapHook.hooks?.PreToolUse?.[0]?.hooks?.[0];
 assert.ok(bootstrapHookCommand, "bootstrap must contain the PreToolUse command hook");
-assert.match(bootstrapHookCommand.command, /powershell -NoProfile -Command/);
-assert.match(bootstrapHookCommand.command, /python -B/);
+assert.match(bootstrapHookCommand.command, /powershell\.exe -NoLogo -NoProfile -NonInteractive -Command/);
+assert.match(bootstrapHookCommand.command, /python\.exe -X utf8 -B/);
+assert.match(bootstrapHookCommand.command, /Join-Path \(git rev-parse --show-toplevel\)/);
+assert.doesNotMatch(bootstrapHookCommand.command, /\$repo/);
 assert.equal(Object.hasOwn(bootstrapHookCommand, "commandWindows"), false, "bootstrap must not rely on commandWindows");
 const destinations = new Set(manifest.files.map((file) => file.destination));
 const compatibleContracts = new Map([

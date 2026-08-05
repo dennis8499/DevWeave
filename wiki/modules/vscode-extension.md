@@ -5,8 +5,8 @@ sources: [.codex/hooks.json, vscode-extension/esbuild.mjs, vscode-extension/pack
 last_updated: 2026-08-05
 tags: [module, vscode, control-center]
 status: active
-source_fingerprint: "sha256:e6b1881770e1a43c93df6cbe92a7aa699cea17f26c3afd1f82b74eda83d24161"
-verified_by: 20260805-120943-feature-devweave-0-2-1-current-version-only-rele
+source_fingerprint: "sha256:a919a5e80826537f7d543f65794e626a0a80ae4b94c0b77b13d99d15da943eb0"
+verified_by: 20260805-150125-bug-codex-cli-pretooluse-hook-powershell-utf
 ---
 
 # DevWeave VS Code Extension
@@ -39,11 +39,11 @@ Workspace watcher 保留自動 refresh，事件經 250ms debounce 後交給 `Ref
 
 Production bundle `0.2.1` 使用由 package version 產生的 manifest，固定完整控制套件：`devweave`、`codebase-design`、`diagnosing-bugs`、`grill-me`、`grilling`、`tdd` 六組 skills，加上通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。README、docs、產品 source、tests、fixtures、work item 與 history 不會成為 target workspace 的 bootstrap files；使用手冊只留在 Extension help。Project、三份 baseline 與三份 Wiki starter 明確宣告 `adopt-compatible` contract，其餘 controls 宣告 `exact`。
 
-Windows Codex 的 PreToolUse hook 是由根目錄 `.codex/hooks.json` 產生的 exact bootstrap control：標準 `command` 由 Codex 的 `cmd.exe` 啟動 `powershell -NoProfile -Command`，從 Git root 以 `python -B` 找到並執行 `guard.py`；不再維護不會被 Codex runner 採用的 `commandWindows` 欄位。`cmd.exe /d /s /c` 可實際啟動此 launcher，且 guard 的 policy deny 仍以合法 JSON 與 process exit 0 回傳。
+Windows Codex 的 PreToolUse hook 是由根目錄 `.codex/hooks.json` 產生的 exact bootstrap control：標準 `command` 使用 `powershell.exe -NoLogo -NoProfile -NonInteractive -Command`，由 Codex 的 `cmd.exe` 或 PowerShell 外層啟動，再從 Git root 以 `python.exe -X utf8 -B` 找到並執行 `guard.py`；guard 直接以 UTF-8 bytes 讀寫 JSON，不再維護不會被 Codex runner 採用的 `commandWindows` 欄位。`cmd.exe /d /s /c`、PowerShell outer runner、nested cwd、raw UTF-8、malformed input 與 read-only silence 均由 process-level contract 驗證，policy deny 仍以合法 JSON 與 process exit 0 回傳。
 
 `BootstrapInstaller.inspect()` 先驗證 manifest path、byte length 與 SHA-256，再依 `bootstrap-compat.ts` shared validator 檢查 semantic identity。合法 evolved project/baseline/Wiki bytes 會 adopted；AGENTS、skills、hook、lock 與其他 controls 仍以 exact bytes 判定。初始化或修復只建立 missing paths，不同或不合法內容永不覆寫並列為 conflict；只要仍有 missing 或 conflict，report 與 Dashboard 就標示 partial；若中途寫入失敗，僅 rollback 本輪新增內容，既有檔案保持不變。重跑完整 bundle 是 idempotent。
 
-Hook 的 source-derived consistency 由 package verifier 檢查根目錄 hook 與 `dist/bootstrap/hooks.json` 的 PowerShell／`python -B` semantic contract；0.2.1 VSIX 從 current source 重新產出，其他 VSIX 不屬於封裝、驗收或回復條件。
+Hook 的 source-derived consistency 由 package verifier 檢查根目錄 hook 與 `dist/bootstrap/hooks.json` 的 PowerShell／explicit UTF-8／`python -B`／Git-root／no-`commandWindows` semantic contract；0.2.1 VSIX 從 current source 重新產出，其他 VSIX 不屬於封裝、驗收或回復條件。
 
 ## Security and compatibility
 

@@ -1,0 +1,24 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-004"
+  ],
+  "created_at": "2026-08-05T07:24:17+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "745e54445e6ef50a6a261e296cfe243324fcda3a",
+  "id": "EVID-008",
+  "kind": "package",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "947fd0a9cf0d13104c9340fd0ab10a7ed67e50e1b71e6a1d3f018478645d113f",
+  "stale": false,
+  "status": "passed",
+  "summary": "npm.cmd run package 成功：由根 .codex/hooks.json 產生 source-derived bootstrap，package verifier 通過新的 powershell.exe/NoLogo/NoProfile/NonInteractive/python.exe/-X utf8/-B/Git-root/no-commandWindows contract；產生 0.2.1 VSIX，58 bootstrap files、118 entries，artifact SHA-256 已輸出。",
+  "tasks": [
+    "TASK-003"
+  ]
+}
