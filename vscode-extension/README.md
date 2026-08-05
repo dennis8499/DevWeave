@@ -85,6 +85,7 @@ npm run typecheck
 npm test
 npm run package
 npm run test:smoke
+npx --yes @vscode/vsce package --allow-missing-repository
 ```
 
 `npm run package` 會從 `package.json` 產生 0.2.1 production bundle、完整 bootstrap manifest 與 `devweave-control-center-0.2.1.vsix`；`npm run test:smoke` 會使用 VS Code Extension Host 驗證 activation、Activity Bar view 與公開 commands。Extension unit tests 目前為 73 項，全部通過。
