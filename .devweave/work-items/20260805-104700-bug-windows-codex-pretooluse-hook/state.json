@@ -1,0 +1,815 @@
+{
+  "base_baseline": {
+    "files": {
+      ".devweave/baseline/architecture.md": "79eb667e88e5321a60c6e577e2b25f157c778430a0c64beb7a61b817c5ec1ce3",
+      ".devweave/baseline/product.md": "ecf7df6dc096499d47b7f71cb1a372c6ab96e70717d9d7cf405fd572ec17b735",
+      ".devweave/baseline/quality.md": "a8ac71eb2ec07d66bc42319ba957aa517e014e64815b612968aaad0b6da4377f"
+    },
+    "fingerprint": "af6fb057bf2262923bb8a9a248870804f4a2f080188d11d6870b942b7e72a08a"
+  },
+  "base_knowledge": {
+    "files": {
+      "wiki/architecture/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/architecture/devweave-knowledge-workflow.md": "7dfe72640a9adb975720d27f59f7bb43b281fe368ddea47eb1e428dcc11fc1b6",
+      "wiki/decisions/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/dependencies/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/entities/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/guides/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/index.md": "52ca1ec89b7dda200069e6d59fdc0822f43a038ce462ce5c125ffa9b1fcebad0",
+      "wiki/log.md": "b85a037c792fa36a98d694dbe75163c48173caefb41465d58ece0ae994ca100f",
+      "wiki/modules/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/modules/knowledge-engine.md": "28809efd6c6b99124bca365a7283470269b587c285cbb1e31356128d998d7b20",
+      "wiki/modules/vscode-extension.md": "d1d9a7eabab885c48f08b27e9c6f244221d04f4b3b3942906a03b3712ffe967e",
+      "wiki/overview.md": "51a357c5c0e4557c624f7bb2020dd25d04794c5c794de42dcc98b68aaca30883",
+      "wiki/patterns/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/synthesis/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fingerprint": "8ff5874df3bfd96df9b904d2affbcf61e09a91a0508c26bbd58164b8c35690d1",
+    "log": {
+      "body_hash": "fbf8dae1050e00bb34ae4c90bbf7c1afefde3e6581527f6bc9ddda41eac9da76",
+      "body_length": 5510
+    },
+    "pages": {
+      "wiki/architecture/devweave-knowledge-workflow.md": {
+        "body_hash": "32a6a5704345d6a599ef707e7cacbdbdb7aeca6a446c93c56a071c5a422f2618",
+        "body_length": 12674,
+        "computed_source_fingerprint": "sha256:469e65b74bee6bc106127debdea25c80ec606cc02a24fe9672ee319b02498a81",
+        "file_hash": "7dfe72640a9adb975720d27f59f7bb43b281fe368ddea47eb1e428dcc11fc1b6",
+        "last_updated": "2026-08-05",
+        "parse_errors": [],
+        "path": "wiki/architecture/devweave-knowledge-workflow.md",
+        "relative": "architecture/devweave-knowledge-workflow.md",
+        "source_error": null,
+        "source_fingerprint": "sha256:469e65b74bee6bc106127debdea25c80ec606cc02a24fe9672ee319b02498a81",
+        "sources": [
+          ".agents/skills",
+          "AGENTS.md",
+          "README.md",
+          "docs/使用手冊.md",
+          "tests/test_repository_contract.py"
+        ],
+        "status": "active",
+        "title": "DevWeave Knowledge Workflow",
+        "type": "architecture",
+        "verified_by": "20260805-094544-feature-plan-first"
+      },
+      "wiki/index.md": {
+        "body_hash": "2346b903ccfd5132295f47d881c10a5968d257f64d9f438492ad850a0abeaef4",
+        "body_length": 1467,
+        "computed_source_fingerprint": "none",
+        "file_hash": "52ca1ec89b7dda200069e6d59fdc0822f43a038ce462ce5c125ffa9b1fcebad0",
+        "last_updated": "2026-08-05",
+        "parse_errors": [],
+        "path": "wiki/index.md",
+        "relative": "index.md",
+        "source_error": null,
+        "source_fingerprint": "none",
+        "sources": [],
+        "status": "active",
+        "title": "Wiki Index",
+        "type": "index",
+        "verified_by": "20260805-094544-feature-plan-first"
+      },
+      "wiki/log.md": {
+        "body_hash": "fbf8dae1050e00bb34ae4c90bbf7c1afefde3e6581527f6bc9ddda41eac9da76",
+        "body_length": 5510,
+        "computed_source_fingerprint": "none",
+        "file_hash": "b85a037c792fa36a98d694dbe75163c48173caefb41465d58ece0ae994ca100f",
+        "last_updated": "2026-08-05",
+        "parse_errors": [],
+        "path": "wiki/log.md",
+        "relative": "log.md",
+        "source_error": null,
+        "source_fingerprint": "none",
+        "sources": [],
+        "status": "active",
+        "title": "Wiki Activity Log",
+        "type": "log",
+        "verified_by": "20260805-094544-feature-plan-first"
+      },
+      "wiki/modules/knowledge-engine.md": {
+        "body_hash": "9257798926aa83dab370c5646d8ef549e09e049dd8064787126e177c16005788",
+        "body_length": 13872,
+        "computed_source_fingerprint": "sha256:793f795c62a81a4faf52b4b0b037941443ffa6e41bcf6ace041e299d7bc3b51c",
+        "file_hash": "28809efd6c6b99124bca365a7283470269b587c285cbb1e31356128d998d7b20",
+        "last_updated": "2026-08-05",
+        "parse_errors": [],
+        "path": "wiki/modules/knowledge-engine.md",
+        "relative": "modules/knowledge-engine.md",
+        "source_error": null,
+        "source_fingerprint": "sha256:793f795c62a81a4faf52b4b0b037941443ffa6e41bcf6ace041e299d7bc3b51c",
+        "sources": [
+          ".agents/skills",
+          ".agents/skills/devweave/assets/wiki/templates",
+          ".agents/skills/devweave/scripts",
+          "AGENTS.md",
+          "tests/test_repository_contract.py"
+        ],
+        "status": "active",
+        "title": "Knowledge Engine",
+        "type": "module",
+        "verified_by": "20260805-094544-feature-plan-first"
+      },
+      "wiki/modules/vscode-extension.md": {
+        "body_hash": "4637edcd23ecca78929f3d7a3bd5adbbe13bf9661c8a042d0f47ffecf0a3a410",
+        "body_length": 6511,
+        "computed_source_fingerprint": "sha256:fe8093d63c4b93a1c66d0767b039ce762835b2f2e981f192514dad76803007fa",
+        "file_hash": "d1d9a7eabab885c48f08b27e9c6f244221d04f4b3b3942906a03b3712ffe967e",
+        "last_updated": "2026-08-04",
+        "parse_errors": [],
+        "path": "wiki/modules/vscode-extension.md",
+        "relative": "modules/vscode-extension.md",
+        "source_error": null,
+        "source_fingerprint": "sha256:fe8093d63c4b93a1c66d0767b039ce762835b2f2e981f192514dad76803007fa",
+        "sources": [
+          "vscode-extension/esbuild.mjs",
+          "vscode-extension/package.json",
+          "vscode-extension/scripts",
+          "vscode-extension/src",
+          "vscode-extension/webview"
+        ],
+        "status": "active",
+        "title": "DevWeave VS Code Extension",
+        "type": "module",
+        "verified_by": "20260804-205655-feature-devweave-0-2-1-windows"
+      },
+      "wiki/overview.md": {
+        "body_hash": "d893d43e03fdf7910e0fe9fa829bce1fe299316edd1d17a34120f203a84fb4d8",
+        "body_length": 10296,
+        "computed_source_fingerprint": "sha256:469e65b74bee6bc106127debdea25c80ec606cc02a24fe9672ee319b02498a81",
+        "file_hash": "51a357c5c0e4557c624f7bb2020dd25d04794c5c794de42dcc98b68aaca30883",
+        "last_updated": "2026-08-05",
+        "parse_errors": [],
+        "path": "wiki/overview.md",
+        "relative": "overview.md",
+        "source_error": null,
+        "source_fingerprint": "sha256:469e65b74bee6bc106127debdea25c80ec606cc02a24fe9672ee319b02498a81",
+        "sources": [
+          ".agents/skills",
+          "AGENTS.md",
+          "README.md",
+          "docs/使用手冊.md",
+          "tests/test_repository_contract.py"
+        ],
+        "status": "active",
+        "title": "DevWeave Codebase Overview",
+        "type": "overview",
+        "verified_by": "20260805-094544-feature-plan-first"
+      }
+    },
+    "root": "wiki"
+  },
+  "base_source": {
+    "branch": "master",
+    "dirty_paths": [],
+    "files": {},
+    "fingerprint": "d19606ec753eadd3d85d8836af30245fb3ee7bd9617aae888256545e48c4ffa2",
+    "head": "8300fac45be9573ee265665ec6557e130391de3b"
+  },
+  "baseline_updates": {
+    "rationale": "本次不更新 accepted living baseline：只修正Windows launcher adapter、tracked regression、troubleshooting與source-derived package；不改變guard decision schema、CLI、engine lifecycle、system boundary或verification profile。",
+    "recorded_at": "2026-08-05T03:30:45+00:00",
+    "targets": []
+  },
+  "blocker": null,
+  "closed_at": "2026-08-05T03:33:41+00:00",
+  "created_at": "2026-08-05T02:47:01+00:00",
+  "evidence": {
+    "EVID-001": {
+      "binds_current_source": true,
+      "command_id": null,
+      "covers": [
+        "AC-001"
+      ],
+      "created_at": "2026-08-05T02:52:06+00:00",
+      "exit_code": null,
+      "expectation": null,
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-001",
+      "kind": "reproduction",
+      "log_truncated": false,
+      "observed_result": "failure",
+      "raw_log": null,
+      "schema_version": 1,
+      "source_fingerprint": "d19606ec753eadd3d85d8836af30245fb3ee7bd9617aae888256545e48c4ffa2",
+      "stale": true,
+      "status": "failed",
+      "summary": "以 cmd.exe /d /s /c 執行目前 .codex/hooks.json 的 Unix command；C:/Users/小豬的電腦/Desktop/Project/DevWeave 不被 cmd.exe 替換，hook launcher 失敗；PowerShell launcher 可正常啟動 guard。",
+      "tasks": []
+    },
+    "EVID-002": {
+      "binds_current_source": false,
+      "command_id": null,
+      "covers": [
+        "AC-001"
+      ],
+      "created_at": "2026-08-05T02:52:33+00:00",
+      "exit_code": null,
+      "expectation": null,
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-002",
+      "kind": "reproduction",
+      "log_truncated": false,
+      "observed_result": "failure",
+      "raw_log": null,
+      "schema_version": 1,
+      "source_fingerprint": "d19606ec753eadd3d85d8836af30245fb3ee7bd9617aae888256545e48c4ffa2",
+      "stale": false,
+      "status": "passed",
+      "summary": "修正前以 cmd.exe 執行目前 hook command 可穩定觀察 launcher failure；同一輸入改用 PowerShell launcher 可成功啟動 guard。",
+      "tasks": []
+    },
+    "EVID-003": {
+      "binds_current_source": true,
+      "command_id": null,
+      "covers": [
+        "AC-001"
+      ],
+      "created_at": "2026-08-05T02:56:04+00:00",
+      "exit_code": null,
+      "expectation": null,
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-003",
+      "kind": "launcher-smoke",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": null,
+      "schema_version": 1,
+      "source_fingerprint": "d19606ec753eadd3d85d8836af30245fb3ee7bd9617aae888256545e48c4ffa2",
+      "stale": true,
+      "status": "passed",
+      "summary": "cmd.exe /d /s /c 實際啟動修正後 PowerShell hook command；guard process exit code 為 0，commandWindows 已移除。",
+      "tasks": [
+        "TASK-001"
+      ]
+    },
+    "EVID-004": {
+      "binds_current_source": true,
+      "command_id": null,
+      "covers": [
+        "AC-002",
+        "AC-004"
+      ],
+      "created_at": "2026-08-05T02:59:02+00:00",
+      "exit_code": null,
+      "expectation": null,
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-004",
+      "kind": "regression",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": null,
+      "schema_version": 1,
+      "source_fingerprint": "c125c440c2cd52698344bf84a8952c36c213843f105984cf4d03b8e945b270b5",
+      "stale": true,
+      "status": "passed",
+      "summary": "Repository contract suite 13 tests passed；真實 cmd.exe/PowerShell/Python 啟動鏈對未綁定 Write payload 返回 zero exit 與合法 permissionDecision=deny JSON。",
+      "tasks": [
+        "TASK-002"
+      ]
+    },
+    "EVID-005": {
+      "binds_current_source": true,
+      "command_id": null,
+      "covers": [
+        "AC-003",
+        "AC-005"
+      ],
+      "created_at": "2026-08-05T03:00:42+00:00",
+      "exit_code": null,
+      "expectation": null,
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-005",
+      "kind": "package",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": null,
+      "schema_version": 1,
+      "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+      "stale": false,
+      "status": "passed",
+      "summary": "npm.cmd run package 通過；0.2.1 產生 58 bootstrap files/118 VSIX entries，embedded hook 使用 PowerShell canonical command；legacy 0.1.0/0.2.0 artifacts 經 verifier 保持固定 hash。",
+      "tasks": [
+        "TASK-003"
+      ]
+    },
+    "EVID-006": {
+      "binds_current_source": true,
+      "command_id": null,
+      "covers": [
+        "AC-004"
+      ],
+      "created_at": "2026-08-05T03:08:01+00:00",
+      "exit_code": null,
+      "expectation": null,
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-006",
+      "kind": "verification",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": null,
+      "schema_version": 1,
+      "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+      "stale": false,
+      "status": "passed",
+      "summary": "完整 high-risk 驗證通過：root Python unittest 98 tests（1 項既有 symlink privilege skip）、Extension tests 73/73、typecheck、Windows smoke、package verifier 與 git diff --check 均通過；smoke 的第一次 sandbox Access denied 已以升權重跑成功，非產品失敗。",
+      "tasks": [
+        "TASK-004"
+      ]
+    },
+    "EVID-007": {
+      "binds_current_source": true,
+      "command_id": null,
+      "covers": [
+        "AC-001",
+        "AC-002"
+      ],
+      "created_at": "2026-08-05T03:21:16+00:00",
+      "exit_code": null,
+      "expectation": null,
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-007",
+      "kind": "verification",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": null,
+      "schema_version": 1,
+      "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+      "stale": false,
+      "status": "passed",
+      "summary": "在Wiki seal後的current source fingerprint下重驗Windows launcher與policy deny：cmd.exe /d /s /c 啟動標準PowerShell command，未綁定Write payload返回process exit 0與合法permissionDecision=deny JSON；根hook、embedded bootstrap與guard decision schema一致。",
+      "tasks": [
+        "TASK-004"
+      ]
+    },
+    "EVID-008": {
+      "binds_current_source": true,
+      "command_id": null,
+      "covers": [
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005"
+      ],
+      "created_at": "2026-08-05T03:22:14+00:00",
+      "exit_code": null,
+      "expectation": null,
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-008",
+      "kind": "review",
+      "log_truncated": false,
+      "observed_result": "neutral",
+      "raw_log": ".devweave/cache/logs/20260805-104700-bug-windows-codex-pretooluse-hook/EVID-008.log",
+      "review": {
+        "context_mode": "isolated_read_only",
+        "covers": [
+          "AC-001",
+          "AC-002",
+          "AC-003",
+          "AC-004",
+          "AC-005"
+        ],
+        "findings": [],
+        "report_sha256": "8e4ee8d566dab00c2572ac0e4903b5e754e8cd02a39b55564e962e7c03dd6cc5",
+        "result": "unavailable",
+        "reviewer_id": "019fcfea-0aec-77b1-a06b-3dbe688712e8",
+        "severity": "none",
+        "tasks": [
+          "TASK-001",
+          "TASK-002",
+          "TASK-003",
+          "TASK-004"
+        ]
+      },
+      "schema_version": 1,
+      "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+      "stale": false,
+      "status": "failed",
+      "summary": "Independent review returned an unavailable result with a malformed advisory payload; the engine-safe fallback preserves the warning and does not assert pass. Existing evidence supports the launcher, unchanged guard, regression, package, legacy retention, documentation, and Wiki seal.",
+      "tasks": [
+        "TASK-001",
+        "TASK-002",
+        "TASK-003",
+        "TASK-004"
+      ]
+    },
+    "EVID-009": {
+      "argv": [
+        "python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "binds_current_source": true,
+      "command_id": "unit-tests",
+      "covers": [
+        "AC-002",
+        "AC-004"
+      ],
+      "created_at": "2026-08-05T03:29:12+00:00",
+      "cwd": ".",
+      "execution_error": null,
+      "exit_code": 0,
+      "expectation": "zero",
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-009",
+      "kind": "regression",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": ".devweave/cache/logs/20260805-104700-bug-windows-codex-pretooluse-hook/EVID-009.log",
+      "schema_version": 1,
+      "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+      "stale": false,
+      "started_at": "2026-08-05T03:24:23+00:00",
+      "status": "passed",
+      "summary": ".KnowledgeCoreTests.test_project_upgrade_is_read_only_until_init_and_legacy_state_loads) ... ok\r\ntest_scaffold_supports_all_nine_types_and_conditional_fields (test_knowledge.KnowledgeCoreTests.test_scaffold_supports_all_nine_types_and_conditional_fields) ... ok\r\ntest_scaffold_uses_canonical_template_and_never_overwrites (test_knowledge.KnowledgeCoreTests.test_scaffold_uses_canonical_template_and_never_overwrites) ... ok\r\ntest_seal_rejects_placeholder_and_template_tokens_before_writing (test_knowledge.KnowledgeCoreTests.test_seal_rejects_placeholder_and_template_tokens_before_writing) ... ok\r\ntest_source_fingerprint_tracks_dirty_directory_rename_delete_and_ignores_ignored (test_knowledge.KnowledgeCoreTests.test_source_fingerprint_tracks_dirty_directory_rename_delete_and_ignores_ignored) ... ok\r\ntest_declared_delete_and_append_only_log_rules (test_knowledge.KnowledgeLifecycleTests.test_declared_delete_and_append_only_log_rules) ... ok\r\ntest_only_affected_page_blocks_and_unrelated_stale_page_warns (test_knowledge.KnowledgeLifecycleTests.test_only_affected_page_blocks_and_unrelated_stale_page_warns) ... ok\r\ntest_plan_requires_real_changes_and_seal_rejects_unplanned_pages (test_knowledge.KnowledgeLifecycleTests.test_plan_requires_real_changes_and_seal_rejects_unplanned_pages) ... ok\r\ntest_refresh_promotion_passes_g3_and_wiki_only_change_stales_only_g3 (test_knowledge.KnowledgeLifecycleTests.test_refresh_promotion_passes_g3_and_wiki_only_change_stales_only_g3) ... ok\r\ntest_codebase_wiki_closed_loop_is_documented_on_the_single_router (test_repository_contract.RepositoryContractTests.test_codebase_wiki_closed_loop_is_documented_on_the_single_router) ... ok\r\ntest_companion_skill_precedence_policy_covers_side_effect_boundaries (test_repository_contract.RepositoryContractTests.test_companion_skill_precedence_policy_covers_side_effect_boundaries) ... ok\r\ntest_companion_skill_provenance_and_relative_links_are_complete (test_repository_contract.RepositoryContractTests.test_companion_skill_provenance_and_relative_links_are_complete) ... ok\r\ntest_devweave_is_the_only_router_with_expected_companions (test_repository_contract.RepositoryContractTests.test_devweave_is_the_only_router_with_expected_companions) ... ok\r\ntest_doctor_passes_for_an_initialized_fixture_with_hook (test_repository_contract.RepositoryContractTests.test_doctor_passes_for_an_initialized_fixture_with_hook) ... ok\r\ntest_high_risk_review_stays_on_the_single_router_and_read_only_extension (test_repository_contract.RepositoryContractTests.test_high_risk_review_stays_on_the_single_router_and_read_only_extension) ... ok\r\ntest_hook_contract_is_json_and_resolves_from_git_root (test_repository_contract.RepositoryContractTests.test_hook_contract_is_json_and_resolves_from_git_root) ... ok\r\ntest_hook_launcher_runs_through_windows_cmd_and_preserves_deny_json (test_repository_contract.RepositoryContractTests.test_hook_launcher_runs_through_windows_cmd_and_preserves_deny_json) ... ok\r\ntest_interactive_decision_policy_is_explicit (test_repository_contract.RepositoryContractTests.test_interactive_decision_policy_is_explicit) ... ok\r\ntest_maintenance_only_skill_is_excluded_from_governed_sets_and_bundle (test_repository_contract.RepositoryContractTests.test_maintenance_only_skill_is_excluded_from_governed_sets_and_bundle) ... ok\r\ntest_native_question_contract_is_shared_without_host_or_engine_adapters (test_repository_contract.RepositoryContractTests.test_native_question_contract_is_shared_without_host_or_engine_adapters) ... ok\r\ntest_runtime_has_no_openspec_or_third_party_imports (test_repository_contract.RepositoryContractTests.test_runtime_has_no_openspec_or_third_party_imports) ... ok\r\ntest_skill_frontmatter_metadata_and_invocation_policy_are_explicit (test_repository_contract.RepositoryContractTests.test_skill_frontmatter_metadata_and_invocation_policy_are_explicit) ... ok\r\n\r\n----------------------------------------------------------------------\r\nRan 98 tests in 288.422s\r\n\r\nOK (skipped=1)",
+      "tasks": [
+        "TASK-002"
+      ],
+      "timed_out": false
+    },
+    "EVID-010": {
+      "argv": [
+        "npm.cmd",
+        "run",
+        "test"
+      ],
+      "binds_current_source": true,
+      "command_id": "extension-tests",
+      "covers": [
+        "AC-004"
+      ],
+      "created_at": "2026-08-05T03:29:21+00:00",
+      "cwd": "vscode-extension",
+      "execution_error": null,
+      "exit_code": 0,
+      "expectation": "zero",
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-010",
+      "kind": "verification",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": ".devweave/cache/logs/20260805-104700-bug-windows-codex-pretooluse-hook/EVID-010.log",
+      "schema_version": 1,
+      "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+      "stale": false,
+      "started_at": "2026-08-05T03:29:18+00:00",
+      "status": "passed",
+      "summary": "mand free (1.9863ms)\n✔ prompt composer redacts absolute paths and credential-like values (0.4671ms)\n✔ mutation public prompt is disabled when the snapshot has a critical diagnostic (1.3939ms)\n✔ every public command produces the documented command text (1.1765ms)\n✔ public Webview protocol accepts public intents and rejects machine actions (1.853ms)\n✔ Dashboard host invalidates preview tickets across snapshot and selection changes (1.1164ms)\n✔ Dashboard preview protocol preserves the exact intent and revision (0.3852ms)\n✔ legacy copyNextAction command opens the Control Center preview flow (1.1086ms)\n✔ release package derives 0.2.1 bundle metadata and preserves rollback artifacts (17.371ms)\n✔ command catalog groups all nine public commands in task language (3.1683ms)\n✔ snapshot guidance is explicitly non-authoritative and hands off next to Codex (1.1996ms)\n✔ snapshot guidance handles an empty active-work state without selecting closed history (0.5012ms)\n✔ snapshot guidance makes initialization and bootstrap write boundary explicit (0.3077ms)\n✔ review readiness explains gate, blocker, stale evidence, task and Wiki checks (1.172ms)\n✔ review readiness can be ready for a pending gate without pretending the gate is approved (0.7138ms)\n✔ high-risk acceptance readiness projects independent review states (0.7429ms)\n✔ closed work is explicitly not reviewable (0.1924ms)\n✔ diagnostics and audit events become readable while preserving technical raw data (1.7818ms)\n✔ display mode protocol accepts only the typed preference message (0.6429ms)\n✔ readiness and bootstrap statuses are presented in Traditional Chinese (0.1962ms)\n✔ PreviewGate stages and consumes only a matching ticket once (1.7145ms)\n✔ PreviewGate rejects mismatched panel, intent, or revision without consuming (0.5838ms)\n✔ PreviewGate compares typed intent fields without delimiter collisions (0.5209ms)\n✔ PreviewGate invalidation makes a ticket stale and prevents restore (0.277ms)\n✔ PreviewGate restores only the consumed current ticket for clipboard retry (0.3113ms)\n✔ host preview messages carry intent and the snapshot revision (2.0825ms)\n✔ RefreshCoordinator never overlaps reads and publishes the newest pending snapshot (11.3752ms)\n✔ RefreshCoordinator reports a read failure and accepts a later retry (1.5089ms)\n✔ Extension runtime has no process, shell, or external-network path and confines writes to bootstrap (5.5326ms)\n✔ package and Webview keep the approved dependency and CSP boundary (2.3463ms)\n✔ workflow mutations remain preview-first and bootstrap uses explicit confirmation (1.8749ms)\n✔ Wiki bootstrap has three prompt-only entrances with one public intent (1.9064ms)\n✔ P2 preferences and Wiki browsing stay Extension-local and discoverable (1.6326ms)\n[walkthrough] multi-active implicit-selection=blocked explicit-selection=active-2\n✔ selection never promotes closed history to the implicit current work (2.0373ms)\n✔ multiple active works require an explicit choice (0.5922ms)\n✔ work grouping exposes active work and closed history as separate collections (0.7429ms)\n✔ snapshot reader parallelizes independent text reads while keeping diagnostics sorted (31.2344ms)\n[accessibility] tabs=5 panels=5 hidden-inactive=4 keyboard=arrows/Home/End focus-restore=section-key forced-colors=checked\n✔ Wiki result mount writes rendered markup into the dedicated result host (1.5506ms)\n✔ Webview contract keeps preview metadata, stale reset, and accessible five-tab navigation (2.7776ms)\n✔ WikiSearchModel keeps draft input separate until Enter commits it (1.4154ms)\n✔ WikiSearchModel matches title, path, and body case-insensitively with contains semantics (0.1946ms)\n✔ WikiSearchModel applies exact type filtering and show-all state (0.7281ms)\n✔ RenderScheduler coalesces local renders into one frame (0.3609ms)\nℹ tests 73\nℹ suites 0\nℹ pass 73\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 1140.3609",
+      "tasks": [
+        "TASK-004"
+      ],
+      "timed_out": false
+    },
+    "EVID-011": {
+      "argv": [
+        "npm.cmd",
+        "run",
+        "test"
+      ],
+      "binds_current_source": true,
+      "command_id": "extension-tests",
+      "covers": [
+        "AC-004"
+      ],
+      "created_at": "2026-08-05T03:29:37+00:00",
+      "cwd": "vscode-extension",
+      "execution_error": null,
+      "exit_code": 0,
+      "expectation": "zero",
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-011",
+      "kind": "verification",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": ".devweave/cache/logs/20260805-104700-bug-windows-codex-pretooluse-hook/EVID-011.log",
+      "schema_version": 1,
+      "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+      "stale": false,
+      "started_at": "2026-08-05T03:29:35+00:00",
+      "status": "passed",
+      "summary": "and free (2.7601ms)\n✔ prompt composer redacts absolute paths and credential-like values (6.3074ms)\n✔ mutation public prompt is disabled when the snapshot has a critical diagnostic (1.0326ms)\n✔ every public command produces the documented command text (1.0722ms)\n✔ public Webview protocol accepts public intents and rejects machine actions (0.9065ms)\n✔ Dashboard host invalidates preview tickets across snapshot and selection changes (1.1781ms)\n✔ Dashboard preview protocol preserves the exact intent and revision (0.4154ms)\n✔ legacy copyNextAction command opens the Control Center preview flow (2.0043ms)\n✔ release package derives 0.2.1 bundle metadata and preserves rollback artifacts (3.193ms)\n✔ command catalog groups all nine public commands in task language (2.9503ms)\n✔ snapshot guidance is explicitly non-authoritative and hands off next to Codex (0.6632ms)\n✔ snapshot guidance handles an empty active-work state without selecting closed history (0.3219ms)\n✔ snapshot guidance makes initialization and bootstrap write boundary explicit (0.3858ms)\n✔ review readiness explains gate, blocker, stale evidence, task and Wiki checks (2.9735ms)\n✔ review readiness can be ready for a pending gate without pretending the gate is approved (0.5237ms)\n✔ high-risk acceptance readiness projects independent review states (0.5398ms)\n✔ closed work is explicitly not reviewable (0.1439ms)\n✔ diagnostics and audit events become readable while preserving technical raw data (1.8792ms)\n✔ display mode protocol accepts only the typed preference message (0.6047ms)\n✔ readiness and bootstrap statuses are presented in Traditional Chinese (0.6185ms)\n✔ PreviewGate stages and consumes only a matching ticket once (2.7057ms)\n✔ PreviewGate rejects mismatched panel, intent, or revision without consuming (0.3591ms)\n✔ PreviewGate compares typed intent fields without delimiter collisions (0.1977ms)\n✔ PreviewGate invalidation makes a ticket stale and prevents restore (0.2273ms)\n✔ PreviewGate restores only the consumed current ticket for clipboard retry (0.2979ms)\n✔ host preview messages carry intent and the snapshot revision (1.6168ms)\n✔ RefreshCoordinator never overlaps reads and publishes the newest pending snapshot (12.2842ms)\n✔ RefreshCoordinator reports a read failure and accepts a later retry (1.8274ms)\n✔ Extension runtime has no process, shell, or external-network path and confines writes to bootstrap (10.2901ms)\n✔ package and Webview keep the approved dependency and CSP boundary (2.3126ms)\n✔ workflow mutations remain preview-first and bootstrap uses explicit confirmation (1.8067ms)\n✔ Wiki bootstrap has three prompt-only entrances with one public intent (4.4115ms)\n✔ P2 preferences and Wiki browsing stay Extension-local and discoverable (1.5191ms)\n[walkthrough] multi-active implicit-selection=blocked explicit-selection=active-2\n✔ selection never promotes closed history to the implicit current work (1.6007ms)\n✔ multiple active works require an explicit choice (0.5908ms)\n✔ work grouping exposes active work and closed history as separate collections (0.7624ms)\n✔ snapshot reader parallelizes independent text reads while keeping diagnostics sorted (34.8936ms)\n[accessibility] tabs=5 panels=5 hidden-inactive=4 keyboard=arrows/Home/End focus-restore=section-key forced-colors=checked\n✔ Wiki result mount writes rendered markup into the dedicated result host (1.6468ms)\n✔ Webview contract keeps preview metadata, stale reset, and accessible five-tab navigation (2.6261ms)\n✔ WikiSearchModel keeps draft input separate until Enter commits it (3.7671ms)\n✔ WikiSearchModel matches title, path, and body case-insensitively with contains semantics (0.8749ms)\n✔ WikiSearchModel applies exact type filtering and show-all state (0.6736ms)\n✔ RenderScheduler coalesces local renders into one frame (0.2538ms)\nℹ tests 73\nℹ suites 0\nℹ pass 73\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 841.677",
+      "tasks": [
+        "TASK-004"
+      ],
+      "timed_out": false
+    },
+    "EVID-012": {
+      "argv": [
+        "npm.cmd",
+        "run",
+        "typecheck"
+      ],
+      "binds_current_source": true,
+      "command_id": "extension-typecheck",
+      "covers": [
+        "AC-004"
+      ],
+      "created_at": "2026-08-05T03:29:46+00:00",
+      "cwd": "vscode-extension",
+      "execution_error": null,
+      "exit_code": 0,
+      "expectation": "zero",
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-012",
+      "kind": "verification",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": ".devweave/cache/logs/20260805-104700-bug-windows-codex-pretooluse-hook/EVID-012.log",
+      "schema_version": 1,
+      "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+      "stale": false,
+      "started_at": "2026-08-05T03:29:43+00:00",
+      "status": "passed",
+      "summary": "> devweave-control-center@0.2.1 typecheck\n> tsc --noEmit",
+      "tasks": [
+        "TASK-004"
+      ],
+      "timed_out": false
+    },
+    "EVID-013": {
+      "argv": [
+        "npm.cmd",
+        "run",
+        "package"
+      ],
+      "binds_current_source": true,
+      "command_id": "extension-package",
+      "covers": [
+        "AC-003",
+        "AC-005"
+      ],
+      "created_at": "2026-08-05T03:29:53+00:00",
+      "cwd": "vscode-extension",
+      "execution_error": null,
+      "exit_code": 1,
+      "expectation": "zero",
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-013",
+      "kind": "package",
+      "log_truncated": false,
+      "observed_result": "failure",
+      "raw_log": ".devweave/cache/logs/20260805-104700-bug-windows-codex-pretooluse-hook/EVID-013.log",
+      "schema_version": 1,
+      "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+      "stale": false,
+      "started_at": "2026-08-05T03:29:52+00:00",
+      "status": "failed",
+      "summary": "> devweave-control-center@0.2.1 package\n> node esbuild.mjs --production && node scripts/package-vsix.mjs && node scripts/verify-package.mjs\n\n\nX [ERROR] Cannot read directory \"../../../..\": Access is denied.\n\nX [ERROR] Could not resolve \"C:/Users/小豬的電腦/Desktop/Project/DevWeave/vscode-extension/src/extension.ts\"\n\n2 errors\nC:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\node_modules\\esbuild\\lib\\main.js:1467\r\n  let error = new Error(text);\r\n              ^\r\n\r\nError: Build failed with 2 errors:\r\nerror: Cannot read directory \"../../../..\": Access is denied.\r\nerror: Could not resolve \"C:/Users/小豬的電腦/Desktop/Project/DevWeave/vscode-extension/src/extension.ts\"\r\n    at failureErrorWithLog (C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\node_modules\\esbuild\\lib\\main.js:1467:15)\r\n    at C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\node_modules\\esbuild\\lib\\main.js:926:25\r\n    at C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\node_modules\\esbuild\\lib\\main.js:878:52\r\n    at buildResponseToResult (C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\node_modules\\esbuild\\lib\\main.js:924:7)\r\n    at C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\node_modules\\esbuild\\lib\\main.js:951:16\r\n    at responseCallbacks.<computed> (C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\node_modules\\esbuild\\lib\\main.js:603:9)\r\n    at handleIncomingPacket (C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\node_modules\\esbuild\\lib\\main.js:658:12)\r\n    at Socket.readFromStdout (C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\node_modules\\esbuild\\lib\\main.js:581:7)\r\n    at Socket.emit (node:events:509:28)\r\n    at addChunk (node:internal/streams/readable:563:12) {\r\n  errors: [Getter/Setter],\r\n  warnings: [Getter/Setter]\r\n}\r\n\r\nNode.js v24.17.0",
+      "tasks": [
+        "TASK-003"
+      ],
+      "timed_out": false
+    },
+    "EVID-014": {
+      "argv": [
+        "npm.cmd",
+        "run",
+        "package"
+      ],
+      "binds_current_source": true,
+      "command_id": "extension-package",
+      "covers": [
+        "AC-003",
+        "AC-005"
+      ],
+      "created_at": "2026-08-05T03:30:12+00:00",
+      "cwd": "vscode-extension",
+      "execution_error": null,
+      "exit_code": 0,
+      "expectation": "zero",
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-014",
+      "kind": "package",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": ".devweave/cache/logs/20260805-104700-bug-windows-codex-pretooluse-hook/EVID-014.log",
+      "schema_version": 1,
+      "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+      "stale": false,
+      "started_at": "2026-08-05T03:30:10+00:00",
+      "status": "passed",
+      "summary": "> devweave-control-center@0.2.1 package\n> node esbuild.mjs --production && node scripts/package-vsix.mjs && node scripts/verify-package.mjs\n\nCreated C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\devweave-control-center-0.2.1.vsix (276470 bytes, 118 entries)\nVerified 0.2.1: 58 bootstrap files and 118 VSIX entries.\n\n\n  dist\\extension.js  57.9kb\n\nDone in 12ms\n\n  dist\\webview\\main.js  75.2kb\n\nDone in 9ms",
+      "tasks": [
+        "TASK-003"
+      ],
+      "timed_out": false
+    },
+    "EVID-015": {
+      "argv": [
+        "npm.cmd",
+        "run",
+        "test:smoke"
+      ],
+      "binds_current_source": true,
+      "command_id": "extension-smoke",
+      "covers": [
+        "AC-004"
+      ],
+      "created_at": "2026-08-05T03:30:31+00:00",
+      "cwd": "vscode-extension",
+      "execution_error": null,
+      "exit_code": 0,
+      "expectation": "zero",
+      "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+      "id": "EVID-015",
+      "kind": "verification",
+      "log_truncated": false,
+      "observed_result": "success",
+      "raw_log": ".devweave/cache/logs/20260805-104700-bug-windows-codex-pretooluse-hook/EVID-015.log",
+      "schema_version": 1,
+      "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+      "stale": false,
+      "started_at": "2026-08-05T03:30:24+00:00",
+      "status": "passed",
+      "summary": "> devweave-control-center@0.2.1 test:smoke\n> npm run build && tsx test/smoke.test.ts\n\n\n> devweave-control-center@0.2.1 build\n> node esbuild.mjs\n\n\r\n[main 2026-08-05T03:30:27.496Z] StorageMainService: creating application shared storage\n[main 2026-08-05T03:30:27.584Z] [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)\n[main 2026-08-05T03:30:27.587Z] [shared storage] Initializing fallback application storage (path: in-memory)\n[main 2026-08-05T03:30:27.615Z] [shared storage] Fallback application storage initialized with 3 items\n[main 2026-08-05T03:30:27.616Z] update#setState disabled\n[main 2026-08-05T03:30:27.616Z] update#ctor - updates are disabled by the environment\nStarted local extension host with pid 22640.\nLoading development extension at c:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\nSettings Sync: Account status changed from uninitialized to unavailable\n[main 2026-08-05T03:30:30.222Z] Extension host with pid 22640 exited with code: 0, signal: unknown.\nExit code:   0\n\n\n  dist\\extension.js       95.5kb\n  dist\\extension.js.map  202.2kb\n\nDone in 18ms\n\n  dist\\webview\\main.js      101.9kb\n  dist\\webview\\main.js.map  156.2kb\n\nDone in 11ms\n- Resolving version...\n√ Validated version: 1.131.0\n√ Found existing install in C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\.vscode-test\\vscode-win32-x64-archive-1.131.0\n(node:19748) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n[vscode.mermaid-markdown-features]: Extension 'vscode.mermaid-markdown-features' CANNOT use 'legacyToolReferenceFullNames' without the 'chatParticipantPrivate' API proposal enabled",
+      "tasks": [
+        "TASK-004"
+      ],
+      "timed_out": false
+    }
+  },
+  "gates": {
+    "acceptance": {
+      "approved_at": "2026-08-05T03:33:36+00:00",
+      "approved_by": "human",
+      "fingerprint": "83b0ab97a29efbc6ac700c66a71104248da2318e38f01247b8e52328502e5a3a",
+      "status": "approved"
+    },
+    "build": {
+      "approved_at": "2026-08-05T02:54:53+00:00",
+      "approved_by": "human",
+      "fingerprint": "427581a54387b8b5f289138da7b4414a223cb2b1db7294a55ef8965b94c7ab08",
+      "status": "approved"
+    },
+    "scope": {
+      "approved_at": "2026-08-05T02:52:52+00:00",
+      "approved_by": "human",
+      "fingerprint": "22de6a9b418df1b4990bb5e773a86b5cb5a3a3e5bb8dd6e251a7020fd1c6443e",
+      "status": "approved"
+    }
+  },
+  "id": "20260805-104700-bug-windows-codex-pretooluse-hook",
+  "kind": "bug",
+  "knowledge_context": {
+    "gaps": [],
+    "pages": [
+      "wiki/index.md",
+      "wiki/overview.md",
+      "wiki/modules/knowledge-engine.md",
+      "wiki/modules/vscode-extension.md"
+    ],
+    "recorded_at": "2026-08-05T02:48:17+00:00",
+    "records": [
+      {
+        "computed_source_fingerprint": "none",
+        "content_hash": "52ca1ec89b7dda200069e6d59fdc0822f43a038ce462ce5c125ffa9b1fcebad0",
+        "path": "wiki/index.md",
+        "present": true,
+        "source_fingerprint": "none",
+        "status": "active"
+      },
+      {
+        "computed_source_fingerprint": "sha256:469e65b74bee6bc106127debdea25c80ec606cc02a24fe9672ee319b02498a81",
+        "content_hash": "51a357c5c0e4557c624f7bb2020dd25d04794c5c794de42dcc98b68aaca30883",
+        "path": "wiki/overview.md",
+        "present": true,
+        "source_fingerprint": "sha256:469e65b74bee6bc106127debdea25c80ec606cc02a24fe9672ee319b02498a81",
+        "status": "active"
+      },
+      {
+        "computed_source_fingerprint": "sha256:793f795c62a81a4faf52b4b0b037941443ffa6e41bcf6ace041e299d7bc3b51c",
+        "content_hash": "28809efd6c6b99124bca365a7283470269b587c285cbb1e31356128d998d7b20",
+        "path": "wiki/modules/knowledge-engine.md",
+        "present": true,
+        "source_fingerprint": "sha256:793f795c62a81a4faf52b4b0b037941443ffa6e41bcf6ace041e299d7bc3b51c",
+        "status": "active"
+      },
+      {
+        "computed_source_fingerprint": "sha256:fe8093d63c4b93a1c66d0767b039ce762835b2f2e981f192514dad76803007fa",
+        "content_hash": "d1d9a7eabab885c48f08b27e9c6f244221d04f4b3b3942906a03b3712ffe967e",
+        "path": "wiki/modules/vscode-extension.md",
+        "present": true,
+        "source_fingerprint": "sha256:fe8093d63c4b93a1c66d0767b039ce762835b2f2e981f192514dad76803007fa",
+        "status": "active"
+      }
+    ]
+  },
+  "knowledge_review": {
+    "affected_pages": [
+      "wiki/architecture/devweave-knowledge-workflow.md",
+      "wiki/modules/knowledge-engine.md",
+      "wiki/modules/vscode-extension.md",
+      "wiki/overview.md"
+    ],
+    "change_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+    "covered_changed_paths": [
+      "docs/使用手冊.md",
+      "tests/test_repository_contract.py",
+      "vscode-extension/scripts/verify-package.mjs"
+    ],
+    "disposition": "promote",
+    "invalidated_at": null,
+    "rationale": "Windows Codex hook launcher與0.2.1 bootstrap行為是可重用的Extension整合知識：標準command由cmd.exe啟動PowerShell，經Git root執行guard.py；process exit 0與hookSpecificOutput permissionDecision deny是兩層不同契約；Extension不會靜默覆寫既有exact .codex/hooks.json。應更新既有vscode-extension頁面並同步index/log。",
+    "recorded_at": "2026-08-05T03:09:22+00:00",
+    "uncovered_changed_paths": [
+      "vscode-extension/devweave-control-center-0.2.1.vsix"
+    ]
+  },
+  "knowledge_review_required": true,
+  "knowledge_updates": {
+    "change_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77",
+    "coupled": [
+      "wiki/index.md",
+      "wiki/log.md"
+    ],
+    "deletes": [],
+    "rationale": "依 affected source overlap refresh 四個既有 source-bound頁面；在vscode-extension頁面提升Windows Codex hook/bootstrap與process-failure/policy-deny邊界，其餘 affected頁面只更新必要的來源綁定與相關摘要；由engine自動couple wiki/index.md與wiki/log.md。0.2.1 VSIX為release artifact，已有package evidence，無需新增Wiki content page。",
+    "recorded_at": "2026-08-05T03:10:45+00:00",
+    "sealed": [
+      "wiki/architecture/devweave-knowledge-workflow.md",
+      "wiki/index.md",
+      "wiki/log.md",
+      "wiki/modules/knowledge-engine.md",
+      "wiki/modules/vscode-extension.md",
+      "wiki/overview.md"
+    ],
+    "upserts": [
+      "wiki/architecture/devweave-knowledge-workflow.md",
+      "wiki/modules/knowledge-engine.md",
+      "wiki/modules/vscode-extension.md",
+      "wiki/overview.md"
+    ]
+  },
+  "last_verification": {
+    "at": "2026-08-05T03:30:31+00:00",
+    "evidence_id": "EVID-015",
+    "source_fingerprint": "d1580353e72e0905924535ed47ebea83c4ad6bbb89c80f37396632c159381c77"
+  },
+  "phase": "closed",
+  "risk": {
+    "downgrade_rationale": null,
+    "level": "high",
+    "rationale": "此變更控制 Codex PreToolUse 寫入 guard 的啟動方式；launcher 失敗會使所有受保護操作無法可靠執行，需完整 Windows/package/security 驗證。"
+  },
+  "schema_version": 1,
+  "scope": {
+    "paths": [
+      ".codex/hooks.json",
+      "docs/使用手冊.md",
+      "tests/test_repository_contract.py",
+      "vscode-extension",
+      "wiki/index.md",
+      "wiki/log.md",
+      "wiki/modules/vscode-extension.md"
+    ],
+    "rationale": "修正 canonical hook launcher，加入 process-level contract regression，更新 bootstrap package verifier、使用手冊與 source-bound Extension Wiki。"
+  },
+  "status": "closed",
+  "tasks": {
+    "TASK-001": {
+      "completed_at": "2026-08-05T02:56:05+00:00",
+      "evidence": [
+        "EVID-003"
+      ],
+      "note": "",
+      "started_at": "2026-08-05T02:55:14+00:00",
+      "status": "completed"
+    },
+    "TASK-002": {
+      "completed_at": "2026-08-05T02:59:03+00:00",
+      "evidence": [
+        "EVID-004"
+      ],
+      "note": "",
+      "started_at": "2026-08-05T02:56:27+00:00",
+      "status": "completed"
+    },
+    "TASK-003": {
+      "completed_at": "2026-08-05T03:00:43+00:00",
+      "evidence": [
+        "EVID-005"
+      ],
+      "note": "",
+      "started_at": "2026-08-05T02:59:16+00:00",
+      "status": "completed"
+    },
+    "TASK-004": {
+      "completed_at": "2026-08-05T03:08:40+00:00",
+      "evidence": [
+        "EVID-006"
+      ],
+      "note": "產品修改、package與完整高風險驗證輸入已完成；G3 acceptance、Knowledge Review promote/seal與Independent Review依verification phase contract執行。",
+      "started_at": "2026-08-05T03:00:49+00:00",
+      "status": "completed"
+    }
+  },
+  "title": "修正 Windows Codex PreToolUse Hook 失敗",
+  "updated_at": "2026-08-05T03:33:41+00:00",
+  "waivers": []
+}

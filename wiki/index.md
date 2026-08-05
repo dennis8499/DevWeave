@@ -6,7 +6,7 @@ last_updated: 2026-08-05
 tags: [index]
 status: active
 source_fingerprint: none
-verified_by: 20260805-094544-feature-plan-first
+verified_by: 20260805-104700-bug-windows-codex-pretooluse-hook
 ---
 
 # Codebase Wiki — 索引
@@ -17,7 +17,7 @@ verified_by: 20260805-094544-feature-plan-first
 
 | 頁面 | 摘要 |
 | --- | --- |
-| [[overview]] | DevWeave Plan-first workflow、`request_user_input` native seam、ordinary/Skill capability boundary、structured fallback、Wiki init preflight、high-risk G3 Independent Review、companion Skill overlay、0.2.1 Windows release 與真實來源優先序概觀 |
+| [[overview]] | DevWeave Plan-first workflow、`request_user_input` native seam、ordinary/Skill capability boundary、structured fallback、Wiki init preflight、high-risk G3 Independent Review、companion Skill overlay、0.2.1 Windows release、Codex hook process/policy boundary 與真實來源優先序概觀 |
 
 ## Architecture
 
@@ -26,7 +26,7 @@ verified_by: 20260805-094544-feature-plan-first
 ## Modules
 
 - [[knowledge-engine]] | Wiki model、reserved-starter init、coverage、review record evidence、canonical scaffold、seal、machine lifecycle、`request_user_input` host boundary、Skill governance 與 0.2.1 router boundary
-- [[vscode-extension]] | 0.2.1 Windows Control Center 五區的 PreviewGate、Wiki DOM mount、refresh/snapshot、status --all/next multi-work、穩定 tabpanel accessibility、copy transaction、繁中 error detail、semantic bootstrap adoption、Independent Review readiness、embedded help 與安全邊界
+- [[vscode-extension]] | 0.2.1 Windows Control Center 五區的 PreviewGate、Wiki DOM mount、refresh/snapshot、status --all/next multi-work、穩定 tabpanel accessibility、copy transaction、繁中 error detail、Windows Codex hook launcher、semantic bootstrap adoption、Independent Review readiness、embedded help 與安全邊界
 
 ## Entities
 

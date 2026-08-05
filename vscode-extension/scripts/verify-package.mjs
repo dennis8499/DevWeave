@@ -26,6 +26,12 @@ for (const legacy of legacyArtifacts) {
 const bootstrapRoot = join(extensionRoot, "dist", "bootstrap");
 const manifest = JSON.parse(await readFile(join(bootstrapRoot, "manifest.json"), "utf8"));
 assert.equal(manifest.bundleVersion, version, "bundle and Extension versions must match");
+const bootstrapHook = JSON.parse(await readFile(join(bootstrapRoot, "hooks.json"), "utf8"));
+const bootstrapHookCommand = bootstrapHook.hooks?.PreToolUse?.[0]?.hooks?.[0];
+assert.ok(bootstrapHookCommand, "bootstrap must contain the PreToolUse command hook");
+assert.match(bootstrapHookCommand.command, /powershell -NoProfile -Command/);
+assert.match(bootstrapHookCommand.command, /python -B/);
+assert.equal(Object.hasOwn(bootstrapHookCommand, "commandWindows"), false, "bootstrap must not rely on commandWindows");
 const destinations = new Set(manifest.files.map((file) => file.destination));
 const compatibleContracts = new Map([
   [".devweave/project.json", "devweave-project-v1"],

@@ -4,6 +4,7 @@ import ast
 import json
 import re
 import shutil
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -345,8 +346,40 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("Bash", group["matcher"])
         self.assertIn("apply_patch", group["matcher"])
         command = group["hooks"][0]
+        self.assertIn("powershell -NoProfile -Command", command["command"])
         self.assertIn("git rev-parse --show-toplevel", command["command"])
-        self.assertIn("git rev-parse --show-toplevel", command["commandWindows"])
+        self.assertNotIn("commandWindows", command)
+
+    def test_hook_launcher_runs_through_windows_cmd_and_preserves_deny_json(self) -> None:
+        hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
+        hook = json.loads(hook_path.read_text(encoding="utf-8"))
+        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+        payload = {
+            "cwd": str(REPOSITORY_ROOT),
+            "session_id": "",
+            "tool_name": "Write",
+            "tool_input": {
+                "command": "*** Update File: src/app.txt\n@@\n-old\n+new"
+            },
+        }
+        # Use COMSPEC with the same raw command-string quoting as Codex's
+        # Windows hook runner; passing the command as a subprocess argv item
+        # changes cmd.exe's handling of the nested PowerShell quotes.
+        result = subprocess.run(
+            f'cmd.exe /d /s /c "{command}"',
+            cwd=REPOSITORY_ROOT,
+            input=json.dumps(payload, ensure_ascii=True),
+            text=True,
+            capture_output=True,
+            shell=True,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        output = json.loads(result.stdout)
+        specific = output["hookSpecificOutput"]
+        self.assertEqual("PreToolUse", specific["hookEventName"])
+        self.assertEqual("deny", specific["permissionDecision"])
+        self.assertIn("active work item", specific["permissionDecisionReason"])
 
     def test_doctor_passes_for_an_initialized_fixture_with_hook(self) -> None:
         with RepositoryHarness() as harness:

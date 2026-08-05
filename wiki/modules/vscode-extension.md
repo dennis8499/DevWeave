@@ -1,12 +1,12 @@
 ---
 title: DevWeave VS Code Extension
 type: module
-sources: [vscode-extension/esbuild.mjs, vscode-extension/package.json, vscode-extension/scripts, vscode-extension/src, vscode-extension/webview]
-last_updated: 2026-08-04
+sources: [.codex/hooks.json, vscode-extension/esbuild.mjs, vscode-extension/package.json, vscode-extension/scripts, vscode-extension/src]
+last_updated: 2026-08-05
 tags: [module, vscode, control-center]
 status: active
-source_fingerprint: "sha256:fe8093d63c4b93a1c66d0767b039ce762835b2f2e981f192514dad76803007fa"
-verified_by: 20260804-205655-feature-devweave-0-2-1-windows
+source_fingerprint: "sha256:cee98932a20a98f7c092eb62f1edde71af893c7d980ffde2f9252f9a93d366ef"
+verified_by: 20260805-104700-bug-windows-codex-pretooluse-hook
 ---
 
 # DevWeave VS Code Extension
@@ -39,7 +39,11 @@ Workspace watcher 保留自動 refresh，事件經 250ms debounce 後交給 `Ref
 
 Production bundle `0.2.1` 使用由 package version 產生的 manifest，固定完整控制套件：`devweave`、`codebase-design`、`diagnosing-bugs`、`grill-me`、`grilling`、`tdd` 六組 skills，加上通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。README、docs、產品 source、tests、fixtures、work item 與 history 不會成為 target workspace 的 bootstrap files；使用手冊只留在 Extension help。Project、三份 baseline 與三份 Wiki starter 明確宣告 `adopt-compatible` contract，其餘 controls 宣告 `exact`。
 
+Windows Codex 的 PreToolUse hook 是由根目錄 `.codex/hooks.json` 產生的 exact bootstrap control：標準 `command` 由 Codex 的 `cmd.exe` 啟動 `powershell -NoProfile -Command`，從 Git root 以 `python -B` 找到並執行 `guard.py`；不再維護不會被 Codex runner 採用的 `commandWindows` 欄位。`cmd.exe /d /s /c` 可實際啟動此 launcher，且 guard 的 policy deny 仍以合法 JSON 與 process exit 0 回傳。
+
 `BootstrapInstaller.inspect()` 先驗證 manifest path、byte length 與 SHA-256，再依 `bootstrap-compat.ts` shared validator 檢查 semantic identity。合法 evolved project/baseline/Wiki bytes 會 adopted；AGENTS、skills、hook、lock 與其他 controls 仍以 exact bytes 判定。初始化或修復只建立 missing paths，不同或不合法內容永不覆寫並列為 conflict；只要仍有 missing 或 conflict，report 與 Dashboard 就標示 partial；若中途寫入失敗，僅 rollback 本輪新增內容，既有檔案保持不變。重跑完整 bundle 是 idempotent。
+
+Hook 的 source-derived consistency 由 package verifier 檢查根目錄 hook 與 `dist/bootstrap/hooks.json` 的 PowerShell／`python -B` semantic contract；0.2.1 VSIX 重新產出，既有 0.2.0 與 0.1.0 rollback artifacts 維持固定 bytes/hash。
 
 ## Security and compatibility
 

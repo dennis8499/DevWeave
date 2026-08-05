@@ -1,0 +1,25 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-002",
+    "AC-004"
+  ],
+  "created_at": "2026-08-05T02:59:02+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+  "id": "EVID-004",
+  "kind": "regression",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "c125c440c2cd52698344bf84a8952c36c213843f105984cf4d03b8e945b270b5",
+  "stale": false,
+  "status": "passed",
+  "summary": "Repository contract suite 13 tests passed；真實 cmd.exe/PowerShell/Python 啟動鏈對未綁定 Write payload 返回 zero exit 與合法 permissionDecision=deny JSON。",
+  "tasks": [
+    "TASK-002"
+  ]
+}

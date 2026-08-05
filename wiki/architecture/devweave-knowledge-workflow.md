@@ -5,8 +5,8 @@ sources: [.agents/skills, AGENTS.md, README.md, docs/使用手冊.md, tests/test
 last_updated: 2026-08-05
 tags: [architecture]
 status: active
-source_fingerprint: "sha256:469e65b74bee6bc106127debdea25c80ec606cc02a24fe9672ee319b02498a81"
-verified_by: 20260805-094544-feature-plan-first
+source_fingerprint: "sha256:117a39898529b1997c82e3862c37b7d80b84bb3d6c5de28d5c5b41c6c2905ac2"
+verified_by: 20260805-104700-bug-windows-codex-pretooluse-hook
 ---
 
 # DevWeave Knowledge Workflow
@@ -37,10 +37,13 @@ Repository contract 以 exact six-governed-Skill set、frontmatter identity、re
 10. `promote` 建立一至五個 content upsert/delete；新頁經 canonical scaffold 先成為 placeholder。完成 active 內容後同步 index、append-only log，再 seal source fingerprint 與 Work Item provenance。`no-update` 僅在非 bootstrap、無 affected page、無 Wiki diff 時成立。
 11. G3 重新比對完整 Wiki diff、affected pages、plan、coupling、log、seal、baseline、current evidence 與 Independent Review。`passed` 正常通過；unavailable/advisory 形成 warning；critical security/data-loss/irreversible/scope finding 只有 exact named `review-critical` acceptance waiver 可解除。它只驗證實作是否符合已批准內容，不默默補入新需求或設計。人工核准後才可 close。
 12. 0.2.1 Windows release verification 必須固定記錄 doctor、Extension tests/typecheck/package/smoke、Python full suite、四條 disposable walkthrough 與 `git diff --check`；VSIX verifier 確認 0.2.1 與 0.2.0/0.1.0 retention。High-risk review 仍只由 router 啟動 exactly one isolated read-only reviewer，current `passed` 且無 unresolved advisory 才符合 G3 release bar。
+13. Windows Codex 的 PreToolUse launcher 是 bootstrap control contract：標準 `command` 由 Codex 的 `cmd.exe` 啟動 PowerShell，再從 Git root 以 `python -B` 執行 `guard.py`；程序 exit 與 guard 的 `permissionDecision` JSON 是分離的結果，Extension 不會靜默覆寫既有 exact hook。
 
 ## VS Code Control Center integration
 
 VS Code Extension 是這條 lifecycle 的唯讀 projection client。Host 以 `WorkspaceSnapshotReader` 讀取 project、work item、Wiki、evidence 與 bootstrap completeness；它不執行 Python engine、shell、Git、network 或 Codex API。使用者確認初始化後，`BootstrapInstaller` 才能套用 0.2.1 allowlisted control bundle；project、三份 baseline 與三份 Wiki starter 依 shared semantic validator 採用合法 evolved bytes，其他 controls 仍以 exact policy 檢查，missing-only write 與 conflict/rollback 邊界不變。
+
+Bootstrap bundle 內的 hook 來自根目錄 `.codex/hooks.json`，其 Windows launcher 經 `cmd.exe /d /s /c` 實際驗證；正常 DevWeave policy deny 仍輸出 `hookSpecificOutput.permissionDecision: deny` 且 process exit 0。這個 source-derived 行為由 package verifier 與 repository contract regression 固定檢查。
 
 Knowledge section 的查詢是 Extension-local 行為，不會改寫 G1 context 或 Wiki：`WikiSearchModel` 保留 draft/applied query，按 Enter 後才以 case-insensitive contains 搜尋 title、path 與 body preview；type filter 是精確匹配，結果與 metric 真實 mount 到 `#wiki-results`。檔案 watcher 仍自動 refresh，但由 250ms debounce、single-flight 與 latest-pending coordinator 合併 burst，snapshot 的平行讀取最後以 deterministic order 合併。
 

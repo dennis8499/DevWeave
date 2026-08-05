@@ -5,8 +5,8 @@ sources: [.agents/skills, AGENTS.md, README.md, docs/使用手冊.md, tests/test
 last_updated: 2026-08-05
 tags: [overview]
 status: active
-source_fingerprint: "sha256:469e65b74bee6bc106127debdea25c80ec606cc02a24fe9672ee319b02498a81"
-verified_by: 20260805-094544-feature-plan-first
+source_fingerprint: "sha256:117a39898529b1997c82e3862c37b7d80b84bb3d6c5de28d5c5b41c6c2905ac2"
+verified_by: 20260805-104700-bug-windows-codex-pretooluse-hook
 ---
 
 # DevWeave Codebase Overview
@@ -24,6 +24,8 @@ DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router�
 7. 0.2.1 Windows 公開版交付 repository 與 VSIX，正式支援 Windows、VS Code 1.90+、Python 3.11+、Git 與 Codex；不包含 Marketplace 上架或 macOS/Linux 支援承諾。Control Center 的公開操作採 preview → 使用者確認複製 → Codex Chat handoff → Refresh，0.2.0 與 0.1.0 VSIX 保留作為回退。
 
 本次 release hardening 另固定幾個容易被使用者誤解的邊界：`devweave.wikiBootstrap` 與 legacy `devweave.copyNextAction` 都只開啟 Control Center 的 preview flow，host 的 `PreviewGate` 仍是最後 copy gate；多 active work 的 `next` 必須明確選取，未指定 work 的 `status` 明確交給 `$devweave status --all`；五個 section 的 tab/tabpanel 關聯在 inactive 狀態也保持有效 target，方向鍵/Home/End、focus restore 與 forced-colors contract 由 Extension-local seam 驗證。
+
+Windows Codex hook 也有明確的兩層契約：`.codex/hooks.json` 的標準 `command` 讓 Codex 的 `cmd.exe` 啟動 PowerShell，PowerShell 從 Git root 以 `python -B` 執行 `guard.py`；launcher process failure 與 guard 回傳的 JSON `permissionDecision: deny` 不同，後者仍是正常 process exit 0 的 DevWeave policy result。Extension bootstrap 只產生來源一致的 hook；既有 workspace 的 exact hook 不會被 Extension 靜默覆寫。
 
 ## 互動式決策與 Gate
 
@@ -46,6 +48,7 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 - Extension 的 Wiki 搜尋以 Enter 套用大小寫不敏感的 title/path/body-preview 包含式查詢；輸入期間保留同一個 input DOM，結果與 metrics 真實 mount 到 `#wiki-results`。五個 tab/tabpanel 使用完整 ARIA 關聯、方向鍵/Home/End 與 focus restore；Watcher 由 debounce 與 single-flight refresh coordinator 合併，snapshot 的獨立讀取平行化後仍依固定順序輸出。
 - Copy 成功後的 Webview `copyResult` 通知與 Extension-native success toast 不再共享 clipboard failure restore path；host 只在 clipboard adapter 失敗時恢復 ticket，walkthrough 的 bounded labels 則保留在 configured Extension/Python raw logs。
 - 0.2.1 bootstrap bundle 的 version 從 package version 產生，提供完整控制面：六組核准 skills、通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。Project、baseline 與三份 Wiki starter 以明確 semantic contract 採用合法 evolved bytes；AGENTS、skills、hook、lock 與其他 controls 維持 exact，初始化只建立缺少且無衝突的檔案，失敗或取消不留下 partial control bundle，說明手冊留在 Extension 內，不落地到 target repository。
+- Windows 的 PreToolUse hook 使用上述標準 `command`，不依賴 Codex 不採用的 `commandWindows` 平行欄位；未綁定或未通過 G2 的寫入仍由 guard 以 deny JSON 表達，而不是把 policy deny 變成 hook process failure。
 
 ## 關鍵模組
 

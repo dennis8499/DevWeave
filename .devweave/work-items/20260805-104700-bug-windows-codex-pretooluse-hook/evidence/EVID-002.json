@@ -1,0 +1,22 @@
+{
+  "binds_current_source": false,
+  "command_id": null,
+  "covers": [
+    "AC-001"
+  ],
+  "created_at": "2026-08-05T02:52:33+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "8300fac45be9573ee265665ec6557e130391de3b",
+  "id": "EVID-002",
+  "kind": "reproduction",
+  "log_truncated": false,
+  "observed_result": "failure",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "d19606ec753eadd3d85d8836af30245fb3ee7bd9617aae888256545e48c4ffa2",
+  "stale": false,
+  "status": "passed",
+  "summary": "修正前以 cmd.exe 執行目前 hook command 可穩定觀察 launcher failure；同一輸入改用 PowerShell launcher 可成功啟動 guard。",
+  "tasks": []
+}

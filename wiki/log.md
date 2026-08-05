@@ -6,7 +6,7 @@ last_updated: 2026-08-05
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260805-094544-feature-plan-first
+verified_by: 20260805-104700-bug-windows-codex-pretooluse-hook
 ---
 
 # Activity Log
@@ -65,3 +65,8 @@ verified_by: 20260805-094544-feature-plan-first
 - Refresh [[overview]]、[[devweave-knowledge-workflow]] 與 [[knowledge-engine]]，將 Plan Mode 定為 G1/G2/Gate material decision 的正式 native 入口，canonical host tool 固定為 `request_user_input`。
 - 記錄一題／二至三選項／推薦第一項 `(Recommended)`／host `Other`、等待 answer、普通 pre-G2 回到 Plan Mode、明確 compatibility structured fallback、G2 後 approved-task boundary 與新決策 `revise` 回流。
 - 記錄 ordinary/Skill native tool visibility 是外部 host capability；不新增 engine question state、CLI、ledger、fake adapter 或 Extension 問答 UI，並保留 cancel/timeout/malformed 的 no-guess/no-mutation safety。
+
+## [2026-08-05] promote | 20260805-104700-bug-windows-codex-pretooluse-hook
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，記錄 Windows Codex runner 以標準 `command` 經 `cmd.exe` 啟動 PowerShell／`python -B` guard 的 bootstrap contract。
+- 提升 process failure 與 DevWeave policy `permissionDecision: deny` 的分層語意、`commandWindows` 移除、source-derived 0.2.1 embedded hook verifier，以及既有 exact workspace hook 需使用者確認、不由 Extension 靜默覆寫的邊界；0.1.0／0.2.0 rollback artifacts 保持不變。
