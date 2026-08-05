@@ -573,6 +573,7 @@ class KnowledgeCoreTests(unittest.TestCase):
             self.assertEqual(custom, (wiki / "index.md").read_text(encoding="utf-8"))
             self.assertTrue((wiki / "overview.md").is_file())
             self.assertTrue((wiki / "log.md").is_file())
+            print("[walkthrough] python-evolved-adoption custom-index-preserved=true", flush=True)
 
     def test_bootstrap_conflict_is_reported_without_touching_user_content(self) -> None:
         with RepositoryHarness() as harness:
@@ -622,6 +623,7 @@ class KnowledgeCoreTests(unittest.TestCase):
                 (wiki / "modules").read_text(encoding="utf-8"),
             )
             self.assertFalse((harness.repo / ".devweave").exists())
+            print("[walkthrough] python-conflict-fail-closed user-bytes-preserved=true partial-state=none", flush=True)
 
     def test_project_upgrade_is_read_only_until_init_and_legacy_state_loads(self) -> None:
         with RepositoryHarness() as harness:

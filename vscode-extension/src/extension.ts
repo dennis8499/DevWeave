@@ -20,7 +20,8 @@ export function activate(context: vscode.ExtensionContext): void {
     refresh: () => controller.refresh(),
     initialize: () => controller.initialize(),
     preview: (intent) => controller.preview(intent),
-    copy: (intent) => controller.copy(intent),
+    copy: (bundle) => controller.copyBundle(bundle),
+    copySuccess: () => controller.notifyCopySuccess(),
     openFile: (path) => controller.openFile(path),
     selectWork: (workId) => controller.selectWork(workId),
     getPreferences: () => controller.getPreferences(),
@@ -53,7 +54,7 @@ class ExtensionController {
   private tree: WorkItemsTreeProvider | undefined;
   private dashboard: DashboardPanel | undefined;
   private activeRoot: vscode.Uri | undefined;
-  private snapshot: WorkspaceSnapshot = unavailableSnapshot("No workspace selected.");
+  private snapshot: WorkspaceSnapshot = unavailableSnapshot("尚未選擇 workspace。");
   private selectedWorkId: string | null = null;
   private reader: WorkspaceSnapshotReader | undefined;
   private refreshCoordinator: RefreshCoordinator<WorkspaceSnapshot> | undefined;
@@ -115,6 +116,7 @@ class ExtensionController {
       await vscode.window.showInformationMessage(this.multipleRootMessage());
       return;
     }
+    this.activeRoot = root;
     if (workId) {
       this.selectedWorkId = workId;
     }
@@ -203,10 +205,11 @@ class ExtensionController {
       const report = bootstrapFailure("workspace", this.multipleRootMessage());
       return { report, snapshot: this.snapshot };
     }
+    this.activeRoot = root;
     const snapshot = await this.refresh();
     if (snapshot.mutationBlocked) {
       const report = bootstrapConflict(snapshot.projectPath, "目前 project.json 存在但 snapshot 有 critical diagnostic；不會自動修復或覆寫既有內容。");
-      await vscode.window.showErrorMessage("DevWeave workspace 有 conflict/diagnostic，初始化未執行。", "Open Dashboard");
+      await vscode.window.showErrorMessage("DevWeave workspace 有衝突或嚴重問題，初始化未執行。", "開啟控制中心");
       return { report, snapshot };
     }
     const resources = new VscodeBootstrapResourceReader(this.context.extensionUri);
@@ -230,7 +233,7 @@ class ExtensionController {
         errors: [],
         rolledBack: []
       };
-      await vscode.window.showInformationMessage("目前 workspace 已完成 DevWeave 初始化。", "Open Dashboard");
+      await vscode.window.showInformationMessage("目前 workspace 已完成 DevWeave 初始化。", "開啟控制中心");
       return { report, snapshot };
     }
     const isRepair = snapshot.projectExists;
@@ -239,10 +242,10 @@ class ExtensionController {
         ? `DevWeave control bundle 尚未完整（剩餘 ${inspection.missing.length + inspection.conflicts.length} 項）。這會只補齊無衝突缺檔，不覆寫既有不同內容。是否繼續？`
         : "這會在目前 workspace 建立 DevWeave control bundle、六組 skills、hook、project、baseline 與 Wiki starter。是否繼續？",
       { modal: true },
-      "Initialize DevWeave",
-      "Cancel"
+      "繼續初始化",
+      "取消"
     );
-    if (confirmation !== "Initialize DevWeave") {
+    if (confirmation !== "繼續初始化") {
       const report = bootstrapFailure("workspace", "使用者取消初始化；repository 未寫入。");
       return { report, snapshot };
     }
@@ -252,79 +255,93 @@ class ExtensionController {
       const refreshed = await this.refresh();
       this.output.appendLine(`[bootstrap] ${JSON.stringify(report)}`);
       if (report.complete) {
-        await vscode.window.showInformationMessage("DevWeave 初始化完成；已重新整理 workspace snapshot。", "Open Dashboard");
+        await vscode.window.showInformationMessage("DevWeave 初始化完成；已重新整理 workspace 檔案快照。", "開啟控制中心");
       } else {
-        await vscode.window.showErrorMessage("DevWeave 初始化未完成，請檢查 conflict/error 路徑。", "Open Dashboard");
+        await vscode.window.showErrorMessage("DevWeave 初始化未完成，請檢查衝突或錯誤路徑。", "開啟控制中心");
       }
       return { report, snapshot: refreshed };
     } catch (error) {
       const report = bootstrapFailure("bootstrap", error instanceof Error ? error.message : String(error));
       const refreshed = await this.refresh();
       this.output.appendLine(`[bootstrap] ${JSON.stringify(report)}`);
-      await vscode.window.showErrorMessage("DevWeave bootstrap bundle 無法載入，workspace 未宣稱初始化成功。", "Open Dashboard");
+      await vscode.window.showErrorMessage("DevWeave bootstrap bundle 無法載入，workspace 未宣稱初始化成功。", "開啟控制中心");
       return { report, snapshot: refreshed };
     }
   }
 
-  public async copy(intent: PublicCommandIntent): Promise<PromptBundle> {
-    const bundle = await this.preview(intent);
-    const snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
-    if (bundle.mutation && snapshot.mutationBlocked) {
-      throw new Error("DevWeave snapshot is read-only because critical contract diagnostics are present. Use the status command form first.");
-    }
-    await this.copyBundle(bundle);
-    return bundle;
-  }
-
   public async copyNextAction(): Promise<void> {
-    const work = this.currentWork();
-    await this.copy({ type: "next", ...(work ? { workId: work.id } : {}) });
+    const root = await this.resolveRoot(true);
+    if (!root) {
+      await vscode.window.showInformationMessage(this.multipleRootMessage());
+      return;
+    }
+    this.activeRoot = root;
+
+    const snapshot = await this.refresh();
+    const activeWorks = snapshot.workItems.filter((work) => work.status === "active");
+    const selectedActiveWork = this.selectedWorkId
+      ? activeWorks.find((work) => work.id === this.selectedWorkId)
+      : undefined;
+    const work = activeWorks.length === 1 ? activeWorks[0] : selectedActiveWork;
+
+    if (!work) {
+      await this.dashboard?.show(snapshot, this.selectedWorkId ?? undefined);
+      await vscode.window.showInformationMessage(
+        activeWorks.length === 0
+          ? "目前沒有 active work；請先建立或選取 work，再預覽下一步。"
+          : "目前有多個 active work；請先在控制中心選取 work，再預覽下一步。"
+      );
+      return;
+    }
+
+    this.selectedWorkId = work.id;
+    const selectedSnapshot = { ...snapshot, selectedWorkId: work.id };
+    await this.dashboard?.show(selectedSnapshot, work.id);
+    await this.dashboard?.previewAction({ type: "next", workId: work.id });
   }
 
   public async previewWikiBootstrap(): Promise<void> {
     const intent = { type: "wikiBootstrap" } as const;
     try {
-      const bundle = await this.preview(intent);
-      const warningText = bundle.warnings.length > 0
-        ? `\n\n注意：${bundle.warnings.join(" ")}`
-        : "";
-      const confirmation = await vscode.window.showWarningMessage(
-        `預覽 Codex Chat prompt：\n\n${bundle.chatText}${warningText}\n\nExtension 不會執行 CLI 或寫入 Wiki。`,
-        { modal: true },
-        "Copy prompt",
-        "Cancel"
-      );
-      if (confirmation === "Copy prompt") {
-        await this.copyBundle(bundle);
+      const root = await this.resolveRoot(true);
+      if (!root) {
+        await vscode.window.showInformationMessage(this.multipleRootMessage());
+        return;
       }
+      this.activeRoot = root;
+      const snapshot = await this.refresh();
+      await this.dashboard?.show(snapshot, this.selectedWorkId ?? undefined);
+      await this.dashboard?.previewAction(intent);
     } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error ?? "未知錯誤");
+      this.output.appendLine(`[wiki-bootstrap] ${detail}`);
       await vscode.window.showErrorMessage(
-        error instanceof Error ? error.message : "無法產生 Wiki bootstrap prompt。",
-        "Open Dashboard"
+        "無法在控制中心產生 Wiki bootstrap prompt 預覽；請先確認 workspace，再重新整理。",
+        "開啟控制中心"
       );
     }
   }
 
   public async openFile(relativePath: string): Promise<void> {
     if (!this.activeRoot || !isSafeWorkspacePath(relativePath) || !isAllowedDevWeavePath(relativePath)) {
-      throw new Error("File path is not safe or no repository is selected.");
+      throw new Error("檔案路徑不安全，或尚未選擇 repository。");
     }
     const uri = vscode.Uri.joinPath(this.activeRoot, ...relativePath.replaceAll("\\", "/").split("/"));
     const document = await vscode.workspace.openTextDocument(uri);
     await vscode.window.showTextDocument(document, { preview: true });
   }
 
-  private currentWork() {
-    if (this.selectedWorkId) {
-      return this.snapshot.workItems.find((work) => work.id === this.selectedWorkId);
+  public async copyBundle(bundle: PromptBundle): Promise<PromptBundle> {
+    const snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
+    if (bundle.mutation && snapshot.mutationBlocked) {
+      throw new Error("目前 workspace 有 critical contract 問題，只能查看；請先使用 status 確認後再重新整理。");
     }
-    const active = this.snapshot.workItems.filter((work) => work.status === "active");
-    return active.length === 1 ? active[0] : undefined;
+    await this.clipboard.copy(bundle.chatText);
+    return bundle;
   }
 
-  private async copyBundle(bundle: PromptBundle): Promise<void> {
-    await this.clipboard.copy(bundle.chatText);
-    await vscode.window.showInformationMessage("DevWeave prompt 已複製到 clipboard；請在 Codex Chat 審閱並送出。", "Open Dashboard");
+  public async notifyCopySuccess(): Promise<void> {
+    await vscode.window.showInformationMessage("DevWeave prompt 已複製到剪貼簿；請在 Codex Chat 審閱並送出。", "開啟控制中心");
   }
 
   private scheduleRefresh(): void {

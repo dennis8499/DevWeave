@@ -1,0 +1,25 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-013",
+    "AC-015"
+  ],
+  "created_at": "2026-08-04T13:59:59+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "868be0912a5b4a218d27bed01b4162e2f344a0dd",
+  "id": "EVID-016",
+  "kind": "diff-check",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "44e87f48dfdc10531879b21e3fefcbf6702e6a9517bc2e30f9a28c0c2ff48071",
+  "stale": false,
+  "status": "passed",
+  "summary": "git diff --check 通過；僅有 Windows 工作樹 LF/CRLF normalization warning，沒有 whitespace error。",
+  "tasks": [
+    "TASK-007"
+  ]
+}

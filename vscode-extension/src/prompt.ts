@@ -55,7 +55,7 @@ export class DevWeavePromptComposer implements PromptComposer {
       case "next":
         return `$devweave next${optionalArg(intent.workId)}`;
       case "status":
-        return `$devweave status${optionalArg(intent.workId)}`;
+        return intent.all === true ? "$devweave status --all" : `$devweave status${optionalArg(intent.workId)}`;
       case "wikiBootstrap":
         return "$devweave wiki bootstrap";
       case "revise":

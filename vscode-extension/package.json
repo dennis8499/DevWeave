@@ -2,7 +2,7 @@
   "name": "devweave-control-center",
   "displayName": "DevWeave Control Center｜開發流程總覽",
   "description": "以繁體中文呈現 DevWeave 檔案快照；工作流程命令交接到 Codex Chat，初始化則需確認固定 bootstrap 寫入。",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "devweave",
   "license": "MIT",
   "engines": {
@@ -61,11 +61,11 @@
       },
       {
         "command": "devweave.copyNextAction",
-        "title": "DevWeave: 複製「詢問下一步」prompt 到 Codex Chat"
+        "title": "DevWeave: 開啟「詢問下一步」預覽"
       },
       {
         "command": "devweave.wikiBootstrap",
-        "title": "DevWeave: 建立 Codebase Wiki（複製 prompt）"
+        "title": "DevWeave: 建立 Codebase Wiki（開啟預覽）"
       }
     ],
     "menus": {

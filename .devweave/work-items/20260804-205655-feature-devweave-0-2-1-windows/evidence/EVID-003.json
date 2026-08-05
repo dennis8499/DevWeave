@@ -1,0 +1,25 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-006",
+    "AC-008"
+  ],
+  "created_at": "2026-08-04T13:28:09+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "868be0912a5b4a218d27bed01b4162e2f344a0dd",
+  "id": "EVID-003",
+  "kind": "test",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "d7e7dc57db44160ac324bfa93b304b23a98282f815ec48856082f6590227c92b",
+  "stale": false,
+  "status": "passed",
+  "summary": "TASK-002 targeted verification pass：legacy copyNextAction command contract、single/multi/zero active work selection guard、closed work exclusion、Control Center preview handoff 與 typecheck。",
+  "tasks": [
+    "TASK-002"
+  ]
+}

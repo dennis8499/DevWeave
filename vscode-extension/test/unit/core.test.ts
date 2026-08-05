@@ -473,6 +473,7 @@ test("every public command produces the documented command text", () => {
     [{ type: "next" }, "$devweave next", false],
     [{ type: "status", workId: "demo" }, "$devweave status demo", false],
     [{ type: "status" }, "$devweave status", false],
+    [{ type: "status", all: true }, "$devweave status --all", false],
     [{ type: "wikiBootstrap" }, "$devweave wiki bootstrap", true],
     [{ type: "revise", workId: "demo", change: "調整公開命令欄位" }, "$devweave revise demo 調整公開命令欄位", true],
     [{ type: "approve", workId: "demo" }, "$devweave approve demo", true]
@@ -496,9 +497,12 @@ test("public Webview protocol accepts public intents and rejects machine actions
   assert.deepEqual(parsePublicCommandIntent({ type: "next", workId: "demo" }), { type: "next", workId: "demo" });
   assert.deepEqual(parsePublicCommandIntent({ type: "status" }), { type: "status" });
   assert.deepEqual(parsePublicCommandIntent({ type: "status", workId: "demo" }), { type: "status", workId: "demo" });
+  assert.deepEqual(parsePublicCommandIntent({ type: "status", all: true }), { type: "status", all: true });
+  assert.equal(parsePublicCommandIntent({ type: "status", workId: "demo", all: true }), null);
   assert.deepEqual(parsePublicCommandIntent({ type: "wikiBootstrap" }), { type: "wikiBootstrap" });
   assert.equal(parsePublicCommandIntent({ type: "wikiBootstrap", workId: "demo" }), null);
   assert.equal(parsePublicCommandIntent({ type: "feature", request: "   " }), null);
+  assert.equal(parsePublicCommandIntent({ type: "feature", request: "bad\u0000value" }), null);
   assert.equal(parsePublicCommandIntent({ type: "bug", symptom: "" }), null);
   assert.equal(parsePublicCommandIntent({ type: "revise", workId: "", change: "change" }), null);
   assert.equal(parsePublicCommandIntent({ type: "revise", workId: "demo", change: "   " }), null);

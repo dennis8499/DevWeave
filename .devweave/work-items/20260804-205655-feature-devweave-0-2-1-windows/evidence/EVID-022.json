@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "npm.cmd",
+    "run",
+    "test:smoke"
+  ],
+  "binds_current_source": true,
+  "command_id": "extension-smoke",
+  "covers": [
+    "AC-005",
+    "AC-006",
+    "AC-009",
+    "AC-010",
+    "AC-015"
+  ],
+  "created_at": "2026-08-04T14:36:59+00:00",
+  "cwd": "vscode-extension",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "git_head": "868be0912a5b4a218d27bed01b4162e2f344a0dd",
+  "id": "EVID-022",
+  "kind": "smoke",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260804-205655-feature-devweave-0-2-1-windows/EVID-022.log",
+  "schema_version": 1,
+  "source_fingerprint": "455d7549d139d6f1166b3ae06906291cd3f00bae51b849c7376a7dad7344e297",
+  "stale": false,
+  "started_at": "2026-08-04T14:36:52+00:00",
+  "status": "passed",
+  "summary": "> devweave-control-center@0.2.1 test:smoke\n> npm run build && tsx test/smoke.test.ts\n\n\n> devweave-control-center@0.2.1 build\n> node esbuild.mjs\n\n\r\n[main 2026-08-04T14:36:54.763Z] StorageMainService: creating application shared storage\n[main 2026-08-04T14:36:54.822Z] [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)\n[main 2026-08-04T14:36:54.824Z] [shared storage] Initializing fallback application storage (path: in-memory)\n[main 2026-08-04T14:36:54.842Z] [shared storage] Fallback application storage initialized with 3 items\n[main 2026-08-04T14:36:54.842Z] update#setState disabled\n[main 2026-08-04T14:36:54.842Z] update#ctor - updates are disabled by the environment\nStarted local extension host with pid 4720.\nLoading development extension at c:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\nSettings Sync: Account status changed from uninitialized to unavailable\n[main 2026-08-04T14:36:56.941Z] Extension host with pid 4720 exited with code: 0, signal: unknown.\nExit code:   0\n\n\n  dist\\extension.js       93.2kb\n  dist\\extension.js.map  198.6kb\n\nDone in 12ms\n\n  dist\\webview\\main.js      100.2kb\n  dist\\webview\\main.js.map  153.2kb\n\nDone in 9ms\n- Resolving version...\n√ Validated version: 1.131.0\n√ Found existing install in C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\.vscode-test\\vscode-win32-x64-archive-1.131.0\n(node:4248) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n[vscode.mermaid-markdown-features]: Extension 'vscode.mermaid-markdown-features' CANNOT use 'legacyToolReferenceFullNames' without the 'chatParticipantPrivate' API proposal enabled",
+  "tasks": [
+    "TASK-007"
+  ],
+  "timed_out": false
+}

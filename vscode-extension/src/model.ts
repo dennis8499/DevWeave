@@ -277,7 +277,7 @@ export type PublicCommandIntent =
   | { type: "refactor"; request: string }
   | { type: "bug"; symptom: string }
   | { type: "next"; workId?: string }
-  | { type: "status"; workId?: string }
+  | { type: "status"; workId?: string; all?: true }
   | { type: "wikiBootstrap" }
   | { type: "revise"; workId: string; change: string }
   | { type: "approve"; workId: string };

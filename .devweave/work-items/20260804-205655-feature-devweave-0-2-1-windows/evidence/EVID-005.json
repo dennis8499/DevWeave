@@ -1,0 +1,34 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-014"
+  ],
+  "created_at": "2026-08-04T13:44:47+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "868be0912a5b4a218d27bed01b4162e2f344a0dd",
+  "id": "EVID-005",
+  "kind": "test",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "14314b8abb263db0053465a0605476b224a887734c2c2968f87d788905e5d70f",
+  "stale": false,
+  "status": "passed",
+  "summary": "Extension cross-functional regression suite：71 tests passed，涵蓋 PreviewGate one-shot/stale/retry、protocol intent/revision、Dashboard host invalidation/copy adapter、legacy command、多 active/closed selection、Wiki DOM mount、ARIA/keyboard、Chinese readiness/CTA、bootstrap rollback 與 public command schema；typecheck passed。",
+  "tasks": [
+    "TASK-004"
+  ]
+}

@@ -121,6 +121,7 @@ test("BootstrapInstaller installs a missing project file through the workspace s
   assert.equal(report.status, "initialized");
   assert.ok(report.created.includes(".devweave/project.json"));
   assert.equal(workspace.text(".devweave/project.json"), '{"managed":true}\n');
+  console.log("[walkthrough] fresh-install initialized=true partial-state=none");
 });
 
 test("BootstrapInstaller fails closed when an existing target conflicts", async () => {
@@ -183,6 +184,7 @@ test("BootstrapInstaller repairs non-conflicting files without overwriting a con
   assert.ok(report.conflicts.some((item) => item.path === ".devweave/project.json"));
   assert.equal(workspace.text(".devweave/project.json"), '{"managed":false}\n');
   assert.equal(workspace.text(".devweave/second.json"), '{"second":true}\n');
+  console.log("[walkthrough] conflict-fail-closed conflict-preserved=true nonconflicting-file=installed");
 });
 
 test("BootstrapInstaller is idempotent for compatible existing bytes", async () => {
@@ -264,6 +266,7 @@ test("BootstrapInstaller rolls back files created before a later write fails", a
   assert.ok(report.rolledBack.includes(".devweave/project.json"));
   assert.equal(await workspace.stat(".devweave/project.json"), "absent");
   assert.equal(await workspace.stat(".devweave/second.json"), "absent");
+  console.log("[walkthrough] write-failure rollback=complete partial-state=none");
 });
 
 test("BootstrapInstaller rejects malformed manifest entries without throwing", async () => {
@@ -344,6 +347,7 @@ test("BootstrapInstaller adopts evolved project content through the declared sem
   assert.deepEqual(report.created, []);
   assert.deepEqual(report.adopted, [".devweave/project.json"]);
   assert.equal(workspace.text(".devweave/project.json"), existing);
+  console.log("[walkthrough] evolved-workspace adopted=true custom-content-preserved=true");
 });
 
 test("BootstrapInstaller explains semantic incompatibility instead of adopting identity drift", async () => {

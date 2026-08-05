@@ -21,6 +21,7 @@ const runtimeFiles = [
   "src/refresh-coordinator.ts",
   "src/render-scheduler.ts",
   "src/wiki-search.ts",
+  "src/wiki-results-mount.ts",
   "webview/main.ts"
 ];
 
@@ -59,7 +60,7 @@ test("workflow mutations remain preview-first and bootstrap uses explicit confir
   const extension = readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8");
   const protocol = readFileSync(resolve(extensionRoot, "src/protocol.ts"), "utf8");
   assert.match(webview, /id="public-command-form"/);
-  assert.match(webview, /Preview public command/);
+  assert.match(webview, /預覽公開操作/);
   assert.match(webview, /data-action="confirm-copy"/);
   assert.match(webview, /type: "previewAction"/);
   assert.match(webview, /type: "copyAction"/);
@@ -87,14 +88,16 @@ test("Wiki bootstrap has three prompt-only entrances with one public intent", ()
   const commands = packageJson.contributes?.commands ?? [];
   const palette = packageJson.contributes?.menus?.commandPalette ?? [];
 
-  assert.match(webview, /\["wikiBootstrap", "wiki bootstrap — 建立 Codebase Wiki"\]/);
+  assert.match(webview, /wikiBootstrap/);
+  assert.match(webview, /data-action="wiki-bootstrap"/);
   assert.match(webview, /data-action="wiki-bootstrap"/);
   assert.match(webview, /action === "wiki-bootstrap"[\s\S]*type: "wikiBootstrap"/);
-  assert.ok(commands.some((item) => item.command === "devweave.wikiBootstrap" && item.title === "DevWeave: 建立 Codebase Wiki（複製 prompt）"));
+  assert.ok(commands.some((item) => item.command === "devweave.wikiBootstrap" && item.title === "DevWeave: 建立 Codebase Wiki（開啟預覽）"));
   assert.ok(palette.some((item) => item.command === "devweave.wikiBootstrap"));
   assert.ok(packageJson.activationEvents?.includes("onCommand:devweave.wikiBootstrap"));
   assert.match(extension, /registerCommand\("devweave\.wikiBootstrap"/);
-  assert.match(extension, /previewWikiBootstrap[\s\S]*type: "wikiBootstrap"/);
+  assert.match(extension, /previewWikiBootstrap[\s\S]*dashboard\?\.show[\s\S]*dashboard\?\.previewAction\(intent\)/);
+  assert.doesNotMatch(extension, /previewWikiBootstrap[\s\S]*copyBundle\(bundle\)/);
   assert.match(extension, /showWarningMessage\([\s\S]*modal: true/);
   assert.doesNotMatch(extension, /devweave\.py|knowledge bootstrap|workspace\.fs\.writeFile/);
 });

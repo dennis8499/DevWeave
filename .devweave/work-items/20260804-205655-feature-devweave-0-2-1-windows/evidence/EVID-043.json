@@ -1,0 +1,102 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013",
+    "AC-014",
+    "AC-015",
+    "AC-016"
+  ],
+  "created_at": "2026-08-04T15:37:33+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "868be0912a5b4a218d27bed01b4162e2f344a0dd",
+  "id": "EVID-043",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "failure",
+  "raw_log": ".devweave/cache/logs/20260804-205655-feature-devweave-0-2-1-windows/EVID-043.log",
+  "review": {
+    "context_mode": "isolated_read_only",
+    "covers": [
+      "AC-001",
+      "AC-002",
+      "AC-003",
+      "AC-004",
+      "AC-005",
+      "AC-006",
+      "AC-007",
+      "AC-008",
+      "AC-009",
+      "AC-010",
+      "AC-011",
+      "AC-012",
+      "AC-013",
+      "AC-014",
+      "AC-015",
+      "AC-016"
+    ],
+    "findings": [
+      {
+        "evidence": "vscode-extension/webview/main.ts 在未選定 work 時將 status intent 產生為 {type:\"status\"}；src/prompt.ts 因此輸出 $devweave status，而非 all-mode。devweave.py 對多個 eligible work 會要求 selection；現有 Python 測試亦確認該行為。這與 AC-008、EVID-035/038 及 Wiki/acceptance 所宣稱的 status 可查詢全部 active work 不一致。",
+        "id": "F-001",
+        "recommendation": "加入明確的 all-status intent/command，或由 public router 映射至 status --all；同步更新 parser、composer、文件與回歸測試後重跑 current evidence。",
+        "severity": "critical",
+        "title": "多 active work 的 status 預覽實際產生 ambiguous $devweave status"
+      },
+      {
+        "evidence": "vscode-extension/src/preview-gate.ts 以 NUL 串接 revise intent；parsePublicCommandIntent 只檢查非空字串，接受 NUL。{type:\"revise\",workId:\"a\",change:\"b\\u0000c\"} 與 {type:\"revise\",workId:\"a\\u0000b\",change:\"c\"} 會產生相同 key，使不相同的 typed intent 通過 host take。",
+        "id": "F-002",
+        "recommendation": "改用 discriminated-union 欄位的結構化相等比較或無歧義 canonical encoding，並拒絕控制字元；加入碰撞回歸測試。",
+        "severity": "critical",
+        "title": "PreviewGate typed-intent key 存在 NUL 分隔符碰撞"
+      },
+      {
+        "evidence": "dashboard.ts 的 error path 直接轉送 Error.message；src/prompt.ts 的 mutation-blocked 錯誤含英文技術訊息，clipboard adapter 亦可能轉送原生錯誤；webview/main.ts 將該訊息直接顯示為 status。",
+        "id": "F-003",
+        "recommendation": "將 user-facing failure 映射為 Traditional Chinese，原始技術訊息另存於可展開診斷區，並加入 AC-010 錯誤路徑測試。",
+        "severity": "advisory",
+        "title": "Clipboard/compose 原始錯誤可能成為非 Traditional Chinese primary status"
+      }
+    ],
+    "report_sha256": "a2e621dd9790ed50e6e95180a050d523a7e50d4c4e4b2edc79f759b4cc390503",
+    "result": "critical",
+    "reviewer_id": "019fcd5f-8518-7902-878c-c15c4709a355",
+    "severity": "critical",
+    "tasks": [
+      "TASK-001",
+      "TASK-002",
+      "TASK-003",
+      "TASK-004",
+      "TASK-005",
+      "TASK-006",
+      "TASK-007"
+    ]
+  },
+  "schema_version": 1,
+  "source_fingerprint": "f84a97d75f905442a86e21147aa6dcbd9ea3b9d1a797a515ab4964284232633f",
+  "stale": false,
+  "status": "failed",
+  "summary": "目前 source fingerprint、Git HEAD、package、evidence、Wiki 與 acceptance provenance 一致，但多 work status-all contract 未實作，且 PreviewGate intent 比對存在可利用的分隔符碰撞；release 不具備 G3 readiness。",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006",
+    "TASK-007"
+  ]
+}

@@ -310,6 +310,7 @@ class StateAndFingerprintTests(unittest.TestCase):
             self.assertIsNone(complete["work"])
             self.assertTrue(complete["bootstrap"]["complete"])
             self.assertEqual([], core.list_work(harness.repo))
+            print("[walkthrough] python-fresh-resume-complete created/resume/already_complete=verified", flush=True)
 
     def test_bootstrap_acceptance_requires_core_plan_and_zero_product_diff(self) -> None:
         with RepositoryHarness() as harness:
@@ -1497,6 +1498,7 @@ class IndependentReviewTests(unittest.TestCase):
             core.atomic_write_json(core.state_path(harness.repo, first["id"]), state)
             with self.assertRaises(core.ValidationError):
                 core.revise_work(harness.repo, first["id"], "requirements", "重新開啟")
+            print("[walkthrough] python-multi-active implicit-selection=blocked closed-reopen=blocked", flush=True)
 
     def test_timeout_and_log_truncation_are_recorded(self) -> None:
         with RepositoryHarness() as harness:

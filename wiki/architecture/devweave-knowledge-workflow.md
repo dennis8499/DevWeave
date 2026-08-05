@@ -1,12 +1,12 @@
 ---
 title: DevWeave Knowledge Workflow
 type: architecture
-sources: [.agents/skills/devweave, AGENTS.md, README.md, docs/使用手冊.md, vscode-extension/src]
+sources: [.agents/skills/devweave, AGENTS.md, README.md, docs/使用手冊.md, vscode-extension]
 last_updated: 2026-08-04
 tags: [architecture]
 status: active
-source_fingerprint: "sha256:2a13d02c6860ef5c98e3037ccf3ae12ed6c276218b30f96e6ff1711fa37b82b5"
-verified_by: 20260804-183511-feature-g1-g2-wiki-extension-bundle
+source_fingerprint: "sha256:cc55b453b85cb27f69a6543576a74ed20186931b4f76c1595a05b982018dd389"
+verified_by: 20260804-205655-feature-devweave-0-2-1-windows
 ---
 
 # DevWeave Knowledge Workflow
@@ -28,12 +28,21 @@ DevWeave 將 Codebase Wiki 納入既有 Work Item lifecycle，而不是建立第
 9. Verification 的 `knowledge review` 保存 disposition、rationale、affected/covered/uncovered paths 與 product change fingerprint。後續產品 fingerprint 改變會使 knowledge review、plan 與 source-bound review evidence invalid，並要求重新審查。
 10. `promote` 建立一至五個 content upsert/delete；新頁經 canonical scaffold 先成為 placeholder。完成 active 內容後同步 index、append-only log，再 seal source fingerprint 與 Work Item provenance。`no-update` 僅在非 bootstrap、無 affected page、無 Wiki diff 時成立。
 11. G3 重新比對完整 Wiki diff、affected pages、plan、coupling、log、seal、baseline、current evidence 與 Independent Review。`passed` 正常通過；unavailable/advisory 形成 warning；critical security/data-loss/irreversible/scope finding 只有 exact named `review-critical` acceptance waiver 可解除。它只驗證實作是否符合已批准內容，不默默補入新需求或設計。人工核准後才可 close。
+12. 0.2.1 Windows release verification 必須固定記錄 doctor、Extension tests/typecheck/package/smoke、Python full suite、四條 disposable walkthrough 與 `git diff --check`；VSIX verifier 確認 0.2.1 與 0.2.0/0.1.0 retention。High-risk review 仍只由 router 啟動 exactly one isolated read-only reviewer，current `passed` 且無 unresolved advisory 才符合 G3 release bar。
 
 ## VS Code Control Center integration
 
-VS Code Extension 是這條 lifecycle 的唯讀 projection client。Host 以 `WorkspaceSnapshotReader` 讀取 project、work item、Wiki、evidence 與 bootstrap completeness；它不執行 Python engine、shell、Git、network 或 Codex API。使用者確認初始化後，`BootstrapInstaller` 才能套用 0.2.0 allowlisted control bundle；project、三份 baseline 與三份 Wiki starter 依 shared semantic validator 採用合法 evolved bytes，其他 controls 仍以 exact policy 檢查，missing-only write 與 conflict/rollback 邊界不變。
+VS Code Extension 是這條 lifecycle 的唯讀 projection client。Host 以 `WorkspaceSnapshotReader` 讀取 project、work item、Wiki、evidence 與 bootstrap completeness；它不執行 Python engine、shell、Git、network 或 Codex API。使用者確認初始化後，`BootstrapInstaller` 才能套用 0.2.1 allowlisted control bundle；project、三份 baseline 與三份 Wiki starter 依 shared semantic validator 採用合法 evolved bytes，其他 controls 仍以 exact policy 檢查，missing-only write 與 conflict/rollback 邊界不變。
 
-Knowledge section 的查詢是 Extension-local 行為，不會改寫 G1 context 或 Wiki：`WikiSearchModel` 保留 draft/applied query，按 Enter 後才以 case-insensitive contains 搜尋 title、path 與 body preview；type filter 是精確匹配，結果與 metric 透過局部 render 更新。檔案 watcher 仍自動 refresh，但由 250ms debounce、single-flight 與 latest-pending coordinator 合併 burst，snapshot 的平行讀取最後以 deterministic order 合併。
+Knowledge section 的查詢是 Extension-local 行為，不會改寫 G1 context 或 Wiki：`WikiSearchModel` 保留 draft/applied query，按 Enter 後才以 case-insensitive contains 搜尋 title、path 與 body preview；type filter 是精確匹配，結果與 metric 真實 mount 到 `#wiki-results`。檔案 watcher 仍自動 refresh，但由 250ms debounce、single-flight 與 latest-pending coordinator 合併 burst，snapshot 的平行讀取最後以 deterministic order 合併。
+
+Preview safety 由 host `PreviewGate` 最終 enforcement：ticket 綁定 panel identity、typed intent、完整 prompt bundle、snapshot revision 與一次性 consume；intent 以 discriminated-union 欄位逐欄比較，不使用可碰撞的 delimiter key，protocol 也拒絕危險控制字元。Refresh、初始化、work selection 或 snapshot 更新會 invalidate 舊 ticket；clipboard failure 只可在同一 current ticket 安全 retry 一次。Host-launched `actionPreview` 傳回同一 intent/bundle/revision，使 `devweave.copyNextAction` 不再 bypass preview。
+
+`devweave.wikiBootstrap` 也必須走同一條 host preview route；native command 入口不持有直接 clipboard seam。Webview 的 `dashboard-sections.ts` 將五個 tab 的順序、方向鍵/Home/End 與 panel `id`/`aria-labelledby`/hidden state 保持為純 contract，inactive panel 仍存在讓每個 `aria-controls` 有效，並由 bounded release test 驗證 focus restore 與 forced-colors CSS boundary。
+
+Copy transaction 將 clipboard adapter failure 與成功後的 `copyResult`/native toast notification 分離：ticket 一旦被成功 consume 並寫入 clipboard，後續 notification transport failure 不得 restore，避免同一 preview 被重複複製；Python/Extension walkthrough markers 由 configured verification commands 留在 current raw logs。
+
+Control Center 的五個區域使用 tab/tabpanel `aria-controls`、`aria-labelledby`、roving tabindex、方向鍵/Home/End 與 focus restore；主要 CTA、native modal action、readiness、error 與 empty-state copy 使用繁體中文。錯誤的 user-facing status 先顯示繁中指引，原始技術訊息只放在可展開 detail，技術 command 名稱保留在 code/technical label。
 
 說明頁是 Extension bundle 內的 lazy local content，不寫入 target repository，也不需要網路。這些 UI／package 知識在 G3 promote 更新，若需求或設計改變仍須回到同一 Work Item 的 `revise` 與 Gate lifecycle。
 
@@ -46,7 +55,7 @@ Knowledge section 的查詢是 Extension-local 行為，不會改寫 G1 context 
 - 互動式問答由 router/phase guidance 約束；不新增 pending-question state、CLI、JSON schema、VS Code UI 或第二套 question ledger。沉默與模糊同意不構成 approval，未回答的 material decision 會停在目前階段。
 - 每頁最多五個 sources；每次 context 最多五個內容頁；每次 promotion 最多五個 content targets。
 - Bootstrap 不接受 repository 子路徑 scope，不修改產品 source，且需 promote overview、至少一個 architecture、至少一個 module。
-- Extension 不建立 process/network seam，也不自行重算 Git/source fingerprint；其 bootstrap 與 Independent Review readiness 判定都是非權威 filesystem projection。
+- Extension 不建立 process/network seam，也不自行重算 Git/source fingerprint；其 bootstrap、PreviewGate 與 Independent Review readiness 判定都是非權威 filesystem projection，但 host copy boundary 仍是 clipboard 安全的最終 enforcement point。
 - `bootstrap-compat.ts` 是 installer 與 snapshot 共用的 semantic validator seam；manifest 缺少 policy 時正規化為 exact，unknown policy/kind 在寫入前 fail closed。
 
 ## Evidence and Gaps

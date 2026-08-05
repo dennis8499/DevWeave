@@ -19,8 +19,15 @@ export const helpContent: readonly HelpSection[] = [
       "如果 workspace 只有部分內容，Extension 只會建立缺少且沒有衝突的檔案；既有不同內容永不覆寫，結果會標示 partial 或 conflict。"
     ],
     items: [
-      "0.2.0 bundle 不會把 README、docs、產品 source、tests、fixtures、work item 或歷史紀錄寫入 workspace。",
-      "初始化寫入失敗時，Extension 會回復本次新建立的檔案；既有檔案保持不變。"
+      "0.2.1 bundle 不會把 README、docs、產品 source、tests、fixtures、work item 或歷史紀錄寫入 workspace。",
+      "按「取消」或初始化寫入失敗時，Extension 會回復本次新建立的檔案；既有檔案保持不變，不留下 partial control bundle。"
+    ]
+  },
+  {
+    title: "Windows 安裝與支援範圍",
+    paragraphs: [
+      "0.2.1 正式支援 Windows、VS Code 1.90+、Python 3.11+、Git 與 Codex。請在 VS Code Extensions 的 `...` 選單選擇 Install from VSIX…，安裝 repository 內的 `devweave-control-center-0.2.1.vsix`，再從 Activity Bar 開啟 Control Center。",
+      "本公開版交付 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援；0.2.0 與 0.1.0 VSIX 會保留作為回退版本。"
     ]
   },
   {
@@ -41,6 +48,18 @@ export const helpContent: readonly HelpSection[] = [
     title: "Companion Skills",
     paragraphs: [
       "grill-me／grilling 用於需求釐清，codebase-design 用於 G2 設計，diagnosing-bugs 用於診斷，tdd 用於已有 G2 核准後的實作。它們不建立第二套 lifecycle，也不能取代 DevWeave gate。"
+    ]
+  },
+  {
+    title: "Preview、Refresh 與多 work",
+    paragraphs: [
+      "公開操作請依序完成：選擇 work 或 task →「預覽公開操作」→確認 prompt →「複製 prompt」→到 Codex Chat 貼上、審閱並送出→回到 Extension「重新整理檔案快照」。",
+      "Preview 綁定目前 panel、intent 與 snapshot revision。Refresh、切換 work、初始化結果或 snapshot 更新後，舊 prompt 會失效，必須重新預覽；clipboard 暫時失敗時可在同一個 preview 重試一次。"
+    ],
+    items: [
+      "既有 `devweave.copyNextAction` 只會開啟 Control Center，不再直接複製。",
+      "單一 active work 會自動顯示 next preview；多個 active work 必須先明確選取；沒有 active work 時會引導建立或選取。",
+      "`status` 可以明確查詢全部 active work；`next` 不會猜測多 work 的目標。"
     ]
   },
   {

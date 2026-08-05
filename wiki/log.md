@@ -6,7 +6,7 @@ last_updated: 2026-08-04
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260804-183511-feature-g1-g2-wiki-extension-bundle
+verified_by: 20260804-205655-feature-devweave-0-2-1-windows
 ---
 
 # Activity Log
@@ -46,3 +46,10 @@ verified_by: 20260804-183511-feature-g1-g2-wiki-extension-bundle
 
 - Refresh [[overview]]、[[devweave-knowledge-workflow]] 與 [[knowledge-engine]]，記錄 native-first G1/G2 structured decision interface、Wiki reserved-starter preflight/order、custom-only compatibility 與 ordinary bootstrap advisory boundary。
 - Refresh [[vscode-extension]]，記錄七個 data-contract semantic adoption kinds、shared installer/snapshot validator、exact controls、missing-only writes 與 fail-closed conflict behavior。
+
+## [2026-08-04] promote | 20260804-205655-feature-devweave-0-2-1-windows
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，記錄 0.2.1 Windows VSIX 支援邊界與 rollback artifact、PreviewGate 的 panel/intent/revision copy enforcement、Refresh stale invalidation、legacy `copyNextAction`/multi-work semantics、Wiki `#wiki-results` DOM mount、五區 tab/tabpanel accessibility 與繁中 handoff。
+- 追加 release hardening：`wikiBootstrap` 統一進入 host preview route，五個 inactive tabpanel 保持可指向的 ARIA target，並以 current-source bounded walkthrough/accessibility output 與固定舊版 VSIX hash 驗證 G3 release bar。
+- 再同步 review hardening：Control Center 明確為五區，copy success notification 不會 restore 已 consumed ticket，EVID-035/EVID-038 raw logs 保存 accessibility 與 Python/Extension walkthrough markers。
+- 再同步 critical-review hardening：`status --all` 明確承接未選定 work 的全量查詢，PreviewGate 改用 typed intent 欄位比較並拒絕危險控制字元，錯誤 primary status 改為繁中且保留可展開 technical detail；EVID-046～EVID-048 保存 current 73-test、package、smoke、typecheck 與 Python verification provenance。

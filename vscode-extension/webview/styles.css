@@ -37,9 +37,10 @@ h3 { font-size: 14px; margin-bottom: 7px; }
 .eyebrow { font-size: 10px; letter-spacing: .13em; font-weight: 700; color: var(--dw-muted); margin-bottom: 5px; }
 .muted, small { color: var(--dw-muted); }
 .mono, code, pre { font-family: var(--vscode-editor-font-family, ui-monospace), monospace; }
-.section-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0 0 18px; padding: 5px; border: 1px solid var(--dw-border); border-radius: 12px; background: var(--dw-card); }
+.section-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 0 0 18px; padding: 5px; border: 1px solid var(--dw-border); border-radius: 12px; background: var(--dw-card); }
 .section-tab { border-color: transparent; background: transparent; color: var(--dw-muted); text-align: left; padding: 10px 12px; }
 .section-tab:hover, .section-tab.active { color: var(--dw-foreground); background: color-mix(in srgb, var(--dw-accent) 13%, transparent); border-color: color-mix(in srgb, var(--dw-accent) 45%, var(--dw-border)); }
+#section-content > [role="tabpanel"]:focus-visible { outline: 2px solid var(--dw-accent); outline-offset: 4px; }
 .section-card, .hero-card, .empty-card, .preview, .loading-card { background: var(--dw-card); border: 1px solid var(--dw-border); border-radius: var(--dw-radius); padding: 19px; margin: 13px 0; box-shadow: 0 8px 24px color-mix(in srgb, var(--dw-foreground) 5%, transparent); }
 .section-intro { padding: 16px 19px; }
 .hero-card { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-color: color-mix(in srgb, var(--dw-accent) 35%, var(--dw-border)); }

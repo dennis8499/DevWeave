@@ -1,0 +1,28 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-006",
+    "AC-011",
+    "AC-012",
+    "AC-014",
+    "AC-015"
+  ],
+  "created_at": "2026-08-04T14:49:34+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "868be0912a5b4a218d27bed01b4162e2f344a0dd",
+  "id": "EVID-031",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "db764fe7c7122108220c599ca8529e13d7173f527c4c61473d5e95b52db20be2",
+  "stale": false,
+  "status": "passed",
+  "summary": "Windows disposable walkthroughs：Extension bounded target command 21/21 通過，輸出明確包含 fresh-install、evolved-workspace、conflict-fail-closed、write-failure rollback、multi-active explicit selection 與五區 accessibility keyboard/focus/forced-colors checks；Python TemporaryDirectory targeted suite 4/4 通過（fresh/resume/complete、evolved adoption、conflict 保留 user bytes、multi-work closed-item safety）。初始化取消/失敗不留 partial state，未經 preview 不會 copy。",
+  "tasks": [
+    "TASK-007"
+  ]
+}

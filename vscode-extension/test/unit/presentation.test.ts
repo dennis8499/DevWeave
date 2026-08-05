@@ -5,6 +5,7 @@ import {
   buildSnapshotGuidance,
   commandPresentations,
   presentAuditEvent,
+  presentStatus,
   presentDiagnostic
 } from "../../src/presentation";
 import type { Diagnostic, KnowledgeProjection, WorkItemProjection, WorkspaceSnapshot } from "../../src/model";
@@ -314,4 +315,11 @@ test("display mode protocol accepts only the typed preference message", () => {
   });
   assert.equal(parseWebviewMessage({ type: "setDisplayMode", mode: "compact" }), null);
   assert.equal(parseWebviewMessage({ type: "setDisplayMode", mode: "concise", extra: true }), null);
+});
+
+test("readiness and bootstrap statuses are presented in Traditional Chinese", () => {
+  assert.equal(presentStatus("ready"), "可進一步審查");
+  assert.equal(presentStatus("not_ready"), "尚未就緒");
+  assert.equal(presentStatus("attention"), "需要注意");
+  assert.equal(presentStatus("initialized"), "已完成初始化");
 });

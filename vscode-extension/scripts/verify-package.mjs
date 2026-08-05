@@ -8,8 +8,20 @@ import { join } from "node:path";
 const extensionRoot = fileURLToPath(new URL("../", import.meta.url));
 const packageJson = JSON.parse(await readFile(join(extensionRoot, "package.json"), "utf8"));
 const version = packageJson.version;
-assert.equal(version, "0.2.0", "package version must be 0.2.0");
-assert.ok(await stat(join(extensionRoot, "devweave-control-center-0.1.0.vsix")), "the existing 0.1.0 VSIX must remain present");
+assert.equal(version, "0.2.1", "package version must be 0.2.1");
+const legacyArtifacts = [
+  { version: "0.1.0", byteLength: 258106, sha256: "75fbad761c6a8c6db1997f5a6ed56dee2ff5a9d95a17f9329e5b6a8bfa2fb357" },
+  { version: "0.2.0", byteLength: 255162, sha256: "3e3610d3fcc888dd5b1f94f73360c3023ba51336018e14dbc67c2e664c218917" }
+];
+for (const legacy of legacyArtifacts) {
+  const legacyPath = join(extensionRoot, `devweave-control-center-${legacy.version}.vsix`);
+  const info = await stat(legacyPath);
+  assert.ok(info.isFile(), `the existing ${legacy.version} VSIX must be a regular file`);
+  assert.ok(info.size > 0, `the existing ${legacy.version} VSIX must be non-empty`);
+  const bytes = await readFile(legacyPath);
+  assert.equal(bytes.byteLength, legacy.byteLength, `the existing ${legacy.version} VSIX byte length changed`);
+  assert.equal(createHash("sha256").update(bytes).digest("hex"), legacy.sha256, `the existing ${legacy.version} VSIX hash changed`);
+}
 
 const bootstrapRoot = join(extensionRoot, "dist", "bootstrap");
 const manifest = JSON.parse(await readFile(join(bootstrapRoot, "manifest.json"), "utf8"));

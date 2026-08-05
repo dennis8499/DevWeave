@@ -5,8 +5,8 @@ sources: [.agents/skills/devweave/SKILL.md, AGENTS.md, README.md, docs/使用手
 last_updated: 2026-08-04
 tags: [overview]
 status: active
-source_fingerprint: "sha256:bd7f0e703c8c869e6bd7c06a0a883addb38816f1107972b2c19b806d072ff390"
-verified_by: 20260804-183511-feature-g1-g2-wiki-extension-bundle
+source_fingerprint: "sha256:e3ef6fe76b1f0a946d321b1a8b26e3d14d72a39eeaabc49bae97342e461ba406"
+verified_by: 20260804-205655-feature-devweave-0-2-1-windows
 ---
 
 # DevWeave Codebase Overview
@@ -21,6 +21,9 @@ DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router�
 4. G2 使用 `codebase-design` 逐題確認重要設計取捨，採用同一套 native-first/fallback 問答規則；回答回流 `design.md`/`plan.md`，完成 `validate` 後展示方案、介面、失敗處理、回復方式與 task plan，等待明確 G2 approval。產品實作與 tracked tests 只在 current G2 後進行，Wiki 在 verification 前保持唯讀。
 5. G3 驗證 current evidence、scope、baseline 與 Knowledge Review，確認實作符合已批准內容。新式 Work Item 必須選擇 `promote` 或 `no-update`；promote 最多變更五個內容頁並同步 index/log/seal。
 6. High-risk Work Item 在 final artifacts 穩定後由唯一 DevWeave router 啟動一個 isolated、read-only Independent Review Agent。Python engine 只接收 machine-only `review record`，保存 source-bound `kind: review` evidence、redacted report hash 與 provenance；standard/low risk 不啟動此 reviewer。
+7. 0.2.1 Windows 公開版交付 repository 與 VSIX，正式支援 Windows、VS Code 1.90+、Python 3.11+、Git 與 Codex；不包含 Marketplace 上架或 macOS/Linux 支援承諾。Control Center 的公開操作採 preview → 使用者確認複製 → Codex Chat handoff → Refresh，0.2.0 與 0.1.0 VSIX 保留作為回退。
+
+本次 release hardening 另固定幾個容易被使用者誤解的邊界：`devweave.wikiBootstrap` 與 legacy `devweave.copyNextAction` 都只開啟 Control Center 的 preview flow，host 的 `PreviewGate` 仍是最後 copy gate；多 active work 的 `next` 必須明確選取，未指定 work 的 `status` 明確交給 `$devweave status --all`；五個 section 的 tab/tabpanel 關聯在 inactive 狀態也保持有效 target，方向鍵/Home/End、focus restore 與 forced-colors contract 由 Extension-local seam 驗證。
 
 ## 互動式決策與 Gate
 
@@ -36,10 +39,11 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 - `knowledge_core.py` 負責 Wiki parser、source/content fingerprint、lint、coverage、reserved-starter preflight、bootstrap assessment、canonical scaffold 與 seal。`init` 先在 lock 外、再在 lock 內檢查 reserved paths，成功後才建立 `.devweave` control state。
 - `devweave_core.py` 負責 Work Item state、gate currentness、review/plan invalidation、G3 reconciliation 與 evidence。
 - High-risk G3 的 review result 分為 `passed`、`unavailable`、`critical`：unavailable/timeout/malformed fallback 與 advisory 是 warning，具名 critical security/data-loss/irreversible/scope finding 會阻擋 G3，只有 exact narrow `review-critical` waiver 可解除；human approval 仍是最後關卡。
-- VS Code Extension 只讀 filesystem projection，三個 Wiki bootstrap 入口都只預覽/複製 `$devweave wiki bootstrap`，不執行 CLI、不寫 Wiki；Control Center 以總覽、工作項目、知識、驗證、稽核與說明六區呈現，顯示偏好只存於 Extension workspaceState。
-- Extension 的 public command UI 以任務語言分組，所有 workflow decision 仍透過 prompt handoff 回到 Codex Chat；active work 與 closed history 分離，Wiki 頁面瀏覽提供有界搜尋、分類與顯示全部入口。
-- Extension 的 Wiki 搜尋以 Enter 套用大小寫不敏感的 title/path/body-preview 包含式查詢；輸入期間保留同一個 input DOM，結果區使用局部 render。Watcher 由 debounce 與 single-flight refresh coordinator 合併，snapshot 的獨立讀取平行化後仍依固定順序輸出。
-- 0.2.0 bootstrap bundle 提供完整控制面：六組核准 skills、通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。Project、baseline 與三份 Wiki starter 以明確 semantic contract 採用合法 evolved bytes；AGENTS、skills、hook、lock 與其他 controls 維持 exact，初始化只建立缺少且無衝突的檔案，說明手冊留在 Extension 內，不落地到 target repository。
+- VS Code Extension 只讀 filesystem projection，三個 Wiki bootstrap 入口都只預覽/複製 `$devweave wiki bootstrap`，不執行 CLI、不寫 Wiki；Control Center 以總覽、工作項目、知識、驗證（含稽核）與說明五區呈現，顯示偏好只存於 Extension workspaceState。
+- Extension 的 public command UI 以任務語言分組，所有 workflow decision 仍透過 prompt handoff 回到 Codex Chat；active work 與 closed history 分離，Wiki 頁面瀏覽提供有界搜尋、分類與顯示全部入口。`devweave.copyNextAction` 保留 command ID 但只開啟 Control Center；多 active work 的 `next` 必須明確選取，未指定 work 的 `status` 使用 `$devweave status --all` 查詢全部 active work。
+- Extension 的 Wiki 搜尋以 Enter 套用大小寫不敏感的 title/path/body-preview 包含式查詢；輸入期間保留同一個 input DOM，結果與 metrics 真實 mount 到 `#wiki-results`。五個 tab/tabpanel 使用完整 ARIA 關聯、方向鍵/Home/End 與 focus restore；Watcher 由 debounce 與 single-flight refresh coordinator 合併，snapshot 的獨立讀取平行化後仍依固定順序輸出。
+- Copy 成功後的 Webview `copyResult` 通知與 Extension-native success toast 不再共享 clipboard failure restore path；host 只在 clipboard adapter 失敗時恢復 ticket，walkthrough 的 bounded labels 則保留在 configured Extension/Python raw logs。
+- 0.2.1 bootstrap bundle 的 version 從 package version 產生，提供完整控制面：六組核准 skills、通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。Project、baseline 與三份 Wiki starter 以明確 semantic contract 採用合法 evolved bytes；AGENTS、skills、hook、lock 與其他 controls 維持 exact，初始化只建立缺少且無衝突的檔案，失敗或取消不留下 partial control bundle，說明手冊留在 Extension 內，不落地到 target repository。
 
 ## 關鍵模組
 

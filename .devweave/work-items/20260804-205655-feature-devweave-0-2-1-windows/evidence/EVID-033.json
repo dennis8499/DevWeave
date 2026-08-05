@@ -1,0 +1,109 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013",
+    "AC-014",
+    "AC-015",
+    "AC-016"
+  ],
+  "created_at": "2026-08-04T15:08:20+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "868be0912a5b4a218d27bed01b4162e2f344a0dd",
+  "id": "EVID-033",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260804-205655-feature-devweave-0-2-1-windows/EVID-033.log",
+  "review": {
+    "context_mode": "isolated_read_only",
+    "covers": [
+      "AC-001",
+      "AC-002",
+      "AC-003",
+      "AC-004",
+      "AC-005",
+      "AC-006",
+      "AC-007",
+      "AC-008",
+      "AC-009",
+      "AC-010",
+      "AC-011",
+      "AC-012",
+      "AC-013",
+      "AC-014",
+      "AC-015",
+      "AC-016"
+    ],
+    "findings": [
+      {
+        "evidence": "vscode-extension/package.json 使用「開啟預覽」，但 vscode-extension/README.md:62 仍記載「複製 prompt」。",
+        "id": "F-001",
+        "recommendation": "更新文件為目前的預覽流程；若保留舊標題，明確標示為歷史相容名稱。",
+        "severity": "advisory",
+        "title": "Wiki bootstrap Command Palette 文件標題過時"
+      },
+      {
+        "evidence": "dashboard-sections.ts 與 architecture baseline 定義五個區域；wiki/overview.md:42 記載六區，knowledge-engine.md:65 另將稽核拆出並遺漏說明區。",
+        "id": "F-002",
+        "recommendation": "修正受影響 Wiki 頁面後重新 refresh、同步 index/log 並 seal。",
+        "severity": "advisory",
+        "title": "Wiki 區域數量與已批准五區設計不一致"
+      },
+      {
+        "evidence": "dashboard.ts:147-151 將 callbacks.copy 與 copyResult postMessage 包在同一 try；clipboard 已成功後若通知傳輸失敗，catch 仍呼叫 restore(ticket)，可能造成重複複製。",
+        "id": "F-003",
+        "recommendation": "只在 clipboard 寫入失敗時 restore；將 copy 成功與結果通知錯誤分離，並補上 post-copy failure regression test。",
+        "severity": "advisory",
+        "title": "Copy 後通知失敗仍會恢復已成功消耗的 ticket"
+      },
+      {
+        "evidence": "EVID-031 的 command_id、exit_code、raw_log 均為 null，僅有 21/21 與 4/4 摘要；EVID-025/027/028 的 raw logs 主要是單元、靜態契約與 Extension Host activation 輸出，無法獨立重播該 walkthrough 聲稱。",
+        "id": "F-004",
+        "recommendation": "附上 bounded command 的 cwd、exit code、完整輸出或截圖/hash；在補足前將相關 AC 視為 advisory。",
+        "severity": "advisory",
+        "title": "AC-015 bounded walkthrough 缺少可重播的原始 provenance"
+      }
+    ],
+    "report_sha256": "2de9ef49770bbe4260fd7863ebad5f69de47fc4b46568073cffedf73770d8f67",
+    "result": "passed",
+    "reviewer_id": "codex-independent-review-20260804-205655",
+    "severity": "advisory",
+    "tasks": [
+      "TASK-001",
+      "TASK-002",
+      "TASK-003",
+      "TASK-004",
+      "TASK-005",
+      "TASK-006",
+      "TASK-007"
+    ]
+  },
+  "schema_version": 1,
+  "source_fingerprint": "db764fe7c7122108220c599ca8529e13d7173f527c4c61473d5e95b52db20be2",
+  "stale": false,
+  "status": "passed",
+  "summary": "未通過 release bar：文件與 Wiki 區域描述需同步、copy 成功後通知失敗不可 restore ticket，且 bounded walkthrough 需要 current raw provenance。",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006",
+    "TASK-007"
+  ]
+}

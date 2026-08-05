@@ -11,13 +11,13 @@ export type WebviewToHostMessage =
   | { type: "copyAction"; intent: PublicCommandIntent };
 
 export type HostToWebviewMessage =
-  | { type: "snapshot"; snapshot: WorkspaceSnapshot; preferences?: DashboardPreferences }
-  | { type: "bootstrapResult"; report: BootstrapReport; snapshot: WorkspaceSnapshot }
-  | { type: "actionPreview"; bundle: PromptBundle }
+  | { type: "snapshot"; snapshot: WorkspaceSnapshot; revision: number; preferences?: DashboardPreferences }
+  | { type: "bootstrapResult"; report: BootstrapReport; snapshot: WorkspaceSnapshot; revision: number }
+  | { type: "actionPreview"; intent: PublicCommandIntent; bundle: PromptBundle; revision: number }
   | { type: "copyResult"; ok: true; bundle: PromptBundle }
   | { type: "copyResult"; ok: false; message: string }
   | { type: "protocolError"; message: string }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string; detail?: string };
 
 export function parseWebviewMessage(value: unknown): WebviewToHostMessage | null {
   const record = asRecord(value);
@@ -81,8 +81,15 @@ export function parsePublicCommandIntent(value: unknown): PublicCommandIntent | 
         ? { type: "next", ...(record.workId === undefined ? {} : { workId: record.workId as string }) }
         : null;
     case "status":
-      return noExtraFields(record, ["type", "workId"]) && optionalWorkId(record)
-        ? { type: "status", ...(record.workId === undefined ? {} : { workId: record.workId as string }) }
+      return noExtraFields(record, ["type", "workId", "all"])
+        && optionalWorkId(record)
+        && optionalAllStatus(record)
+        && !(record.workId !== undefined && record.all === true)
+        ? {
+          type: "status",
+          ...(record.workId === undefined ? {} : { workId: record.workId as string }),
+          ...(record.all === true ? { all: true as const } : {})
+        }
         : null;
     case "wikiBootstrap":
       return noExtraFields(record, ["type"]) ? { type: "wikiBootstrap" } : null;
@@ -106,12 +113,20 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
 function optionalWorkId(record: Record<string, unknown>): boolean {
   return record.workId === undefined || isNonEmptyString(record.workId);
+}
+
+function optionalAllStatus(record: Record<string, unknown>): boolean {
+  return record.all === undefined || record.all === true;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0 && !hasForbiddenControlCharacter(value);
+}
+
+function hasForbiddenControlCharacter(value: string): boolean {
+  return /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(value);
 }
 
 function isDisplayMode(value: unknown): value is DisplayMode {

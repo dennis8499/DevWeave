@@ -61,8 +61,8 @@ const COMMANDS: readonly CommandPresentation[] = [
     name: "status",
     group: "progress",
     label: "查看目前狀態",
-    technicalLabel: "$devweave status",
-    description: "請 engine 回報 work、gate、evidence 與阻塞狀態。",
+    technicalLabel: "$devweave status [--all]",
+    description: "請 engine 回報 work、gate、evidence 與阻塞狀態；多 work 時可明確查詢全部 active work。",
     requiresWork: false,
     mutation: false
   },
@@ -354,7 +354,7 @@ function independentReviewCheck(work: WorkItemProjection, gate: GateName | null)
       key: "independent-review",
       label: "Independent Review",
       ok: false,
-      detail: "尚未有 current independent review；missing 或 unavailable 會需要人工留意。",
+      detail: "尚未有 current Independent Review；缺少或無法使用時需要人工留意。",
       nextStep: "在 Codex Chat 依 verification instructions 完成 Review Agent，再 Refresh。",
       level: "warning"
     };
@@ -365,7 +365,7 @@ function independentReviewCheck(work: WorkItemProjection, gate: GateName | null)
       key: "independent-review",
       label: "Independent Review",
       ok: false,
-      detail: `Review ${latest.id} 有 critical finding；G3 目前 not-ready。`,
+      detail: `Review ${latest.id} 有 critical finding；G3 目前尚未就緒。`,
       nextStep: "先處理 finding，或由人工依 engine 規則確認具名 narrow waiver。",
       level: "critical"
     };
@@ -376,7 +376,7 @@ function independentReviewCheck(work: WorkItemProjection, gate: GateName | null)
       label: "Independent Review",
       ok: false,
       detail: review.result === "unavailable"
-        ? `Review ${latest.id} unavailable；可繼續人工 G3，但需要留意。`
+        ? `Review ${latest.id} 無法使用；可繼續人工 G3，但需要留意。`
         : `Review ${latest.id} 通過但包含 advisory finding；需要留意。`,
       nextStep: "查看 raw evidence 與 report findings，再由人工確認是否繼續。",
       level: "warning"
@@ -434,7 +434,19 @@ const statusLabels: Record<string, string> = {
   warning: "需要注意",
   critical: "嚴重問題",
   placeholder: "待補內容",
-  success: "成功"
+  success: "成功",
+  ready: "可進一步審查",
+  attention: "需要注意",
+  not_ready: "尚未就緒",
+  unknown: "未知",
+  none: "無",
+  unavailable: "無法使用",
+  already_initialized: "已完成初始化",
+  initialized: "已完成初始化",
+  repaired: "已補齊",
+  partial: "部分完成",
+  conflict: "有衝突",
+  complete: "已完成"
 };
 
 const phaseLabels: Record<string, string> = {

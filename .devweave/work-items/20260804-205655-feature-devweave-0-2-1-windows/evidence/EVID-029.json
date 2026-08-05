@@ -1,0 +1,24 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-015"
+  ],
+  "created_at": "2026-08-04T14:48:59+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "868be0912a5b4a218d27bed01b4162e2f344a0dd",
+  "id": "EVID-029",
+  "kind": "doctor",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "db764fe7c7122108220c599ca8529e13d7173f527c4c61473d5e95b52db20be2",
+  "stale": false,
+  "status": "passed",
+  "summary": "Windows doctor 通過：Python、Git root、managed project、DevWeave skill、hook trust、5 個 configured commands 與 Wiki compatibility 均正常。",
+  "tasks": [
+    "TASK-007"
+  ]
+}

@@ -37,6 +37,7 @@ G3 功能驗收：acceptance、回歸測試、scope、Wiki／baseline
 
 ## 前置需求
 
+- 目前公開版支援範圍是 Windows；VS Code 1.90+、Python 3.11+、Git 與 Codex。
 - Git repository。
 - Python 3.11 或更新版本。
 - Codex CLI 或 VS Code Codex Extension。
@@ -45,6 +46,14 @@ G3 功能驗收：acceptance、回歸測試、scope、Wiki／baseline
 
 DevWeave 不是 pip package，也沒有另一套安裝型 router。它由 repository 內的 skill、CLI、
 hook、project state、Wiki 與 baseline 一起運作。
+
+## Windows 公開版 0.2.1
+
+交付內容是 repository 與 `vscode-extension/devweave-control-center-0.2.1.vsix`。VSIX 可在 VS Code 的 Extensions 視窗使用「Install from VSIX…」安裝；安裝後開啟 DevWeave repository，即可從 Activity Bar 進入 Control Center。完整流程請看[繁體中文使用手冊](docs/使用手冊.md)與 [Control Center README](vscode-extension/README.md)。
+
+這個 release 不包含 Marketplace 上架，也不對 macOS/Linux 做支援承諾。舊版 `devweave-control-center-0.2.0.vsix` 與 `devweave-control-center-0.1.0.vsix` 會保留，必要時可在 VS Code 重新安裝 0.2.0 回退。
+
+Control Center 的公開操作都遵循「預覽 → 你確認複製 → Codex Chat 審閱並送出 → Refresh」；Refresh、切換 work 或 workspace snapshot 更新後，舊 prompt 必須重新預覽。`devweave.copyNextAction` 仍保留，但現在會開啟 Control Center；多個 active work 時必須先明確選取 work。
 
 ## 快速開始
 

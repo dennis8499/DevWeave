@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 const production = process.argv.includes("--production");
 const root = fileURLToPath(new URL("./", import.meta.url));
 const repositoryRoot = join(root, "..");
+const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+const version = packageJson.version;
 const outdir = join(root, "dist");
 const esbuildPath = (value) => value.replaceAll("\\", "/");
 const esbuildRoot = esbuildPath(root);
@@ -139,7 +141,7 @@ async function createBootstrapBundle(repo, outputRoot) {
   }
   await writeFile(join(bootstrapRoot, "manifest.json"), `${JSON.stringify({
     schemaVersion: 1,
-    bundleVersion: "0.2.0",
+    bundleVersion: version,
     directories,
     files
   }, null, 2)}\n`, "utf8");
