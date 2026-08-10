@@ -1,0 +1,75 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007"
+  ],
+  "created_at": "2026-08-10T06:37:34+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "60a0b748a9faf89ce22026da4ac66ddda5c477fb",
+  "id": "EVID-013",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "failure",
+  "raw_log": ".devweave/cache/logs/20260810-130022-feature-openai-hooks-windows-shell-pretooluse/EVID-013.log",
+  "review": {
+    "context_mode": "isolated_read_only",
+    "covers": [
+      "AC-001",
+      "AC-002",
+      "AC-003",
+      "AC-004",
+      "AC-005",
+      "AC-006",
+      "AC-007"
+    ],
+    "findings": [
+      {
+        "evidence": "design.md的Manual acceptance要求在VS Code integrated terminal以CMD、Windows PowerShell 5.1與PowerShell 7 profiles執行one-line命令並確認trust與hook語意；現有EVID-002/EVID-003只記錄child-process runners，EVID-005是文件contract，EVID-006/EVID-012沒有該manual walkthrough marker。",
+        "id": "F-001",
+        "recommendation": "補記目前source fingerprint下的三個VS Code integrated terminal profile walkthrough證據，包含trust、root/nested、UTF-8、malformed、deny與read-only結果；完成前不要核准G3。",
+        "severity": "critical",
+        "title": "缺少VS Code integrated terminal walkthrough證據"
+      },
+      {
+        "evidence": ".agents/skills/devweave/scripts/devweave_core.py:3891-3894在非Windows直接將py-3、cmd、powershell、pwsh、hook-schema與launcher-probe設為ok=true；design.md要求標示not applicable且不得宣稱Windows certification，且POSIX python3 launcher未被實際probe。",
+        "id": "F-002",
+        "recommendation": "分離not-applicable與pass狀態並排除aggregate，或對POSIX launcher執行實際probe；保留Windows release scope限制。",
+        "severity": "advisory",
+        "title": "非Windows doctor將未探測檢查回報為ok"
+      }
+    ],
+    "report_sha256": "5dc50dd4e099a23ba6dd6b717922d5c5618f4eac5358a4f1454de6e0cfe0b56a",
+    "result": "critical",
+    "reviewer_id": "independent-reviewer-001",
+    "severity": "critical",
+    "tasks": [
+      "TASK-001",
+      "TASK-002",
+      "TASK-003",
+      "TASK-004",
+      "TASK-005",
+      "TASK-006"
+    ]
+  },
+  "schema_version": 1,
+  "source_fingerprint": "d1dfb70e1093f1a82e7fe49613d254242e665ab2dfddd7715ae487613f15cbd1",
+  "stale": false,
+  "status": "failed",
+  "summary": "Hook、Windows launcher matrix、UTF-8/fail-closed contract與0.2.3 package證據一致；EVID-011已以相同profile取代sandbox-only EVID-010。但缺少核准的VS Code integrated terminal manual walkthrough證據，且doctor在非Windows會將未探測檢查標為ok=true，G3不可通過。",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006"
+  ]
+}

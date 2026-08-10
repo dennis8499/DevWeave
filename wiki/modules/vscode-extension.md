@@ -1,19 +1,19 @@
 ---
 title: DevWeave VS Code Extension
 type: module
-sources: [.codex/hooks.json, vscode-extension/esbuild.mjs, vscode-extension/package.json, vscode-extension/scripts, vscode-extension/src]
-last_updated: 2026-08-05
+sources: [.codex/hooks.json, vscode-extension]
+last_updated: 2026-08-10
 tags: [module, vscode, control-center]
 status: active
-source_fingerprint: "sha256:5e7023ce0927414252c31e9d3658432260cb762b131f86a2f07316206be3273c"
-verified_by: 20260805-184040-feature-plan-mode
+source_fingerprint: "sha256:bf6410859bf833af74cf9eb7be2f2a74ecb12c7dc1a28d2f2403ca978567a67a"
+verified_by: 20260810-130022-feature-openai-hooks-windows-shell-pretooluse
 ---
 
 # DevWeave VS Code Extension
 
 ## Responsibility
 
-`devweave-control-center` 是 DevWeave 0.2.2 Windows 公開版的唯讀 Control Center，本次提供 `devweave-control-center-0.2.2.vsix` 並保留 `devweave-control-center-0.2.1.vsix`。認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；VS Code 1.90+／Python 3.11+ 是技術門檻，不代表其他組合已完成本次認證。Extension host 將 project、Work Item、Wiki、evidence、diagnostics 與 bootstrap completeness 投影給 Webview；workflow decision 仍以 prompt handoff 回到 Codex Chat，Extension 不執行 DevWeave engine、CLI、shell、Git 或 network。
+`devweave-control-center` 是 DevWeave 0.2.3 Windows 公開版的唯讀 Control Center，本次提供 `devweave-control-center-0.2.3.vsix` 並保留 `devweave-control-center-0.2.2.vsix` 與 `devweave-control-center-0.2.1.vsix`。認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次 Python full suite 為 101 項（1 項因 symlink 權限 skipped），Extension unit tests 為 77 項。VS Code 1.90+／Python 3.11+ 是技術門檻，不代表其他組合已完成本次認證。Extension host 將 project、Work Item、Wiki、evidence、diagnostics 與 bootstrap completeness 投影給 Webview；workflow decision 仍以 prompt handoff 回到 Codex Chat，Extension 不執行 DevWeave engine、CLI、shell、Git 或 network。
 
 ## Webview interaction
 
@@ -38,18 +38,18 @@ Workspace watcher 保留自動 refresh，事件經 250ms debounce 後交給 `Ref
 
 ## Bootstrap contract
 
-Production bundle `0.2.2` 使用由 package version 產生的 manifest，固定完整控制套件：`devweave`、`codebase-design`、`diagnosing-bugs`、`grill-me`、`grilling`、`tdd` 六組 skills，加上通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。README、docs、產品 source、tests、fixtures、work item 與 history 不會成為 target workspace 的 bootstrap files；使用手冊只留在 Extension help。Project、三份 baseline 與三份 Wiki starter 明確宣告 `adopt-compatible` contract，其餘 controls 宣告 `exact`。
+Production bundle `0.2.3` 使用由 package version 產生的 manifest，固定完整控制套件：`devweave`、`codebase-design`、`diagnosing-bugs`、`grill-me`、`grilling`、`tdd` 六組 skills，加上通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。README、docs、產品 source、tests、fixtures、work item 與 history 不會成為 target workspace 的 bootstrap files；使用手冊只留在 Extension help。Project、三份 baseline 與三份 Wiki starter 明確宣告 `adopt-compatible` contract，其餘 controls 宣告 `exact`。
 
-Windows Codex 的 PreToolUse hook 是由根目錄 `.codex/hooks.json` 產生的 exact bootstrap control：標準 `command` 使用 `powershell.exe -NoLogo -NoProfile -NonInteractive -Command`，由 Codex 的 `cmd.exe` 或 PowerShell 外層啟動，再從 Git root 以 `python.exe -X utf8 -B` 找到並執行 `guard.py`；guard 直接以 UTF-8 bytes 讀寫 JSON，不再維護不會被 Codex runner 採用的 `commandWindows` 欄位。`cmd.exe /d /s /c`、PowerShell outer runner、nested cwd、raw UTF-8、malformed input 與 read-only silence 均由 process-level contract 驗證，policy deny 仍以合法 JSON 與 process exit 0 回傳。
+Windows Codex 的 PreToolUse hook 是由根目錄 `.codex/hooks.json` 產生的 exact bootstrap control：matcher 固定為 `^(Bash|apply_patch|Edit|Write)$`，同時保留 POSIX `command` 與 Windows `commandWindows`；Windows command 使用 `powershell.exe -NoLogo -NoProfile -NonInteractive -Command`，先設定 .NET `[Console]::InputEncoding` 與 `[Console]::OutputEncoding` 為 UTF-8，再從 Git root 以 `py -3 -X utf8 -B` 找到並執行 `guard.py`，不依賴 shell-scoped `$OutputEncoding`。`cmd.exe /d /s /c`、Windows PowerShell 5.1、PowerShell 7、VS Code terminal、nested cwd、raw UTF-8、malformed input 與 read-only silence 均由 process-level contract 驗證，policy deny 仍以合法 JSON 與 process exit 0 回傳。`doctor` 提供 prerequisite/schema/launcher probe，並區分 launcher failure 與 policy deny。
 
 `BootstrapInstaller.inspect()` 先驗證 manifest path、byte length 與 SHA-256，再依 `bootstrap-compat.ts` shared validator 檢查 semantic identity。合法 evolved project/baseline/Wiki bytes 會 adopted；AGENTS、skills、hook、lock 與其他 controls 仍以 exact bytes 判定。初始化或修復只建立 missing paths，不同或不合法內容永不覆寫並列為 conflict；只要仍有 missing 或 conflict，report 與 Dashboard 就標示 partial；若中途寫入失敗，僅 rollback 本輪新增內容，既有檔案保持不變。重跑完整 bundle 是 idempotent。
 
-Hook 的 source-derived consistency 由 package verifier 檢查根目錄 hook 與 `dist/bootstrap/hooks.json` 的 PowerShell／explicit UTF-8／`python -B`／Git-root／no-`commandWindows` semantic contract；0.2.2 VSIX 從 current source 重新產出，其他 VSIX（包含保留的 0.2.1 artifact）不屬於 current package 驗收輸入。
+Hook 的 source-derived consistency 由 package verifier 檢查根目錄 hook 與 `dist/bootstrap/hooks.json` 的 exact matcher、POSIX/Windows dual path、explicit UTF-8 console setup、`py -3`、Git-root 與 no-`$repo` contract；0.2.3 VSIX 從 current source 重新產出，其他 VSIX（包含保留的 0.2.2 與 0.2.1 artifact）不屬於 current package 驗收輸入。
 
 ## Security and compatibility
 
-Runtime 維持 CSP、no process、no shell、no external network 與 preview-first public command boundary。所有 workspace write 都集中在使用者確認後的 allowlisted bootstrap installer；snapshot、搜尋、help、prompt composition 與 Independent Review readiness 都是 Extension-local/read-only。Extension 不啟動 Review Agent、不呼叫 Python engine、不判定或核准 gate，也不提供 host mode adapter 或切換命令；事故時停止散布並停用或解除安裝 0.2.2，不自動刪除 `.devweave`、Wiki 或 workspace 資料，修復以新版本發布。Public commands 與 legacy snapshot projection 維持相容；`devweave.copyNextAction` 僅開啟 Control Center，單一 active work 才能自動顯示 next preview，多 work 必須先明確選取。
+Runtime 維持 CSP、no process、no shell、no external network 與 preview-first public command boundary。所有 workspace write 都集中在使用者確認後的 allowlisted bootstrap installer；snapshot、搜尋、help、prompt composition 與 Independent Review readiness 都是 Extension-local/read-only。Extension 不啟動 Review Agent、不呼叫 Python engine、不判定或核准 gate，也不提供 host mode adapter 或切換命令；事故時停止散布並停用或解除安裝 0.2.3，不自動刪除 `.devweave`、Wiki 或 workspace 資料，修復以新版本發布。Public commands 與 legacy snapshot projection 維持相容；`devweave.copyNextAction` 僅開啟 Control Center，單一 active work 才能自動顯示 next preview，多 work 必須先明確選取。
 
 ## Verification seams
 
-`WikiSearchModel`、`RenderScheduler`、`RefreshCoordinator`、`PreviewGate`、Wiki result mount adapter、instrumented snapshot reader、`dashboard-sections.ts`、copy transaction boundary、`bootstrap-compat.ts` 與 `BootstrapInstaller.inspect()` 是不依賴 VS Code UI 的測試 seams。package verifier 只讀取 current 0.2.2 VSIX，檢查 manifest 每個 entry 的 destination、byte length、SHA-256、policy/kind、package／bundle version、58 個 bootstrap files、119 個 VSIX entries、required entries 與 current artifact SHA-256；77 項 Extension tests、typecheck 與 smoke test 再確認 host 可載入 bundle，既有 0.2.1 artifact 保留。Configured full-suite raw logs 另保留 Windows walkthrough 與 accessibility marker。
+`WikiSearchModel`、`RenderScheduler`、`RefreshCoordinator`、`PreviewGate`、Wiki result mount adapter、instrumented snapshot reader、`dashboard-sections.ts`、copy transaction boundary、`bootstrap-compat.ts` 與 `BootstrapInstaller.inspect()` 是不依賴 VS Code UI 的測試 seams。package verifier 只讀取 current 0.2.3 VSIX，檢查 manifest 每個 entry 的 destination、byte length、SHA-256、policy/kind、package／bundle version、58 個 bootstrap files、119 個 VSIX entries、required entries、root/embedded hook equality 與 current artifact SHA-256；77 項 Extension tests、typecheck 與 smoke test 再確認 host 可載入 bundle，既有 0.2.2 與 0.2.1 artifact 保留。Configured full-suite raw logs 另保留 Windows walkthrough、accessibility marker 與 101-test/1-symlink-skip result。

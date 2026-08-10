@@ -40,7 +40,7 @@ Initialization preflight is ordered before the project lock and before any `.dev
 
 Machine keys and protocols are English. User-facing discovery, approval summaries, artifacts, and acceptance reports are Traditional Chinese unless the user asks otherwise. DevWeave observes Git state but never implicitly creates branches, worktrees, commits, or pushes.
 
-The single PreToolUse hook is a Codex guardrail, not an operating-system sandbox. It rejects Wiki writes before verification and allows only the exact knowledge plan plus coupled index/log paths afterward. It requires repository trust and cannot prevent edits made outside Codex or after hooks are disabled; G3 rechecks the complete Wiki diff.
+The single PreToolUse hook is a Codex guardrail, not an operating-system sandbox. Its current exact matcher is `^(Bash|apply_patch|Edit|Write)$`; `.codex/hooks.json` provides both POSIX `command` and Windows `commandWindows`, with the Windows path using `powershell.exe -NoLogo -NoProfile -NonInteractive` and `py -3 -X utf8 -B` from the Git root. Run `py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . doctor` as one line from CMD, Windows PowerShell 5.1, PowerShell 7, or a VS Code terminal. A launcher failure is different from a successful DevWeave policy deny; hosted, global, and plugin-owned tool paths are outside this repository hook's coverage. It rejects Wiki writes before verification and allows only the exact knowledge plan plus coupled index/log paths afterward. It requires repository trust and cannot prevent edits made outside Codex or after hooks are disabled; G3 rechecks the complete Wiki diff.
 
 ## Companion engineering skills
 

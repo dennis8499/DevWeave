@@ -2,11 +2,11 @@
 title: Wiki Activity Log
 type: log
 sources: []
-last_updated: 2026-08-05
+last_updated: 2026-08-10
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260805-184040-feature-plan-mode
+verified_by: 20260810-130022-feature-openai-hooks-windows-shell-pretooluse
 ---
 
 # Activity Log
@@ -87,3 +87,14 @@ verified_by: 20260805-184040-feature-plan-mode
 - Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，記錄所有 pre-G2 mutation entry 的 Plan Mode preflight、未具 host capability 時在 Work Item mutation 前停止，以及僅明確 compatibility 才使用 structured fallback。
 - 提升 `PlanModeGuidance` optional metadata、`chatText` 相容性、Control Center overview/preview/copy 的 Plan Mode handoff 與 Extension 不提供 host mode adapter 的邊界。
 - 同步 0.2.2 current package、58 個 bootstrap files、119 個 VSIX entries 與保留 0.2.1 artifact。
+
+## [2026-08-10] promote | 20260810-130022-feature-openai-hooks-windows-shell-pretooluse
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，記錄 exact `PreToolUse` matcher、POSIX `command`/Windows `commandWindows` dual path、`py -3 -X utf8 -B` Git-root launcher 與 CMD/PowerShell 5.1/PowerShell 7/VS Code terminal matrix。
+- 記錄 `doctor` prerequisite/schema/root-nested probe、launcher failure 與 policy deny 的分層診斷、source-derived root/embedded hook verification、0.2.3 current VSIX（58 bootstrap files／119 entries）與保留 0.2.2/0.2.1 artifact。
+- 以 Python 101 tests（1 項因 symlink 權限 skipped）、Extension 77 tests、package/typecheck/smoke 與 repository contract evidence 固定本次驗證邊界；hook 是 Codex guardrail，不是 OS sandbox，hosted/global/plugin-owned paths 不在覆蓋範圍。
+
+## [2026-08-10] refresh | 20260810-130022-feature-openai-hooks-windows-shell-pretooluse
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，補記 Windows handler 先設定 .NET console input/output 為 UTF-8、避免 shell-scoped encoding variable、以及最後一輪 source-derived hook/package contract。
+- 維持四頁 content upsert 與 index/log coupling；本次只更新已規劃的 Wiki targets，既有 activity log body 保持 append-only。

@@ -3703,6 +3703,150 @@ def load_session_binding(repo: Path, session_id: str) -> dict[str, Any] | None:
         return None
 
 
+DOCTOR_PROBE_TIMEOUT_SECONDS = 5
+DOCTOR_LAUNCHER_TIMEOUT_SECONDS = 15
+EXPECTED_HOOK_MATCHER = "^(Bash|apply_patch|Edit|Write)$"
+
+
+def _doctor_output(result: subprocess.CompletedProcess[bytes]) -> str:
+    stdout = result.stdout.decode("utf-8", errors="replace").strip()
+    stderr = result.stderr.decode("utf-8", errors="replace").strip()
+    detail = stdout or stderr or f"exit code {result.returncode}"
+    return detail[:240]
+
+
+def _doctor_process(
+    argv: Sequence[str],
+    cwd: Path,
+    *,
+    input_bytes: bytes = b"",
+    timeout_seconds: int = DOCTOR_PROBE_TIMEOUT_SECONDS,
+) -> tuple[bool, str]:
+    try:
+        result = subprocess.run(
+            list(argv),
+            cwd=cwd,
+            input=input_bytes,
+            capture_output=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except FileNotFoundError:
+        return False, f"{argv[0]} not found"
+    except subprocess.TimeoutExpired:
+        return False, f"{argv[0]} timed out after {timeout_seconds}s"
+    except OSError as exc:
+        return False, f"{argv[0]} failed: {type(exc).__name__}: {exc}"
+    return result.returncode == 0, _doctor_output(result)
+
+
+def _doctor_executable(
+    repo: Path,
+    name: str,
+    args: Sequence[str],
+) -> tuple[bool, str]:
+    executable = shutil.which(name)
+    if executable is None:
+        return False, f"{name} not found on PATH"
+    ok, detail = _doctor_process([executable, *args], repo)
+    return ok, f"{executable}: {detail}"
+
+
+def _doctor_hook_contract(repo: Path) -> tuple[bool, str, str | None]:
+    path = repo / ".codex" / "hooks.json"
+    if not path.exists():
+        return False, f"missing {path}; trust the repository hook after it is installed", None
+    try:
+        hook = read_json(path)
+    except (OSError, DevWeaveError) as exc:
+        return False, f"cannot read hook: {exc}", None
+    groups = hook.get("hooks", {}).get("PreToolUse")
+    if not isinstance(groups, list) or len(groups) != 1:
+        return False, "PreToolUse must contain exactly one guard group", None
+    group = groups[0]
+    if not isinstance(group, dict) or group.get("matcher") != EXPECTED_HOOK_MATCHER:
+        return False, f"matcher must be {EXPECTED_HOOK_MATCHER!r}", None
+    handlers = group.get("hooks")
+    if not isinstance(handlers, list) or len(handlers) != 1:
+        return False, "PreToolUse guard group must contain exactly one handler", None
+    command = handlers[0]
+    if not isinstance(command, dict) or command.get("type") != "command":
+        return False, "PreToolUse handler must be a command hook", None
+    if command.get("timeout") != 30:
+        return False, "command hook timeout must be 30 seconds", None
+    if command.get("statusMessage") != "Checking DevWeave gates":
+        return False, "command hook statusMessage is missing or incorrect", None
+    posix = command.get("command")
+    windows = command.get("commandWindows")
+    if not isinstance(posix, str) or "python3 -X utf8 -B" not in posix:
+        return False, "POSIX command must use python3 -X utf8 -B", None
+    if not isinstance(posix, str) or "$(git rev-parse --show-toplevel)" not in posix:
+        return False, "POSIX command must resolve the Git root", None
+    if not isinstance(windows, str):
+        return False, "Windows commandWindows adapter is missing", None
+    required_windows = (
+        "powershell.exe -NoLogo -NoProfile -NonInteractive -Command",
+        "py -3 -X utf8 -B",
+        "Join-Path (git rev-parse --show-toplevel)",
+    )
+    missing = [fragment for fragment in required_windows if fragment not in windows]
+    if missing:
+        return False, f"Windows launcher is missing: {', '.join(missing)}", None
+    if "$repo" in posix or "$repo" in windows:
+        return False, "hook launcher must not use the $repo shell variable", None
+    return True, "schema valid; trust this repository hook once in Codex", windows
+
+
+def _doctor_launcher_probe(repo: Path, command_windows: str | None) -> tuple[bool, str]:
+    if not command_windows:
+        return False, "launcher probe skipped because commandWindows is unavailable"
+    powershell = shutil.which("powershell.exe")
+    if powershell is None:
+        return False, "powershell.exe not found; launcher probe unavailable"
+    payload = json.dumps(
+        {
+            "cwd": str(repo),
+            "session_id": "",
+            "tool_name": "Bash",
+            "tool_input": {"command": "git status --short"},
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+    probe_cwds = [repo]
+    nested = repo / "vscode-extension"
+    if nested.is_dir():
+        probe_cwds.append(nested)
+    for cwd in probe_cwds:
+        try:
+            result = subprocess.run(
+                [
+                    powershell,
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    command_windows,
+                ],
+                cwd=cwd,
+                input=payload,
+                capture_output=True,
+                check=False,
+                timeout=DOCTOR_LAUNCHER_TIMEOUT_SECONDS,
+            )
+        except FileNotFoundError:
+            return False, "powershell.exe disappeared before launcher probe"
+        except subprocess.TimeoutExpired:
+            return False, f"launcher probe timed out after {DOCTOR_LAUNCHER_TIMEOUT_SECONDS}s at {cwd}"
+        except OSError as exc:
+            return False, f"launcher probe failed at {cwd}: {type(exc).__name__}: {exc}"
+        if result.returncode != 0:
+            return False, f"launcher exited {result.returncode} at {cwd}: {_doctor_output(result)}"
+        if result.stdout:
+            return False, f"read-only Bash launcher must be silent at {cwd}"
+    locations = ", ".join(str(cwd) for cwd in probe_cwds)
+    return True, f"commandWindows probe passed at {locations}"
+
+
 def doctor(repo: Path) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
 
@@ -3722,11 +3866,32 @@ def doctor(repo: Path) -> dict[str, Any]:
         (skill_root() / "SKILL.md").exists(),
         str(skill_root() / "SKILL.md"),
     )
-    add(
-        "hook",
-        (repo / ".codex" / "hooks.json").exists(),
-        "Project hooks require one-time trust in Codex.",
-    )
+    hook_ok, hook_detail, command_windows = _doctor_hook_contract(repo)
+    add("hook", hook_ok, hook_detail)
+    if os.name == "nt":
+        py_ok, py_detail = _doctor_executable(repo, "py", ["-3", "--version"])
+        add("py-3", py_ok, py_detail)
+        cmd_ok, cmd_detail = _doctor_executable(repo, "cmd.exe", ["/d", "/s", "/c", "ver"])
+        add("cmd", cmd_ok, cmd_detail)
+        powershell_ok, powershell_detail = _doctor_executable(
+            repo,
+            "powershell.exe",
+            ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.ToString()"],
+        )
+        add("powershell", powershell_ok, powershell_detail)
+        pwsh_ok, pwsh_detail = _doctor_executable(
+            repo,
+            "pwsh",
+            ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.ToString()"],
+        )
+        add("pwsh", pwsh_ok, pwsh_detail)
+        add("hook-schema", hook_ok, hook_detail)
+        probe_ok, probe_detail = _doctor_launcher_probe(repo, command_windows)
+        add("launcher-probe", probe_ok, probe_detail)
+    else:
+        detail = "Windows-only prerequisite probe skipped on this non-Windows host."
+        for name in ("py-3", "cmd", "powershell", "pwsh", "hook-schema", "launcher-probe"):
+            add(name, True, detail)
     if project_path(repo).exists():
         try:
             project = load_project(repo)

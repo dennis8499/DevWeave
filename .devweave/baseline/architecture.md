@@ -4,7 +4,7 @@
 
 ## System Context
 
-Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；Router 在 pre-G2 mutation entry 的 `start`、`bind`、`revise` 或 bootstrap create 前確認 `request_user_input` host capability，未取得 capability 時停止並提示 Plan Mode，compatibility fallback 必須由使用者明確選擇。`devweave.py` 提供 JSON machine CLI；`devweave_core.py` 擁有 work locks、state、events、evidence、gate、bootstrap profile 與 Knowledge Review/plan currentness；`knowledge_core.py` 以 Python standard library 提供 Wiki reserved-starter preflight/bootstrap assessment、frontmatter、context records、coverage、canonical scaffold、source fingerprint、lint、snapshot 與 seal。單一 `.codex/hooks.json` PreToolUse hook 呼叫 `guard.py`。五個 `.agents/skills/<companion>/` 目錄提供階段內工程方法，root `AGENTS.md` 是它們與唯一 DevWeave router 之間的 precedence interface。
+Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；Router 在 pre-G2 mutation entry 的 `start`、`bind`、`revise` 或 bootstrap create 前確認 `request_user_input` host capability，未取得 capability 時停止並提示 Plan Mode，compatibility fallback 必須由使用者明確選擇。`devweave.py` 提供 JSON machine CLI；`devweave_core.py` 擁有 work locks、state、events、evidence、gate、bootstrap profile 與 Knowledge Review/plan currentness；`knowledge_core.py` 以 Python standard library 提供 Wiki reserved-starter preflight/bootstrap assessment、frontmatter、context records、coverage、canonical scaffold、source fingerprint、lint、snapshot 與 seal。單一 `.codex/hooks.json` PreToolUse hook 以 exact matcher `^(Bash|apply_patch|Edit|Write)$` 呼叫 `guard.py`，並依 host 使用 POSIX `command` 或 Windows `commandWindows` 從 Git root 定位同一 guard。五個 `.agents/skills/<companion>/` 目錄提供階段內工程方法，root `AGENTS.md` 是它們與唯一 DevWeave router 之間的 precedence interface。
 
 ## Boundaries and Interfaces
 
@@ -30,6 +30,7 @@ Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；Router 在 
 - Canonical scaffold 支援九種內容型別，只允許 planned new upsert、合法 type directory 與 1–5 sources，採 exclusive no-overwrite placeholder create；seal 拒絕 placeholder、template token、invalid source 與 critical lint。
 - Critical lint、undeclared/unchanged targets、未刷新 affected pages 或 log rewrite 阻擋 G3；其他 stale/orphan/semantic findings 為 warnings。
 - Hook 是 Codex guardrail 而非 OS sandbox，G3 必須重新 reconcile 完整 Wiki diff。
+- PreToolUse 採精確 `^(Bash|apply_patch|Edit|Write)$` matcher、單一 command handler、30 秒 timeout 與 status message；POSIX 使用 `python3 -X utf8 -B`，Windows handler 先以 `[Console]::InputEncoding`/`[Console]::OutputEncoding` 設定 .NET UTF-8，且不依賴 shell-scoped `$OutputEncoding` 變數，再使用 `powershell.exe` 呼叫 `py -3 -X utf8 -B`；兩者都從 `git rev-parse --show-toplevel` 解析 repository root。`doctor` 以 bounded、read-only launcher probe 驗證 Git root 與 nested VS Code terminal cwd，並把 launcher failure 與 guard policy deny 分開呈現。
 - Companion Skills 採精確 allowlist 與未修改的 project-local copies；不安裝 Matt Pocock 的 setup/spec/ticket/implement orchestration。Instruction conflict 由 root policy 解決，upstream 更新必須建立新的 DevWeave feature。
 
 ## DevWeave Control Center VS Code Extension
@@ -46,7 +47,7 @@ Codex 透過 `.agents/skills/devweave/SKILL.md` 路由公開意圖；Router 在 
 - Control Center 對 high-risk acceptance 投影 `Independent Review` readiness：missing/unavailable/advisory 為 attention，critical 為 not-ready，passed 且 source current 才為 ready；Extension 不啟動 Agent、engine、shell、Git、network 或 lifecycle mutation。
 - Activity Bar TreeView 提供 repository/work-item navigation；Dashboard/Webview 提供 welcome、doctor、phase/gate、task/evidence、Wiki-first、acceptance 與唯讀 audit projection。多 work item 必須明確選取，不以第一筆資料默選。
 - UI 使用 VS Code theme tokens、Codicons、CSP、ARIA/focus、high-contrast、reduced-motion 與非色彩單獨狀態表達；主要內容保持不透明，僅在控制項使用輕微透明效果。
-- `extension-typecheck`、`extension-tests`、`extension-package` 與 `extension-smoke` 透過 DevWeave command profiles 管理；Extension 不提供 branch、commit、push、PR、Marketplace release、版本比較或還原。0.2.2 package verifier 只讀取 current VSIX，並對 package／bundle version、58 個 bootstrap files、119 個 VSIX entries、required entries、每個 bundled source 的 byte length／SHA-256 及 current artifact SHA-256 fail closed；既有 0.2.1 artifact 保留，其他 VSIX 不屬於輸入或回復條件。
+- `extension-typecheck`、`extension-tests`、`extension-package` 與 `extension-smoke` 透過 DevWeave command profiles 管理；Extension 不提供 branch、commit、push、PR、Marketplace release、版本比較或還原。0.2.3 package verifier 只讀取 current VSIX，並對 package／bundle version、root/embedded source-derived hook、58 個 bootstrap files、119 個 VSIX entries、required entries、每個 bundled source 的 byte length／SHA-256 及 current artifact SHA-256 fail closed；既有 0.2.2 與 0.2.1 artifacts 保留，其他 VSIX 不屬於輸入或回復條件。
 
 Provenance: `20260802-200224-feature-wiki-first`（待 G3 核准）。
 

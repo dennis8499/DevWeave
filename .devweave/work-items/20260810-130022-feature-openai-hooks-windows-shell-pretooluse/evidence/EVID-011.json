@@ -1,0 +1,34 @@
+{
+  "argv": [
+    "npm.cmd",
+    "run",
+    "package"
+  ],
+  "binds_current_source": true,
+  "command_id": "extension-package",
+  "covers": [
+    "AC-005",
+    "AC-007"
+  ],
+  "created_at": "2026-08-10T06:03:11+00:00",
+  "cwd": "vscode-extension",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "git_head": "60a0b748a9faf89ce22026da4ac66ddda5c477fb",
+  "id": "EVID-011",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260810-130022-feature-openai-hooks-windows-shell-pretooluse/EVID-011.log",
+  "schema_version": 1,
+  "source_fingerprint": "d1dfb70e1093f1a82e7fe49613d254242e665ab2dfddd7715ae487613f15cbd1",
+  "stale": false,
+  "started_at": "2026-08-10T06:03:09+00:00",
+  "status": "passed",
+  "summary": "> devweave-control-center@0.2.3 package\n> node esbuild.mjs --production && node scripts/package-vsix.mjs && node scripts/verify-package.mjs\n\nCreated C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\devweave-control-center-0.2.3.vsix (285330 bytes, 119 entries)\nVerified 0.2.3: 58 bootstrap files and 119 VSIX entries. VSIX SHA-256: 3da0d256116bc839c2c3c5bb08f5f389e386b55f877c4c9596210ae4ab71ffe7\n\n\n  dist\\extension.js  58.4kb\n\nDone in 10ms\n\n  dist\\webview\\main.js  78.1kb\n\nDone in 8ms",
+  "tasks": [
+    "TASK-006"
+  ],
+  "timed_out": false
+}

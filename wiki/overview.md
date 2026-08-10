@@ -1,12 +1,12 @@
 ---
 title: DevWeave Codebase Overview
 type: overview
-sources: [.agents/skills, AGENTS.md, README.md, docs/使用手冊.md, tests/test_repository_contract.py]
-last_updated: 2026-08-05
+sources: [.agents/skills, .codex/hooks.json, AGENTS.md, README.md, docs/使用手冊.md]
+last_updated: 2026-08-10
 tags: [overview]
 status: active
-source_fingerprint: "sha256:632edba0c9b7356506c1d6c4202366e96bed57efe0ec55db435f9f4d240c91ef"
-verified_by: 20260805-184040-feature-plan-mode
+source_fingerprint: "sha256:ae46134844eb53b377027832e480346775856f96bffe14119b24250e6dabaa24"
+verified_by: 20260810-130022-feature-openai-hooks-windows-shell-pretooluse
 ---
 
 # DevWeave Codebase Overview
@@ -21,11 +21,11 @@ DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router�
 4. G2 使用 `codebase-design` 在 Plan Mode 逐題確認重要設計取捨，採用同一套 native-first/fallback 問答規則；回答回流 `design.md`/`plan.md`，完成 `validate` 後展示方案、介面、失敗處理、回復方式與 task plan，等待明確 G2 approval。G2 前的普通/Skill context 若看不到工具，必須先回到 Plan Mode；G2 後普通模式只執行 approved tasks，新的 material decision 必須用 `revise` 回到最早受影響 phase。Wiki 在 verification 前保持唯讀。
 5. G3 驗證 current evidence、scope、baseline 與 Knowledge Review，確認實作符合已批准內容。新式 Work Item 必須選擇 `promote` 或 `no-update`；promote 最多變更五個內容頁並同步 index/log/seal。
 6. High-risk Work Item 在 final artifacts 穩定後由唯一 DevWeave router 啟動一個 isolated、read-only Independent Review Agent。Python engine 只接收 machine-only `review record`，保存 source-bound `kind: review` evidence、redacted report hash 與 provenance；standard/low risk 不啟動此 reviewer。
-7. 本次 0.2.2 Windows 公開版提供 `devweave-control-center-0.2.2.vsix`，並保留 `devweave-control-center-0.2.1.vsix`；認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host，VS Code 1.90+／Python 3.11+ 僅為技術門檻。Control Center 的公開操作採 preview → 使用者確認複製 → Codex Chat handoff → Refresh；事故時停止散布並停用或解除安裝 0.2.2，保留 repository 資料與 0.2.1 artifact，以新版本修復，不提供舊版 binary rollback。
+7. 本次 0.2.3 Windows 公開版提供 `devweave-control-center-0.2.3.vsix`，並保留 `devweave-control-center-0.2.2.vsix` 與 `devweave-control-center-0.2.1.vsix`；認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host，Python full suite 為 101 項（1 項因 symlink 權限 skipped），Extension tests 為 77 項。Control Center 的公開操作採 preview → 使用者確認複製 → Codex Chat handoff → Refresh；事故時停止散布並停用或解除安裝 0.2.3，保留 repository 資料與既有 artifact，以新版本修復，不提供舊版 binary rollback。
 
 本次 release hardening 另固定幾個容易被使用者誤解的邊界：`devweave.wikiBootstrap` 與 legacy `devweave.copyNextAction` 都只開啟 Control Center 的 preview flow，host 的 `PreviewGate` 仍是最後 copy gate；多 active work 的 `next` 必須明確選取，未指定 work 的 `status` 明確交給 `$devweave status --all`；五個 section 的 tab/tabpanel 關聯在 inactive 狀態也保持有效 target，方向鍵/Home/End、focus restore 與 forced-colors contract 由 Extension-local seam 驗證。
 
-Windows Codex hook 也有明確的兩層契約：`.codex/hooks.json` 的標準 `command` 使用 `powershell.exe -NoLogo -NoProfile -NonInteractive`，以 `python.exe -X utf8 -B` 和不含 shell variable 的 `(Join-Path (git rev-parse --show-toplevel) ...)` 從 Git root 執行 `guard.py`。同一 command 可由 Codex 的 `cmd.exe` 或 PowerShell 外層啟動；guard 直接以 UTF-8 bytes 讀寫 payload。launcher process failure 與 guard 回傳的 JSON `permissionDecision: deny` 不同，後者仍是正常 process exit 0 的 DevWeave policy result。Extension bootstrap 只產生來源一致的 hook；既有 workspace 的 exact hook 不會被 Extension 靜默覆寫。
+Windows Codex hook 也有明確的兩層契約：`.codex/hooks.json` 的 `PreToolUse` 使用 exact matcher `^(Bash|apply_patch|Edit|Write)$`，同時提供 POSIX `command` 與 Windows `commandWindows`。Windows path 由 `powershell.exe -NoLogo -NoProfile -NonInteractive` 先設定 `[Console]::InputEncoding` 與 `[Console]::OutputEncoding` 為 UTF-8，再呼叫 `py -3 -X utf8 -B`，以 Git root 的 `Join-Path` 定位 `guard.py`；它不依賴 shell-scoped `$OutputEncoding`，guard 直接以 UTF-8 bytes 讀寫 payload。相同 `commandWindows` 已由 `cmd.exe`、Windows PowerShell 5.1、PowerShell 7、root 與 `vscode-extension` nested cwd 驗證；launcher process failure 與 guard 回傳的 JSON `permissionDecision: deny` 不同，後者仍是正常 process exit 0 的 DevWeave policy result。`doctor` 可用單行 `py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . doctor` 驗證 Python、Git、三種 Windows launcher、hook schema 與 probe。Extension bootstrap 只產生來源一致的 hook；既有 workspace 的 exact hook 不會被 Extension 靜默覆寫。
 
 ## 互動式決策與 Gate
 
@@ -49,8 +49,8 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 - Extension 的 public command UI 以任務語言分組，所有 workflow decision 仍透過 prompt handoff 回到 Codex Chat；active work 與 closed history 分離，Wiki 頁面瀏覽提供有界搜尋、分類與顯示全部入口。`devweave.copyNextAction` 保留 command ID 但只開啟 Control Center；多 active work 的 `next` 必須明確選取，未指定 work 的 `status` 使用 `$devweave status --all` 查詢全部 active work。
 - Extension 的 Wiki 搜尋以 Enter 套用大小寫不敏感的 title/path/body-preview 包含式查詢；輸入期間保留同一個 input DOM，結果與 metrics 真實 mount 到 `#wiki-results`。五個 tab/tabpanel 使用完整 ARIA 關聯、方向鍵/Home/End 與 focus restore；Watcher 由 debounce 與 single-flight refresh coordinator 合併，snapshot 的獨立讀取平行化後仍依固定順序輸出。
 - Copy 成功後的 Webview `copyResult` 通知與 Extension-native success toast 不再共享 clipboard failure restore path；host 只在 clipboard adapter 失敗時恢復 ticket，walkthrough 的 bounded labels 則保留在 configured Extension/Python raw logs。
-- 0.2.2 bootstrap bundle 的 version 從 package version 產生，提供完整控制面：六組核准 skills、通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。Project、baseline 與三份 Wiki starter 以明確 semantic contract 採用合法 evolved bytes；AGENTS、skills、hook、lock 與其他 controls 維持 exact，初始化只建立缺少且無衝突的檔案，失敗或取消不留下 partial control bundle，說明手冊留在 Extension 內，不落地到 target repository。既有 0.2.1 artifact 仍保留。
-- Windows 的 PreToolUse hook 使用上述標準 `command`，不依賴 Codex 不採用的 `commandWindows` 平行欄位；未綁定或未通過 G2 的寫入仍由 guard 以 deny JSON 表達，而不是把 policy deny 變成 hook process failure。這個邊界由 cmd/PowerShell、root/nested cwd、raw UTF-8、malformed input 與 read-only silence 的真實 child-process regression 覆蓋。
+- 0.2.3 bootstrap bundle 的 version 從 package version 產生，提供完整控制面：六組核准 skills、通用 `AGENTS.md`、`skills-lock.json`、hook、project、baseline 與 Wiki starter。Project、baseline 與三份 Wiki starter 以明確 semantic contract 採用合法 evolved bytes；AGENTS、skills、hook、lock 與其他 controls 維持 exact，初始化只建立缺少且無衝突的檔案，失敗或取消不留下 partial control bundle，說明手冊留在 Extension 內，不落地到 target repository。既有 0.2.2 與 0.2.1 artifact 仍保留。
+- Windows 的 PreToolUse hook 使用 exact matcher 與 POSIX/Windows dual path；handler 先做 .NET console UTF-8 input/output normalization，再由 guard 以 bytes 處理 payload；未綁定或未通過 G2 的寫入仍由 guard 以 deny JSON 表達，而不是把 policy deny 變成 hook process failure。這個邊界由 cmd/PowerShell 5.1/PowerShell 7、root/nested cwd、raw UTF-8、malformed input 與 read-only silence 的真實 child-process regression 覆蓋。
 
 ## 關鍵模組
 
@@ -72,4 +72,4 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 
 需要使用者選擇的五個 companion 都遵循同一份 `native-question-contract.md`：Plan Mode/native `request_user_input`、一題／二至三選項／推薦第一項／host `Other`、等待與 result safety；普通 pre-G2 context 不能自行建立第二套問答 UI，新的 implementation decision 必須 `revise`。
 
-品質檢查包含 UTF-8 quick validation、repository contract 的 exact six-governed-Skill set、frontmatter/metadata/link/invocation policy、maintenance-only/bootstrap exclusion、隔離 forward-test，以及 Python/Extension full verification。Hook hardening 的 repository contract 現在包含 17 項測試；本 work item 的 Python final run 為 103 tests，另維持 77 項 Extension tests、58 個 bootstrap files 與 119 個 VSIX entries。validator 尚未支援的 `disable-model-invocation` 欄位由 repository contract 補驗，並保留 `grill-me` 的必要 policy。
+品質檢查包含 UTF-8 quick validation、repository contract 的 exact six-governed-Skill set、frontmatter/metadata/link/invocation policy、maintenance-only/bootstrap exclusion、隔離 forward-test，以及 Python/Extension full verification。Hook hardening 的 repository contract 覆蓋三種 Windows launcher、UTF-8 deny JSON、malformed input 與 read-only silence；本 work item 的 Python final run 為 101 tests（1 skipped），另維持 77 項 Extension tests、58 個 bootstrap files 與 119 個 VSIX entries。validator 尚未支援的 `disable-model-invocation` 欄位由 repository contract 補驗，並保留 `grill-me` 的必要 policy。

@@ -47,13 +47,13 @@ G3 功能驗收：acceptance、回歸測試、scope、Wiki／baseline
 DevWeave 不是 pip package，也沒有另一套安裝型 router。它由 repository 內的 skill、CLI、
 hook、project state、Wiki 與 baseline 一起運作。
 
-## Windows 公開版 0.2.2
+## Windows 公開版 0.2.3
 
-本次提供 0.2.2 VSIX，交付檔為 `vscode-extension/devweave-control-center-0.2.2.vsix`，並保留既有 0.2.1 artifact。VSIX 可在 VS Code 的 Extensions 視窗使用「Install from VSIX…」安裝；安裝後開啟 DevWeave repository，即可從 Activity Bar 進入 Control Center。完整流程請看[繁體中文使用手冊](docs/使用手冊.md)與 [Control Center README](vscode-extension/README.md)。
+本次提供 0.2.3 VSIX，交付檔為 `vscode-extension/devweave-control-center-0.2.3.vsix`，並保留既有 0.2.2 與 0.2.1 artifact。VSIX 可在 VS Code 的 Extensions 視窗使用「Install from VSIX…」安裝；安裝後開啟 DevWeave repository，即可從 Activity Bar 進入 Control Center。完整流程請看[繁體中文使用手冊](docs/使用手冊.md)與 [Control Center README](vscode-extension/README.md)。
 
-本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；驗收基準為 Python full suite 103 項與 Extension unit tests 77 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻，不是本次已認證組合的宣告。這個 release 不包含 Marketplace 上架，也不對 macOS/Linux 做支援承諾。
+本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 101 項（1 項因 symlink 權限 skipped）與 Extension unit tests 77 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻，不是本次已認證組合的宣告。這個 release 不包含 Marketplace 上架，也不對 macOS/Linux 做支援承諾。
 
-若發生發布事故，處理方式是立即停止散布並停用或解除安裝 0.2.2；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。應保留 workspace snapshot 與 logs，以新版本修復，並保留已發布的 0.2.1 artifact。
+若發生發布事故，處理方式是立即停止散布並停用或解除安裝 0.2.3；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。應保留 workspace snapshot 與 logs，以新版本修復，並保留已發布的 0.2.2 與 0.2.1 artifact。
 
 Control Center 的公開操作都遵循「預覽 → 你確認複製 → Codex Chat 審閱並送出 → Refresh」；Refresh、切換 work 或 workspace snapshot 更新後，舊 prompt 必須重新預覽。若 mutation prompt 顯示 Plan Mode handoff，請先切換 Plan Mode，再貼到 Codex Chat；Extension 仍可複製 prompt，但不會嘗試切換 host mode。`devweave.copyNextAction` 仍保留，但現在會開啟 Control Center；多個 active work 時必須先明確選取 work。
 
@@ -61,21 +61,20 @@ Control Center 的公開操作都遵循「預覽 → 你確認複製 → Codex C
 
 ### 1. 確認 repository 狀態
 
-在 repository root 執行：
+在 repository root 執行以下單行命令；這一行可直接用於 CMD、Windows PowerShell 5.1、PowerShell 7，以及 VS Code terminal：
 
-```powershell
-python -B .agents\skills\devweave\scripts\devweave.py --repo . doctor
-```
+`py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . doctor`
 
-`doctor` 會檢查 Python、Git、`.devweave/project.json`、DevWeave skill、Codex hook、驗證
-命令與 Wiki compatibility。
+`doctor` 會檢查 Python、Git、`.devweave/project.json`、DevWeave skill、Codex hook、驗證命令與 Wiki compatibility；在 Windows 也會檢查 `py -3`、`cmd.exe`、Windows PowerShell 5.1、PowerShell 7、hook schema 與 root／nested launcher probe。若是 launcher failure，先修復 PATH、Python launcher、Git 或缺少的 shell；若 launcher 成功但工具被拒絕，則是 DevWeave gate、scope 或 Wiki policy deny。
+
+`.codex/hooks.json` 的 `PreToolUse` 只匹配 `^(Bash|apply_patch|Edit|Write)$`，並同時提供 POSIX `command` 與 Windows `commandWindows`。Windows handler 使用 `powershell.exe -NoLogo -NoProfile -NonInteractive`，先以不依賴 shell variable 的 .NET UTF-8 console input/output 設定保護中文路徑，再呼叫 `py -3 -X utf8 -B` 從 Git root 定位 `guard.py`；hook 是 Codex guardrail，不是 OS sandbox，也不保證 hosted、global 或 plugin-owned tool path。
 
 ### 2. 初始化未管理的 repository
 
 如果 repository 尚未有 `.devweave/project.json`，可以明確執行：
 
 ```powershell
-python -B .agents\skills\devweave\scripts\devweave.py --repo . init
+py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . init
 ```
 
 `init` 會非破壞性建立 `.devweave/`、三份 baseline、work-item 目錄與 root `wiki/` starter。
@@ -113,9 +112,9 @@ active work item，請先使用 `$devweave status` 找到 work ID，再明確指
 DevWeave CLI 永遠輸出 UTF-8 JSON，適合 Codex 與其他自動化工具：
 
 ```powershell
-python -B .agents\skills\devweave\scripts\devweave.py --repo . status --all
-python -B .agents\skills\devweave\scripts\devweave.py --repo . project
-python -B .agents\skills\devweave\scripts\devweave.py --repo . instructions --work <work-id>
+py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . status --all
+py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . project
+py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . instructions --work <work-id>
 ```
 
 公開 chat surface 與 machine CLI 的完整差異、參數及範例，請見 [使用手冊](docs/使用手冊.md)。
@@ -267,15 +266,15 @@ docs/使用手冊.md                詳細繁體中文操作手冊
 完整測試只使用 Python standard library：
 
 ```powershell
-python -B -m unittest discover -s tests -v
+py -3 -X utf8 -B -m unittest discover -s tests -v
 ```
 
 其他常用檢查：
 
 ```powershell
-python -B .agents\skills\devweave\scripts\devweave.py --repo . doctor
-python -B .agents\skills\devweave\scripts\devweave.py --repo . project
-python -B .agents\skills\devweave\scripts\devweave.py --repo . command list
+py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . doctor
+py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . project
+py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . command list
 git diff --check
 ```
 

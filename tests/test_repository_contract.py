@@ -27,6 +27,40 @@ COMPANION_SKILLS = {
 MAINTENANCE_ONLY_SKILLS = {"writing-great-skills"}
 EXPECTED_REPOSITORY_SKILLS = COMPANION_SKILLS | {"devweave"}
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+WINDOWS_HOOK_RUNNERS = ("cmd", "powershell", "pwsh")
+
+
+def run_windows_hook(
+    command: str,
+    cwd: Path,
+    payload: bytes,
+    runner: str,
+) -> subprocess.CompletedProcess[bytes]:
+    if runner == "cmd":
+        return subprocess.run(
+            f'cmd.exe /d /s /c "{command}"',
+            cwd=cwd,
+            input=payload,
+            capture_output=True,
+            shell=True,
+            check=False,
+        )
+    executable = "powershell.exe" if runner == "powershell" else "pwsh"
+    return subprocess.run(
+        [
+            executable,
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            command,
+        ],
+        cwd=cwd,
+        input=payload,
+        capture_output=True,
+        shell=False,
+        check=False,
+    )
 
 
 class RepositoryContractTests(unittest.TestCase):
@@ -383,167 +417,101 @@ class RepositoryContractTests(unittest.TestCase):
         hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
         hook = json.loads(hook_path.read_text(encoding="utf-8"))
         group = hook["hooks"]["PreToolUse"][0]
-        self.assertIn("Bash", group["matcher"])
-        self.assertIn("apply_patch", group["matcher"])
+        self.assertEqual("^(Bash|apply_patch|Edit|Write)$", group["matcher"])
+        self.assertEqual(1, len(hook["hooks"]["PreToolUse"]))
         command = group["hooks"][0]
+        self.assertEqual("command", command["type"])
+        self.assertEqual(30, command["timeout"])
+        self.assertEqual("Checking DevWeave gates", command["statusMessage"])
+        self.assertIn("python3 -X utf8 -B", command["command"])
+        self.assertIn("$(git rev-parse --show-toplevel)", command["command"])
+        self.assertNotIn("$repo", command["command"])
+        self.assertIn("commandWindows", command)
         self.assertIn(
             "powershell.exe -NoLogo -NoProfile -NonInteractive -Command",
-            command["command"],
+            command["commandWindows"],
         )
-        self.assertIn("python.exe -X utf8 -B", command["command"])
-        self.assertIn("git rev-parse --show-toplevel", command["command"])
-        self.assertNotIn("$repo", command["command"])
-        self.assertNotIn("commandWindows", command)
+        self.assertIn("py -3 -X utf8 -B", command["commandWindows"])
+        self.assertIn(
+            "Join-Path (git rev-parse --show-toplevel)",
+            command["commandWindows"],
+        )
+        self.assertIn("[Console]::InputEncoding = [System.Text.UTF8Encoding]::new(0)", command["commandWindows"])
+        self.assertIn("[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(0)", command["commandWindows"])
+        self.assertNotIn("$repo", command["commandWindows"])
 
-    def test_hook_launcher_runs_through_windows_cmd_and_preserves_deny_json(self) -> None:
+    def test_hook_launcher_matrix_preserves_utf8_deny_json(self) -> None:
         hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
         hook = json.loads(hook_path.read_text(encoding="utf-8"))
-        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
-        payload = {
-            "cwd": str(REPOSITORY_ROOT),
-            "session_id": "",
-            "tool_name": "Write",
-            "tool_input": {
-                "command": "*** Update File: src/app.txt\n@@\n-old\n+new"
-            },
-        }
-        # Use COMSPEC with the same raw command-string quoting as Codex's
-        # Windows hook runner; passing the command as a subprocess argv item
-        # changes cmd.exe's handling of the nested PowerShell quotes.
-        result = subprocess.run(
-            f'cmd.exe /d /s /c "{command}"',
-            cwd=REPOSITORY_ROOT,
-            input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            capture_output=True,
-            shell=True,
-            check=False,
-        )
-        self.assertEqual(
-            0,
-            result.returncode,
-            result.stderr.decode("utf-8", errors="replace"),
-        )
-        output = json.loads(result.stdout.decode("utf-8"))
-        specific = output["hookSpecificOutput"]
-        self.assertEqual("PreToolUse", specific["hookEventName"])
-        self.assertEqual("deny", specific["permissionDecision"])
-        self.assertIn("active work item", specific["permissionDecisionReason"])
+        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["commandWindows"]
+        for runner in WINDOWS_HOOK_RUNNERS:
+            for cwd in (REPOSITORY_ROOT, REPOSITORY_ROOT / "vscode-extension"):
+                payload = {
+                    "cwd": str(cwd),
+                    "session_id": "",
+                    "tool_name": "Write",
+                    "tool_input": {
+                        "command": "*** 更新檔案：src/應用程式.txt\n@@\n-舊\n+新"
+                    },
+                }
+                result = run_windows_hook(
+                    command,
+                    cwd,
+                    json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                    runner,
+                )
+                self.assertEqual(
+                    0,
+                    result.returncode,
+                    f"{runner} at {cwd}: {result.stderr.decode('utf-8', errors='replace')}",
+                )
+                output = json.loads(result.stdout.decode("utf-8"))
+                specific = output["hookSpecificOutput"]
+                self.assertEqual("PreToolUse", specific["hookEventName"])
+                self.assertEqual("deny", specific["permissionDecision"])
+                self.assertIn("active work item", specific["permissionDecisionReason"])
 
-    def test_hook_launcher_runs_through_powershell_with_raw_utf8_deny_json(self) -> None:
+    def test_hook_launcher_matrix_returns_valid_deny_json_for_malformed_utf8_json(self) -> None:
         hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
         hook = json.loads(hook_path.read_text(encoding="utf-8"))
-        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
-        payload = {
-            "cwd": str(REPOSITORY_ROOT),
-            "session_id": "",
-            "tool_name": "Write",
-            "tool_input": {
-                "command": "*** 更新檔案：src/應用程式.txt\n@@\n-舊\n+新"
-            },
-        }
-        result = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoLogo",
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                command,
-            ],
-            cwd=REPOSITORY_ROOT,
-            input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            capture_output=True,
-            shell=False,
-            check=False,
-        )
-        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
-        output = json.loads(result.stdout.decode("utf-8"))
-        specific = output["hookSpecificOutput"]
-        self.assertEqual("PreToolUse", specific["hookEventName"])
-        self.assertEqual("deny", specific["permissionDecision"])
-        self.assertIn("active work item", specific["permissionDecisionReason"])
+        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["commandWindows"]
+        for runner in WINDOWS_HOOK_RUNNERS:
+            for cwd in (REPOSITORY_ROOT, REPOSITORY_ROOT / "vscode-extension"):
+                result = run_windows_hook(command, cwd, b'{"cwd":', runner)
+                self.assertEqual(
+                    0,
+                    result.returncode,
+                    f"{runner} at {cwd}: {result.stderr.decode('utf-8', errors='replace')}",
+                )
+                output = json.loads(result.stdout.decode("utf-8"))
+                specific = output["hookSpecificOutput"]
+                self.assertEqual("deny", specific["permissionDecision"])
+                self.assertIn("無法解析 hook input", specific["permissionDecisionReason"])
 
-    def test_hook_launcher_resolves_git_root_from_nested_cwd(self) -> None:
+    def test_hook_launcher_matrix_keeps_read_only_bash_silent(self) -> None:
         hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
         hook = json.loads(hook_path.read_text(encoding="utf-8"))
-        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
-        nested_cwd = REPOSITORY_ROOT / "vscode-extension"
-        payload = {
-            "cwd": str(nested_cwd),
-            "session_id": "",
-            "tool_name": "Write",
-            "tool_input": {"command": "*** Update File: nested.txt\n@@\n-old\n+new"},
-        }
-        result = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoLogo",
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                command,
-            ],
-            cwd=nested_cwd,
-            input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            capture_output=True,
-            check=False,
-        )
-        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
-        output = json.loads(result.stdout.decode("utf-8"))
-        specific = output["hookSpecificOutput"]
-        self.assertEqual("deny", specific["permissionDecision"])
-        self.assertIn("active work item", specific["permissionDecisionReason"])
-
-    def test_hook_launcher_returns_valid_deny_json_for_malformed_utf8_json(self) -> None:
-        hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
-        hook = json.loads(hook_path.read_text(encoding="utf-8"))
-        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
-        result = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoLogo",
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                command,
-            ],
-            cwd=REPOSITORY_ROOT,
-            input=b'{"cwd":',
-            capture_output=True,
-            check=False,
-        )
-        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
-        output = json.loads(result.stdout.decode("utf-8"))
-        specific = output["hookSpecificOutput"]
-        self.assertEqual("deny", specific["permissionDecision"])
-        self.assertIn("無法解析 hook input", specific["permissionDecisionReason"])
-
-    def test_hook_launcher_keeps_read_only_bash_silent(self) -> None:
-        hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
-        hook = json.loads(hook_path.read_text(encoding="utf-8"))
-        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
-        payload = {
-            "cwd": str(REPOSITORY_ROOT),
-            "session_id": "",
-            "tool_name": "Bash",
-            "tool_input": {"command": "git status --short"},
-        }
-        result = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoLogo",
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                command,
-            ],
-            cwd=REPOSITORY_ROOT,
-            input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            capture_output=True,
-            check=False,
-        )
-        self.assertEqual(0, result.returncode, result.stderr.decode("utf-8", errors="replace"))
-        self.assertEqual(b"", result.stdout)
+        command = hook["hooks"]["PreToolUse"][0]["hooks"][0]["commandWindows"]
+        for runner in WINDOWS_HOOK_RUNNERS:
+            for cwd in (REPOSITORY_ROOT, REPOSITORY_ROOT / "vscode-extension"):
+                payload = {
+                    "cwd": str(cwd),
+                    "session_id": "",
+                    "tool_name": "Bash",
+                    "tool_input": {"command": "git status --short"},
+                }
+                result = run_windows_hook(
+                    command,
+                    cwd,
+                    json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                    runner,
+                )
+                self.assertEqual(
+                    0,
+                    result.returncode,
+                    f"{runner} at {cwd}: {result.stderr.decode('utf-8', errors='replace')}",
+                )
+                self.assertEqual(b"", result.stdout)
 
     def test_doctor_passes_for_an_initialized_fixture_with_hook(self) -> None:
         with RepositoryHarness() as harness:
@@ -551,7 +519,18 @@ class RepositoryContractTests(unittest.TestCase):
             target = harness.repo / ".codex" / "hooks.json"
             target.parent.mkdir()
             shutil.copyfile(REPOSITORY_ROOT / ".codex" / "hooks.json", target)
+            guard_target = harness.repo / ".agents" / "skills" / "devweave" / "scripts" / "guard.py"
+            guard_target.parent.mkdir(parents=True)
+            for script_name in ("guard.py", "devweave_core.py", "knowledge_core.py"):
+                shutil.copyfile(
+                    REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "scripts" / script_name,
+                    guard_target.parent / script_name,
+                )
             report = core.doctor(harness.repo)
+            checks = {item["name"]: item for item in report["checks"]}
+            for name in ("py-3", "cmd", "powershell", "pwsh", "hook-schema", "launcher-probe"):
+                self.assertIn(name, checks)
+                self.assertTrue(checks[name]["ok"], checks[name])
             self.assertTrue(report["ok"], report["checks"])
 
     def test_codebase_wiki_and_current_release_contracts_are_documented(self) -> None:
@@ -626,7 +605,7 @@ class RepositoryContractTests(unittest.TestCase):
             "vscode-extension/webview/help-content.ts",
         )
         release_contract = (
-            "本次提供 0.2.2 VSIX",
+            "本次提供 0.2.3 VSIX",
             "本次認證環境",
             "Windows x64 build 10.0.26200／25H2",
             "VS Code 1.131.0",
@@ -634,16 +613,25 @@ class RepositoryContractTests(unittest.TestCase):
             "Git 2.51.0.windows.1",
             "目前 Codex host",
             "技術門檻",
-            "Python full suite 103 項",
+            "Python full suite 101 項",
             "Extension unit tests 77 項",
+            "symlink 權限",
             "停止散布",
-            "停用或解除安裝 0.2.2",
             "不會自動刪除 `.devweave`、Wiki 或 workspace 資料",
+            "PreToolUse",
+            "commandWindows",
+            "py -3 -X utf8 -B",
+            "CMD",
+            "PowerShell 7",
+            "VS Code terminal",
+            "launcher failure",
         )
         for relative in release_surfaces:
             source = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
             for fragment in release_contract:
                 self.assertIn(fragment, source, f"{relative}: {fragment}")
+            self.assertNotIn("本次提供 0.2.2 VSIX", source, relative)
+            self.assertNotIn("停用或解除安裝 0.2.2", source, relative)
             self.assertNotRegex(source, r"\b0\.(?:1\.0|2\.0)\b", relative)
 
     def test_high_risk_review_stays_on_the_single_router_and_read_only_extension(self) -> None:

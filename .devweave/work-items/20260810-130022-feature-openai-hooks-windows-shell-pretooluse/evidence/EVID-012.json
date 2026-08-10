@@ -1,0 +1,35 @@
+{
+  "argv": [
+    "npm.cmd",
+    "run",
+    "test:smoke"
+  ],
+  "binds_current_source": true,
+  "command_id": "extension-smoke",
+  "covers": [
+    "AC-005",
+    "AC-006",
+    "AC-007"
+  ],
+  "created_at": "2026-08-10T06:03:29+00:00",
+  "cwd": "vscode-extension",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "git_head": "60a0b748a9faf89ce22026da4ac66ddda5c477fb",
+  "id": "EVID-012",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260810-130022-feature-openai-hooks-windows-shell-pretooluse/EVID-012.log",
+  "schema_version": 1,
+  "source_fingerprint": "d1dfb70e1093f1a82e7fe49613d254242e665ab2dfddd7715ae487613f15cbd1",
+  "stale": false,
+  "started_at": "2026-08-10T06:03:24+00:00",
+  "status": "passed",
+  "summary": "> devweave-control-center@0.2.3 test:smoke\n> npm run build && tsx test/smoke.test.ts\n\n\n> devweave-control-center@0.2.3 build\n> node esbuild.mjs\n\n\r\n[main 2026-08-10T06:03:25.826Z] StorageMainService: creating application shared storage\n[main 2026-08-10T06:03:25.893Z] [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)\n[main 2026-08-10T06:03:25.894Z] [shared storage] Initializing fallback application storage (path: in-memory)\n[main 2026-08-10T06:03:25.916Z] [shared storage] Fallback application storage initialized with 3 items\n[main 2026-08-10T06:03:25.917Z] update#setState disabled\n[main 2026-08-10T06:03:25.917Z] update#ctor - updates are disabled by the environment\n[AgentHost:renderer] Acquiring MessagePort to agent host...\n[main 2026-08-10T06:03:26.303Z] AgentHostProcessManager: agent host started\n[AgentHost:renderer] MessagePort acquired, creating client...\nStarted local extension host with pid 10412.\nLoading development extension at c:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\n[AgentHost:renderer] Protocol connection established; clientId=76f069ad-2857-42a8-8a77-3bbdda73b70a\nSettings Sync: Account status changed from uninitialized to unavailable\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[main 2026-08-10T06:03:27.807Z] Extension host with pid 10412 exited with code: 0, signal: unknown.\nExit code:   0\n\n\n  dist\\extension.js       96.4kb\n  dist\\extension.js.map  207.2kb\n\nDone in 11ms\n\n  dist\\webview\\main.js      105.3kb\n  dist\\webview\\main.js.map  162.3kb\n\nDone in 8ms\n- Resolving version...\n✔ Validated version: 1.132.0\n✔ Found existing install in C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\.vscode-test\\vscode-win32-x64-archive-1.132.0\n(node:19756) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n[vscode.mermaid-markdown-features]: Extension 'vscode.mermaid-markdown-features' CANNOT use 'legacyToolReferenceFullNames' without the 'chatParticipantPrivate' API proposal enabled\n[main 2026-08-10T06:03:27.511Z] [AgentHost:stderr] (node:26548) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code --trace-deprecation ...` to show where the warning was created)",
+  "tasks": [
+    "TASK-006"
+  ],
+  "timed_out": false
+}

@@ -19,17 +19,25 @@ export const helpContent: readonly HelpSection[] = [
       "如果 workspace 只有部分內容，Extension 只會建立缺少且沒有衝突的檔案；既有不同內容永不覆寫，結果會標示 partial 或 conflict。"
     ],
     items: [
-      "0.2.2 bundle 不會把 README、docs、產品 source、tests、fixtures、work item 或歷史紀錄寫入 workspace；既有 0.2.1 artifact 保留在 repository。",
+      "0.2.3 bundle 不會把 README、docs、產品 source、tests、fixtures、work item 或歷史紀錄寫入 workspace；既有 0.2.2 與 0.2.1 artifact 保留在 repository。",
       "按「取消」或初始化寫入失敗時，Extension 會回復本次新建立的檔案；既有檔案保持不變，不留下 partial control bundle。"
     ]
   },
   {
     title: "Windows 安裝與認證範圍",
     paragraphs: [
-      "本次提供 0.2.2 VSIX。請在 VS Code Extensions 的 `...` 選單選擇 Install from VSIX…，安裝 repository 內的 `devweave-control-center-0.2.2.vsix`；既有 0.2.1 artifact 保留，再從 Activity Bar 開啟 Control Center。",
-      "本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；驗收基準為 Python full suite 103 項與 Extension unit tests 77 項。",
+      "本次提供 0.2.3 VSIX。請在 VS Code Extensions 的 `...` 選單選擇 Install from VSIX…，安裝 repository 內的 `devweave-control-center-0.2.3.vsix`；既有 0.2.2 與 0.2.1 artifact 保留，再從 Activity Bar 開啟 Control Center。",
+      "本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 101 項（1 項因 symlink 權限 skipped）與 Extension unit tests 77 項。",
       "VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。本公開版不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。",
-      "若發生發布事故，立即停止散布並停用或解除安裝 0.2.2；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。"
+      "PreToolUse 只匹配 `Bash`、`apply_patch`、`Edit`、`Write`；`.codex/hooks.json` 同時提供 POSIX `command` 與 Windows `commandWindows`。Windows handler 先設定不依賴 shell variable 的 .NET UTF-8 console input/output，再由 `py -3 -X utf8 -B` 啟動 guard。",
+      "若發生發布事故，立即停止散布並停用或解除安裝 0.2.3；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。"
+    ]
+  },
+  {
+    title: "Windows Hook 與 Doctor",
+    paragraphs: [
+      "請在 repository root 執行 `py -3 -X utf8 -B .agents\\skills\\devweave\\scripts\\devweave.py doctor`；同一行可用於 CMD、Windows PowerShell 5.1、PowerShell 7 與 VS Code terminal。Doctor 會檢查 Python、Git、`py -3`、三種 Windows launcher、hook schema 與 root／nested launcher probe。",
+      "若 doctor 顯示 launcher failure，先修復 Python launcher、Git 或 shell PATH；若 launcher 成功但工具被拒絕，則是 DevWeave gate／scope／Wiki policy deny。Hook 是 Codex guardrail，不是 Windows OS sandbox，也不覆蓋 hosted、global 或 plugin-owned tool path。"
     ]
   },
   {

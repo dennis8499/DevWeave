@@ -2,9 +2,9 @@
 
 DevWeave Control Center 是以新手為先的 VS Code Extension。它把 DevWeave repository 的檔案狀態整理成五個區域：`總覽`、`工作項目`、`知識`、`驗證與稽核`、`說明`，讓你先知道目前狀態與下一步，再按需要查看治理細節。
 
-本頁對應 DevWeave 0.2.2 Windows 公開版；本次提供 0.2.2 VSIX，並保留 0.2.1 artifact。本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；驗收基準為 Python full suite 103 項與 Extension unit tests 77 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。交付方式是 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。
+本頁對應 DevWeave 0.2.3 Windows 公開版；本次提供 0.2.3 VSIX，並保留 0.2.2 與 0.2.1 artifact。本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 101 項（1 項因 symlink 權限 skipped）與 Extension unit tests 77 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。交付方式是 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。
 
-若發生發布事故，立即停止散布並停用或解除安裝 0.2.2；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。保留 workspace snapshot 與 logs，0.2.1 artifact 仍可作為回溯參考，修復後產生新版本。
+若發生發布事故，立即停止散布並停用或解除安裝 0.2.3；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。保留 workspace snapshot 與 logs，0.2.2 與 0.2.1 artifact 可作為回溯參考，修復後產生新版本。
 
 ## 先記住三件事
 
@@ -23,11 +23,21 @@ DevWeave Control Center 是以新手為先的 VS Code Extension。它把 DevWeav
 
 ## Windows 安裝 VSIX
 
-1. 從 repository 取得 `vscode-extension/devweave-control-center-0.2.2.vsix`。
+1. 從 repository 取得 `vscode-extension/devweave-control-center-0.2.3.vsix`。
 2. 在 VS Code 開啟 Extensions 視窗，按右上角 `...`，選擇「Install from VSIX…」，選取該檔案並等待安裝完成。
 3. 重新載入 VS Code（若畫面提示需要 reload），再開啟 DevWeave repository，從 Activity Bar 選擇 DevWeave Control Center。
 
-也可以在 Windows 終端執行 `code --install-extension vscode-extension/devweave-control-center-0.2.2.vsix`。本 release 不會自動從 Marketplace 更新。
+也可以在 Windows 終端執行 `code --install-extension vscode-extension/devweave-control-center-0.2.3.vsix`。本 release 不會自動從 Marketplace 更新。
+
+## Windows PreToolUse 與 Doctor
+
+`.codex/hooks.json` 是唯一的 repository hook contract：`PreToolUse` 使用 exact matcher `^(Bash|apply_patch|Edit|Write)$`，handler 同時宣告 POSIX `command` 與 Windows `commandWindows`，不依賴 `$repo` 或 shell-specific current-directory 假設。Windows path 使用 `powershell.exe -NoLogo -NoProfile -NonInteractive`，先設定不依賴 shell variable 的 .NET UTF-8 console input/output，再以 `py -3 -X utf8 -B` 由 Git root 定位 `guard.py`。
+
+在 repository root 執行以下單行命令即可做環境診斷；CMD、Windows PowerShell 5.1、PowerShell 7 與 VS Code terminal 都使用同一行：
+
+`py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py doctor`
+
+Doctor 會檢查 Python、Git、`py -3`、`cmd.exe`、Windows PowerShell 5.1、PowerShell 7、hook schema，以及 root／`vscode-extension` nested cwd 的 launcher probe。若是 launcher failure，先修復 PATH、Python launcher、Git 或缺少的 shell；若 launcher 成功但工具被拒絕，則是 gate、scope 或 Wiki policy deny。這個 hook 是 Codex guardrail，不是 Windows OS sandbox；hosted、global 或 plugin-owned tool path 不在本 repository hook 的保證範圍。
 
 ## Preview、Codex handoff 與 Refresh
 
@@ -93,8 +103,8 @@ npm run test:smoke
 npx --yes @vscode/vsce package --allow-missing-repository
 ```
 
-`npm run package` 會從 `package.json` 產生 0.2.2 production bundle、完整 bootstrap manifest 與 `devweave-control-center-0.2.2.vsix`；`npm run test:smoke` 會使用 VS Code Extension Host 驗證 activation、Activity Bar view 與公開 commands。Extension unit tests 目前基線為 77 項，新增導流測試後以實際 package evidence 為準。
+`npm run package` 會從 `package.json` 產生 0.2.3 production bundle、完整 bootstrap manifest 與 `devweave-control-center-0.2.3.vsix`，並保留 0.2.2 artifact；`npm run test:smoke` 會使用 VS Code Extension Host 驗證 activation、Activity Bar view 與公開 commands。Extension unit tests 與 package evidence 以本次實際結果為準。
 
 ## 打包 VSIX
 
-Package verification 只處理 current `devweave-control-center-0.2.2.vsix`，並檢查 package／bundle version、58 個 bootstrap files、119 個 VSIX entries、必要 entries、source byte length／SHA-256 與 current artifact SHA-256；既有 0.2.1 VSIX 保留但不作為 current package。其他 VSIX 不是本次封裝、驗收或回復條件。
+Package verification 只處理 current `devweave-control-center-0.2.3.vsix`，並檢查 package／bundle version、58 個 bootstrap files、119 個 VSIX entries、必要 entries、source byte length／SHA-256、current artifact SHA-256，以及嵌入 hook 與 root `.codex/hooks.json` 的一致性；既有 0.2.2 VSIX 保留但不作為 current package。其他 VSIX 不是本次封裝、驗收或回復條件。
