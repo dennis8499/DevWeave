@@ -36,6 +36,7 @@ from devweave_core import (
     resolve_work,
     revise_work,
     run_verification,
+    run_verification_profile,
     scaffold_knowledge,
     seal_knowledge,
     set_baseline_updates,
@@ -343,6 +344,18 @@ def command_review(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
 
 def command_verify(args: argparse.Namespace, repo: Path) -> tuple[dict[str, Any], int]:
     state = resolve_work(repo, args.work)
+    if args.profile:
+        payload = run_verification_profile(
+            repo,
+            state["id"],
+            profile=args.profile,
+            kind=args.kind,
+            covers=args.covers,
+            tasks=args.task,
+            expectation=args.expect,
+            max_parallel=args.max_parallel,
+        )
+        return payload, 0 if payload["ok"] else 4
     evidence = run_verification(
         repo,
         state["id"],
@@ -407,6 +420,16 @@ def command_command(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
             return {"ok": True, "commands": commands, "profiles": project["verification_profiles"]}
         if args.command_action == "remove":
             before = len(commands)
+            dependents = [
+                item.get("id")
+                for item in commands
+                if args.id in item.get("depends_on", [])
+            ]
+            if dependents:
+                raise ValidationError(
+                    "Command is still required by another verification command.",
+                    {"id": args.id, "dependents": dependents},
+                )
             project["commands"] = [item for item in commands if item.get("id") != args.id]
             for profile in project.get("verification_profiles", {}).values():
                 while args.id in profile:
@@ -439,9 +462,23 @@ def command_command(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
             "timeout_seconds": args.timeout,
             "required_for": sorted(set(args.required_for)),
         }
+        if args.depends_on:
+            entry["depends_on"] = sorted(set(args.depends_on))
+        if args.exclusive_group:
+            entry["exclusive_group"] = args.exclusive_group
         project["commands"] = [item for item in commands if item.get("id") != args.id]
         project["commands"].append(entry)
         project["commands"].sort(key=lambda item: item["id"])
+        command_ids = {item["id"] for item in project["commands"]}
+        invalid_dependencies = [
+            dependency for dependency in entry.get("depends_on", [])
+            if dependency not in command_ids or dependency == args.id
+        ]
+        if invalid_dependencies:
+            raise ValidationError(
+                "Command dependencies must reference existing commands and cannot be self-referential.",
+                {"id": args.id, "depends_on": invalid_dependencies},
+            )
         profiles = project.setdefault(
             "verification_profiles", {level: [] for level in RISK_LEVELS}
         )
@@ -630,11 +667,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     verify_parser = subparsers.add_parser("verify")
     verify_parser.add_argument("--work")
-    verify_parser.add_argument("--command", required=True)
+    verify_target = verify_parser.add_mutually_exclusive_group(required=True)
+    verify_target.add_argument("--command")
+    verify_target.add_argument("--profile", choices=RISK_LEVELS)
     verify_parser.add_argument("--kind", required=True)
     verify_parser.add_argument("--covers", action="append", default=[])
     verify_parser.add_argument("--task", action="append", default=[])
     verify_parser.add_argument("--expect", choices=("zero", "nonzero", "any"), default="zero")
+    verify_parser.add_argument("--max-parallel", type=int, default=3)
     verify_parser.set_defaults(handler=command_verify)
 
     waiver_parser = subparsers.add_parser("waiver")
@@ -691,6 +731,8 @@ def build_parser() -> argparse.ArgumentParser:
         choices=RISK_LEVELS,
         default=[],
     )
+    command_set.add_argument("--depends-on", action="append", default=[])
+    command_set.add_argument("--exclusive-group", default="")
     command_set.add_argument("argv", nargs=argparse.REMAINDER)
     command_set.set_defaults(handler=command_command)
 

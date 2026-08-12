@@ -316,6 +316,8 @@ AC-001、AC-002 對應 TASK-001，證據為 {evidence}，且綁定目前 source 
         argv: list[str] | None = None,
         timeout_seconds: int = 30,
         required_for: tuple[str, ...] = ("standard",),
+        depends_on: tuple[str, ...] = (),
+        exclusive_group: str = "",
     ) -> dict[str, Any]:
         project = core.load_project(self.repo)
         command = {
@@ -325,6 +327,10 @@ AC-001、AC-002 對應 TASK-001，證據為 {evidence}，且綁定目前 source 
             "timeout_seconds": timeout_seconds,
             "required_for": list(required_for),
         }
+        if depends_on:
+            command["depends_on"] = list(depends_on)
+        if exclusive_group:
+            command["exclusive_group"] = exclusive_group
         project["commands"] = [
             item for item in project.get("commands", []) if item.get("id") != command_id
         ] + [command]

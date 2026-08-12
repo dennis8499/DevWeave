@@ -76,3 +76,31 @@ test("RefreshCoordinator reports a read failure and accepts a later retry", asyn
   reads[1]?.resolve("recovered");
   assert.equal(await retry, "recovered");
 });
+
+test("RefreshCoordinator forwards incremental paths and escalates a pending full refresh", async () => {
+  const reads: Array<ReturnType<typeof deferred<string>>> = [];
+  const changes: Array<{ paths: readonly string[]; forceFull: boolean }> = [];
+  const coordinator = new RefreshCoordinator<string>({
+    read: (next) => {
+      changes.push(next);
+      const result = deferred<string>();
+      reads.push(result);
+      return result.promise;
+    },
+    publish: () => undefined
+  });
+
+  const first = coordinator.request({ paths: ["wiki/a.md"], forceFull: false });
+  await yieldToRefresh();
+  const second = coordinator.request({ paths: [".devweave/project.json"], forceFull: true });
+  reads[0]?.resolve("first");
+  await yieldToRefresh();
+  reads[1]?.resolve("second");
+
+  assert.equal(await first, "second");
+  assert.equal(await second, "second");
+  assert.deepEqual(changes, [
+    { paths: ["wiki/a.md"], forceFull: false },
+    { paths: [".devweave/project.json"], forceFull: true }
+  ]);
+});

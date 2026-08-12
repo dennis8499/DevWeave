@@ -16,6 +16,7 @@ import { createHash } from "node:crypto";
 import { DirectoryEntry, FileSystemPort, joinRelativePath } from "./filesystem";
 import type { BootstrapBundleFile } from "./bootstrap";
 import { normalizeBootstrapCompatibility, validateExistingBootstrapContent } from "./bootstrap-compat";
+import type { RefreshChangeSet } from "./refresh-coordinator";
 
 const ARTIFACT_NAMES = ["brief.md", "requirements.md", "design.md", "plan.md", "acceptance.md"];
 const MAX_EVENTS = 100;
@@ -47,7 +48,7 @@ export interface SnapshotReaderOptions {
 }
 
 export interface WorkspaceSnapshotReaderPort {
-  readWorkspace(): Promise<WorkspaceSnapshot>;
+  readWorkspace(changes?: Partial<RefreshChangeSet>): Promise<WorkspaceSnapshot>;
 }
 
 export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
@@ -56,7 +57,20 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
     private readonly options: SnapshotReaderOptions
   ) {}
 
-  public async readWorkspace(): Promise<WorkspaceSnapshot> {
+  private bootstrapChecks = new Map<string, { missing: string | null; conflict: string | null }>();
+  private knowledgePageCache = new Map<string, { text: string; truncated: boolean; page: WikiPageProjection }>();
+  private cachedKnowledge: KnowledgeProjection | undefined;
+  private workItemCache = new Map<string, WorkItemProjection>();
+  private workItemsKnown = false;
+  private baselineFilesCache: string[] | undefined;
+
+  public async readWorkspace(
+    changes: Partial<RefreshChangeSet> = { forceFull: true }
+  ): Promise<WorkspaceSnapshot> {
+    const refreshChanges: RefreshChangeSet = {
+      paths: changes.paths ?? [],
+      forceFull: changes.forceFull ?? changes.paths === undefined
+    };
     const diagnostics: Diagnostic[] = [];
     const capturedAt = (this.options.now ?? (() => new Date().toISOString()))();
     const projectPath = ".devweave/project.json";
@@ -65,9 +79,9 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
       this.files.exists(projectPath),
       this.files.exists(".codex/hooks.json"),
       this.files.exists(".agents/skills/devweave/SKILL.md"),
-      this.files.exists(".devweave/baseline").then((exists) => exists ? this.collectFiles(".devweave/baseline") : []),
-      this.readKnowledge("wiki", knowledgeDiagnostics),
-      this.readBootstrapCompleteness()
+      this.readBaselineFiles(refreshChanges),
+      this.readKnowledge("wiki", knowledgeDiagnostics, refreshChanges),
+      this.readBootstrapCompleteness(refreshChanges)
     ]);
     diagnostics.push(...knowledgeDiagnostics);
 
@@ -159,7 +173,7 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
     const verificationProfiles = isRecord(project?.verification_profiles)
       ? mapStringArrays(project.verification_profiles)
       : {};
-    const workItems = await this.readWorkItems(knowledge, diagnostics);
+    const workItems = await this.readWorkItems(knowledge, diagnostics, refreshChanges);
     const mutationBlocked = diagnostics.some((item) => item.severity === "critical");
     const engineObservedAt = workItems
       .map((item) => item.updatedAt)
@@ -193,42 +207,83 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
     };
   }
 
-  private async readBootstrapCompleteness(): Promise<WorkspaceSnapshot["bootstrap"]> {
+  private async readBaselineFiles(changes: RefreshChangeSet): Promise<string[]> {
+    const affected = changes.paths.some((path) =>
+      path === ".devweave/baseline" || path.startsWith(".devweave/baseline/")
+    );
+    if (!changes.forceFull && this.baselineFilesCache && !affected) {
+      return [...this.baselineFilesCache];
+    }
+    const files = await this.files.exists(".devweave/baseline")
+      ? await this.collectFiles(".devweave/baseline")
+      : [];
+    this.baselineFilesCache = [...files];
+    return files;
+  }
+
+  private async readBootstrapCompleteness(changes: RefreshChangeSet): Promise<WorkspaceSnapshot["bootstrap"]> {
     const expected = [...new Set([
       ...(this.options.bootstrapPaths ?? DEFAULT_BOOTSTRAP_PATHS),
       ...(this.options.bootstrapFiles?.map((file) => file.destination) ?? [])
     ])].sort();
     const fileContracts = new Map((this.options.bootstrapFiles ?? []).map((file) => [file.destination, file]));
-    const checks = await Promise.all(expected.map(async (path) => {
-      if (!(await this.files.exists(path))) return { missing: path, conflict: null };
+    const affected = changes.forceFull
+      ? new Set(expected)
+      : new Set(expected.filter((path) => changes.paths.some((changed) =>
+        changed === path
+        || changed.startsWith(`${path}/`)
+        || path.startsWith(`${changed}/`)
+      )));
+    if (changes.forceFull || this.bootstrapChecks.size === 0) {
+      for (const path of expected) affected.add(path);
+    }
+    await Promise.all([...affected].map(async (path) => {
+      if (!(await this.files.exists(path))) {
+        this.bootstrapChecks.set(path, { missing: path, conflict: null });
+        return;
+      }
       const contract = fileContracts.get(path);
-      if (!contract) return { missing: null, conflict: null };
+      if (!contract) {
+        this.bootstrapChecks.set(path, { missing: null, conflict: null });
+        return;
+      }
       const normalized = normalizeBootstrapCompatibility(contract);
-      if ("error" in normalized) return { missing: null, conflict: path };
+      if ("error" in normalized) {
+        this.bootstrapChecks.set(path, { missing: null, conflict: path });
+        return;
+      }
       if (normalized.existingPolicy === "adopt-compatible") {
         try {
           const bytes = this.files.readBytes
             ? await this.files.readBytes(path)
             : new TextEncoder().encode((await this.files.readText(path)).text);
           const validation = validateExistingBootstrapContent(normalized.compatibility!, bytes);
-          return validation.compatible
+          this.bootstrapChecks.set(path, validation.compatible
             ? { missing: null, conflict: null }
-            : { missing: null, conflict: path };
+            : { missing: null, conflict: path });
         } catch {
-          return { missing: null, conflict: path };
+          this.bootstrapChecks.set(path, { missing: null, conflict: path });
         }
+        return;
       }
-      if (contract.transform !== "copy" || !this.files.readBytes) return { missing: null, conflict: null };
+      if (contract.transform !== "copy" || !this.files.readBytes) {
+        this.bootstrapChecks.set(path, { missing: null, conflict: null });
+        return;
+      }
       try {
         const bytes = await this.files.readBytes(path);
         const hash = createHash("sha256").update(Buffer.from(bytes)).digest("hex");
-        return bytes.byteLength === contract.byteLength && hash === contract.sha256
+        this.bootstrapChecks.set(path, bytes.byteLength === contract.byteLength && hash === contract.sha256
           ? { missing: null, conflict: null }
-          : { missing: null, conflict: path };
+          : { missing: null, conflict: path });
       } catch {
-        return { missing: null, conflict: path };
+        this.bootstrapChecks.set(path, { missing: null, conflict: path });
       }
     }));
+    for (const path of [...this.bootstrapChecks.keys()]) {
+      if (!expected.includes(path)) this.bootstrapChecks.delete(path);
+    }
+    const checks = expected.map((path) => this.bootstrapChecks.get(path) ?? { missing: path, conflict: null });
     const missing = checks.flatMap((check) => check.missing ? [check.missing] : []).sort();
     const conflicts = checks.flatMap((check) => check.conflict ? [check.conflict] : []).sort();
     return {
@@ -241,42 +296,89 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
 
   private async readWorkItems(
     knowledge: KnowledgeProjection,
-    diagnostics: Diagnostic[]
+    diagnostics: Diagnostic[],
+    changes: RefreshChangeSet
   ): Promise<WorkItemProjection[]> {
+    const workItemPaths = changes.paths.filter((path) =>
+      path === ".devweave/work-items" || path.startsWith(".devweave/work-items/")
+    );
+    const knowledgeChanged = changes.paths.some((path) => path === "wiki" || path.startsWith("wiki/"));
+    const projectChanged = changes.paths.includes(".devweave/project.json");
+    if (!changes.forceFull && this.workItemsKnown && workItemPaths.length === 0 && !knowledgeChanged && !projectChanged) {
+      return this.sortedWorkItems();
+    }
+    if (!changes.forceFull && this.workItemsKnown && workItemPaths.length > 0 && !knowledgeChanged && !projectChanged) {
+      const changedIds = new Set<string>();
+      let requiresFull = false;
+      for (const path of workItemPaths) {
+        const parts = path.split("/");
+        if (parts.length < 3 || !parts[2]) {
+          requiresFull = true;
+          break;
+        }
+        changedIds.add(parts[2]);
+      }
+      if (!requiresFull) {
+        const results = await Promise.all([...changedIds].sort().map((id) => this.readWorkItem(id, knowledge)));
+        results.forEach((result) => {
+          diagnostics.push(...result.diagnostics);
+          if (result.value) {
+            this.workItemCache.set(result.value.id, result.value);
+          } else {
+            this.workItemCache.delete(result.id);
+          }
+        });
+        return this.sortedWorkItems();
+      }
+    }
+    this.workItemCache.clear();
     if (!(await this.files.exists(".devweave/work-items"))) {
+      this.workItemsKnown = true;
       return [];
     }
     const entries = (await this.files.readDirectory(".devweave/work-items"))
       .filter((item) => item.kind === "directory")
       .sort((left, right) => left.name.localeCompare(right.name));
-    const results = await Promise.all(entries.map(async (entry): Promise<DiagnosticResult<WorkItemProjection | null>> => {
-      const localDiagnostics: Diagnostic[] = [];
-      const relativeRoot = joinRelativePath(".devweave/work-items", entry.name);
-      const statePath = joinRelativePath(relativeRoot, "state.json");
-      if (!(await this.files.exists(statePath))) {
-        return { value: null, diagnostics: localDiagnostics };
-      }
-      const read = await this.safeReadJson(statePath, localDiagnostics);
-      if (!read.value) {
-        localDiagnostics.push({
-          severity: "critical",
-          code: "work_invalid",
-          message: `Work item state could not be parsed: ${entry.name}.`,
-          path: statePath
-        });
-        return { value: null, diagnostics: localDiagnostics };
-      }
-      return {
-        value: await this.toWorkItem(entry.name, relativeRoot, read.value, knowledge, localDiagnostics),
-        diagnostics: localDiagnostics
-      };
-    }));
-    const workItems: WorkItemProjection[] = [];
+    const results = await Promise.all(entries.map((entry) => this.readWorkItem(entry.name, knowledge)));
     results.forEach((result) => {
       diagnostics.push(...result.diagnostics);
-      if (result.value) workItems.push(result.value);
+      if (result.value) this.workItemCache.set(result.value.id, result.value);
     });
-    return workItems.sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "") || left.id.localeCompare(right.id));
+    this.workItemsKnown = true;
+    return this.sortedWorkItems();
+  }
+
+  private async readWorkItem(
+    id: string,
+    knowledge: KnowledgeProjection
+  ): Promise<DiagnosticResult<WorkItemProjection | null> & { id: string }> {
+    const localDiagnostics: Diagnostic[] = [];
+    const relativeRoot = joinRelativePath(".devweave/work-items", id);
+    const statePath = joinRelativePath(relativeRoot, "state.json");
+    if (!(await this.files.exists(statePath))) {
+      return { id, value: null, diagnostics: localDiagnostics };
+    }
+    const read = await this.safeReadJson(statePath, localDiagnostics);
+    if (!read.value) {
+      localDiagnostics.push({
+        severity: "critical",
+        code: "work_invalid",
+        message: `Work item state could not be parsed: ${id}.`,
+        path: statePath
+      });
+      return { id, value: null, diagnostics: localDiagnostics };
+    }
+    return {
+      id,
+      value: await this.toWorkItem(id, relativeRoot, read.value, knowledge, localDiagnostics),
+      diagnostics: localDiagnostics
+    };
+  }
+
+  private sortedWorkItems(): WorkItemProjection[] {
+    return [...this.workItemCache.values()].sort((left, right) =>
+      (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "") || left.id.localeCompare(right.id)
+    );
   }
 
   private async toWorkItem(
@@ -556,14 +658,37 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
     return read.text.split(/\r?\n/).filter(Boolean).slice(-MAX_EVENTS);
   }
 
-  private async readKnowledge(root: string, diagnostics: Diagnostic[]): Promise<KnowledgeProjection> {
+  private async readKnowledge(
+    root: string,
+    diagnostics: Diagnostic[],
+    changes: RefreshChangeSet
+  ): Promise<KnowledgeProjection> {
+    const wikiPaths = changes.paths.filter((path) => path === root || path.startsWith(`${root}/`));
+    if (!changes.forceFull && this.cachedKnowledge && wikiPaths.length === 0) {
+      return this.cachedKnowledge;
+    }
     let pages: WikiPageProjection[] = [];
     if (await this.files.exists(root)) {
       const paths = (await this.collectFiles(root)).filter((path) => path.endsWith(".md"));
+      const changedPages = new Set(wikiPaths.filter((path) => path.endsWith(".md")));
+      if (changes.forceFull) {
+        this.knowledgePageCache.clear();
+      }
+      for (const path of [...this.knowledgePageCache.keys()]) {
+        if (!paths.includes(path)) this.knowledgePageCache.delete(path);
+      }
       pages = await Promise.all(paths.map(async (path) => {
+        const cached = this.knowledgePageCache.get(path);
+        if (!changes.forceFull && cached && !changedPages.has(path)) {
+          return cached.page;
+        }
         const read = await this.files.readText(path);
-        return parseWikiPage(path, read.text, read.truncated);
+        const page = parseWikiPage(path, read.text, read.truncated);
+        this.knowledgePageCache.set(path, { text: read.text, truncated: read.truncated, page });
+        return page;
       }));
+    } else {
+      this.knowledgePageCache.clear();
     }
     const placeholderPages = pages.filter((page) => page.status === "placeholder").map((page) => page.path);
     const stalePages = pages.filter((page) => page.status === "stale" || Boolean(
@@ -580,7 +705,7 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
       ...stalePages.map((path) => ({ severity: "warning" as const, code: "stale", message: "Wiki page may be stale against its source fingerprint.", path }))
     ];
     const bootstrap = assessBootstrap(pages, critical.length > 0);
-    return {
+    const knowledge = {
       root,
       health: critical.length > 0 ? "critical" : warnings.length > 0 ? "warning" : "healthy",
       pages: pages.sort((a, b) => a.path.localeCompare(b.path)),
@@ -607,6 +732,8 @@ export class WorkspaceSnapshotReader implements WorkspaceSnapshotReaderPort {
       },
       planned: null
     };
+    this.cachedKnowledge = knowledge;
+    return knowledge;
   }
 
   private async collectFiles(root: string): Promise<string[]> {

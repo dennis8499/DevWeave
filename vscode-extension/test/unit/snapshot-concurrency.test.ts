@@ -5,6 +5,7 @@ import { WorkspaceSnapshotReader } from "../../src/snapshot";
 
 class InstrumentedFileSystem implements FileSystemPort {
   private readonly files = new Map<string, string>();
+  public readonly readCounts = new Map<string, number>();
   public activeReads = 0;
   public maxConcurrentReads = 0;
 
@@ -23,11 +24,16 @@ class InstrumentedFileSystem implements FileSystemPort {
     const path = relativePath.replaceAll("\\", "/");
     const text = this.files.get(path);
     if (text === undefined) throw new Error(`Missing file: ${path}`);
+    this.readCounts.set(path, (this.readCounts.get(path) ?? 0) + 1);
     this.activeReads += 1;
     this.maxConcurrentReads = Math.max(this.maxConcurrentReads, this.activeReads);
     await new Promise<void>((resolve) => setTimeout(resolve, path.endsWith("b.md") ? 1 : 5));
     this.activeReads -= 1;
     return { text: text.slice(0, maxBytes), truncated: text.length > maxBytes };
+  }
+
+  public setText(relativePath: string, value: string): void {
+    this.files.set(relativePath.replaceAll("\\", "/"), value);
   }
 
   public async readDirectory(relativePath: string): Promise<DirectoryEntry[]> {
@@ -64,4 +70,26 @@ test("snapshot reader parallelizes independent text reads while keeping diagnost
   assert.ok(files.maxConcurrentReads > 1);
   assert.deepEqual(snapshot.knowledge.critical.filter((item) => item.code === "wiki_parse").map((item) => item.path), ["wiki/a.md", "wiki/b.md"]);
   assert.deepEqual(snapshot.knowledge.pages.map((page) => page.path), ["wiki/a.md", "wiki/b.md"]);
+});
+
+test("snapshot reader reuses unchanged Wiki pages for an incremental refresh", async () => {
+  const files = new InstrumentedFileSystem({
+    ".devweave/project.json": validProject,
+    ".codex/hooks.json": "{}",
+    ".agents/skills/devweave/SKILL.md": "# DevWeave",
+    "wiki/a.md": invalidWiki,
+    "wiki/b.md": invalidWiki
+  });
+  const reader = new WorkspaceSnapshotReader(files, {
+    rootName: "fixture",
+    rootPath: "file:///fixture",
+    now: () => "2026-08-04T00:00:00Z"
+  });
+
+  await reader.readWorkspace();
+  files.setText("wiki/a.md", invalidWiki + "\nchanged");
+  await reader.readWorkspace({ paths: ["wiki/a.md"], forceFull: false });
+
+  assert.equal(files.readCounts.get("wiki/a.md"), 2);
+  assert.equal(files.readCounts.get("wiki/b.md"), 1);
 });

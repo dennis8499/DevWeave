@@ -12,6 +12,7 @@ import sys
 import time
 import unicodedata
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -381,8 +382,32 @@ def load_project(repo: Path) -> dict[str, Any]:
             or not set(required_for).issubset(set(RISK_LEVELS))
         ):
             errors.append(f"commands[{index}].required_for contains invalid risk levels")
+        depends_on = command.get("depends_on", [])
+        if (
+            not isinstance(depends_on, list)
+            or not all(
+                isinstance(item, str) and re.fullmatch(r"[A-Za-z0-9._-]+", item)
+                for item in depends_on
+            )
+        ):
+            errors.append(f"commands[{index}].depends_on contains invalid command IDs")
+        exclusive_group = command.get("exclusive_group", "")
+        if not isinstance(exclusive_group, str):
+            errors.append(f"commands[{index}].exclusive_group must be a string")
     if len(command_ids) != len(set(command_ids)):
         errors.append("command IDs must be unique")
+    known_command_ids = set(command_ids)
+    for index, command in enumerate(commands):
+        if not isinstance(command, dict):
+            continue
+        command_id = command.get("id")
+        for dependency in command.get("depends_on", []):
+            if dependency not in known_command_ids:
+                errors.append(
+                    f"commands[{index}].depends_on references an undefined command: {dependency}"
+                )
+            if dependency == command_id:
+                errors.append(f"commands[{index}].depends_on cannot reference itself")
     profiles = project.get("verification_profiles")
     if not isinstance(profiles, dict):
         errors.append("verification_profiles must be an object")
@@ -3438,24 +3463,9 @@ def _command_by_id(project: dict[str, Any], command_id: str) -> dict[str, Any]:
     return command
 
 
-def run_verification(
-    repo: Path,
-    work_id: str,
-    *,
-    command_id: str,
-    kind: str,
-    covers: Sequence[str] = (),
-    tasks: Sequence[str] = (),
-    expectation: str = "zero",
-) -> dict[str, Any]:
-    if kind == "review":
-        raise ValidationError(
-            "Review evidence must be recorded through the machine-only review record interface."
-        )
-    _validate_evidence_id_syntax(covers, tasks)
-    if expectation not in ("zero", "nonzero", "any"):
-        raise ValidationError("Unknown exit expectation.", {"expectation": expectation})
-    project = load_project(repo)
+def _verification_command(
+    repo: Path, project: dict[str, Any], command_id: str
+) -> tuple[dict[str, Any], Path, int]:
     command = _command_by_id(project, command_id)
     cwd = ensure_within(repo, repo / command.get("cwd", "."))
     timeout = int(command.get("timeout_seconds", 900))
@@ -3469,7 +3479,22 @@ def run_verification(
             "Verification command cwd must be an existing directory.",
             {"command": command_id, "cwd": str(cwd)},
         )
+    return command, cwd, timeout
+
+
+def _as_bytes(value: bytes | str | None) -> bytes:
+    if value is None:
+        return b""
+    if isinstance(value, bytes):
+        return value
+    return value.encode("utf-8", errors="replace")
+
+
+def _execute_verification_command(
+    command: dict[str, Any], cwd: Path, timeout: int
+) -> dict[str, Any]:
     started_at = utc_now()
+    started_monotonic = time.monotonic()
     timed_out = False
     execution_error: str | None = None
     try:
@@ -3482,18 +3507,50 @@ def run_verification(
             check=False,
         )
         exit_code: int | None = result.returncode
-        stdout = result.stdout
-        stderr = result.stderr
+        stdout = _as_bytes(result.stdout)
+        stderr = _as_bytes(result.stderr)
     except subprocess.TimeoutExpired as exc:
         timed_out = True
         exit_code = None
-        stdout = exc.stdout or b""
-        stderr = exc.stderr or b""
+        stdout = _as_bytes(exc.stdout)
+        stderr = _as_bytes(exc.stderr)
     except OSError as exc:
         exit_code = None
         stdout = b""
         stderr = str(exc).encode("utf-8", errors="replace")
         execution_error = f"{type(exc).__name__}: {exc}"
+    return {
+        "exit_code": exit_code,
+        "stdout": stdout,
+        "stderr": stderr,
+        "timed_out": timed_out,
+        "execution_error": execution_error,
+        "started_at": started_at,
+        "finished_at": utc_now(),
+        "duration_ms": int((time.monotonic() - started_monotonic) * 1000),
+    }
+
+
+def _record_verification_execution(
+    repo: Path,
+    work_id: str,
+    *,
+    project: dict[str, Any],
+    command_id: str,
+    command: dict[str, Any],
+    execution: dict[str, Any],
+    source: dict[str, Any],
+    kind: str,
+    covers: Sequence[str],
+    tasks: Sequence[str],
+    expectation: str,
+    batch_id: str | None = None,
+    batch_index: int | None = None,
+) -> dict[str, Any]:
+    exit_code = execution["exit_code"]
+    timed_out = execution["timed_out"]
+    stdout = execution["stdout"]
+    stderr = execution["stderr"]
     expectation_met = (
         (expectation == "any" and exit_code is not None)
         or (expectation == "zero" and exit_code == 0)
@@ -3515,7 +3572,6 @@ def run_verification(
         evidence_id = _next_evidence_id(state)
         log_path = devweave_root(repo) / "cache" / "logs" / work_id / f"{evidence_id}.log"
         atomic_write_bytes(log_path, stored_raw)
-        source = git_snapshot(repo)
         tail = (stdout + b"\n" + stderr)[-4000:].decode("utf-8", errors="replace")
         evidence = {
             "schema_version": SCHEMA_VERSION,
@@ -3529,7 +3585,9 @@ def run_verification(
             "source_fingerprint": source["fingerprint"],
             "git_head": source["head"],
             "created_at": utc_now(),
-            "started_at": started_at,
+            "started_at": execution["started_at"],
+            "finished_at": execution["finished_at"],
+            "duration_ms": execution["duration_ms"],
             "stale": False,
             "binds_current_source": kind not in ("reproduction", "baseline"),
             "command_id": command_id,
@@ -3538,10 +3596,13 @@ def run_verification(
             "exit_code": exit_code,
             "expectation": expectation,
             "timed_out": timed_out,
-            "execution_error": execution_error,
+            "execution_error": execution["execution_error"],
             "raw_log": normalize_relpath(log_path.relative_to(repo)),
             "log_truncated": truncated,
         }
+        if batch_id is not None:
+            evidence["verification_batch_id"] = batch_id
+            evidence["verification_batch_index"] = batch_index
         _write_evidence_unlocked(repo, state, evidence)
         if evidence["status"] == "passed" and evidence["binds_current_source"]:
             state["last_verification"] = {
@@ -3556,6 +3617,206 @@ def run_verification(
                 state["phase"] = "verification"
             save_state_unlocked(repo, state)
         return evidence
+
+
+def run_verification(
+    repo: Path,
+    work_id: str,
+    *,
+    command_id: str,
+    kind: str,
+    covers: Sequence[str] = (),
+    tasks: Sequence[str] = (),
+    expectation: str = "zero",
+) -> dict[str, Any]:
+    if kind == "review":
+        raise ValidationError(
+            "Review evidence must be recorded through the machine-only review record interface."
+        )
+    _validate_evidence_id_syntax(covers, tasks)
+    if expectation not in ("zero", "nonzero", "any"):
+        raise ValidationError("Unknown exit expectation.", {"expectation": expectation})
+    project = load_project(repo)
+    command, cwd, timeout = _verification_command(repo, project, command_id)
+    execution = _execute_verification_command(command, cwd, timeout)
+    source = git_snapshot(repo)
+    return _record_verification_execution(
+        repo,
+        work_id,
+        project=project,
+        command_id=command_id,
+        command=command,
+        execution=execution,
+        source=source,
+        kind=kind,
+        covers=covers,
+        tasks=tasks,
+        expectation=expectation,
+    )
+
+
+def _verification_profile_commands(
+    repo: Path, project: dict[str, Any], profile: str
+) -> tuple[list[str], dict[str, tuple[dict[str, Any], Path, int]]]:
+    if profile not in RISK_LEVELS:
+        raise ValidationError("Unknown verification profile.", {"profile": profile})
+    command_ids = list(project.get("verification_profiles", {}).get(profile, []))
+    if len(command_ids) != len(set(command_ids)):
+        raise ValidationError("Verification profile contains duplicate command IDs.", {"profile": profile})
+    prepared = {
+        command_id: _verification_command(repo, project, command_id)
+        for command_id in command_ids
+    }
+    selected = set(command_ids)
+    for command_id in command_ids:
+        dependencies = prepared[command_id][0].get("depends_on", [])
+        if any(dependency not in selected for dependency in dependencies):
+            raise ValidationError(
+                "Verification command dependency must be in the selected profile.",
+                {"command": command_id, "depends_on": dependencies, "profile": profile},
+            )
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(command_id: str) -> None:
+        if command_id in visiting:
+            raise ValidationError("Verification command dependencies contain a cycle.", {"command": command_id})
+        if command_id in visited:
+            return
+        visiting.add(command_id)
+        for dependency in prepared[command_id][0].get("depends_on", []):
+            visit(dependency)
+        visiting.remove(command_id)
+        visited.add(command_id)
+
+    for command_id in command_ids:
+        visit(command_id)
+    return command_ids, prepared
+
+
+def run_verification_profile(
+    repo: Path,
+    work_id: str,
+    *,
+    profile: str,
+    kind: str,
+    covers: Sequence[str] = (),
+    tasks: Sequence[str] = (),
+    expectation: str = "zero",
+    max_parallel: int = 3,
+) -> dict[str, Any]:
+    if kind == "review":
+        raise ValidationError(
+            "Review evidence must be recorded through the machine-only review record interface."
+        )
+    _validate_evidence_id_syntax(covers, tasks)
+    if expectation not in ("zero", "nonzero", "any"):
+        raise ValidationError("Unknown exit expectation.", {"expectation": expectation})
+    if max_parallel <= 0:
+        raise ValidationError("Verification max parallel must be greater than zero.")
+    project = load_project(repo)
+    command_ids, prepared = _verification_profile_commands(repo, project, profile)
+    batch_id = f"VB-{uuid.uuid4().hex[:12]}"
+    statuses: dict[str, str] = {command_id: "pending" for command_id in command_ids}
+    records: dict[str, dict[str, Any]] = {}
+
+    while True:
+        for command_id in command_ids:
+            if statuses[command_id] != "pending":
+                continue
+            dependencies = prepared[command_id][0].get("depends_on", [])
+            blocked_by = [
+                dependency
+                for dependency in dependencies
+                if statuses[dependency] in ("failed", "blocked")
+            ]
+            if blocked_by:
+                statuses[command_id] = "blocked"
+                records[command_id] = {
+                    "command_id": command_id,
+                    "status": "blocked",
+                    "blocked_by": blocked_by,
+                }
+
+        pending = [command_id for command_id in command_ids if statuses[command_id] == "pending"]
+        if not pending:
+            break
+        ready = [
+            command_id
+            for command_id in pending
+            if all(statuses[dependency] == "passed" for dependency in prepared[command_id][0].get("depends_on", []))
+        ]
+        if not ready:
+            raise ValidationError(
+                "Verification profile cannot make progress.",
+                {"profile": profile, "pending": pending},
+            )
+        selected: list[str] = []
+        groups: set[str] = set()
+        for command_id in ready:
+            group = prepared[command_id][0].get("exclusive_group", "")
+            if group and group in groups:
+                continue
+            selected.append(command_id)
+            if group:
+                groups.add(group)
+            if len(selected) >= max_parallel:
+                break
+
+        executions: dict[str, dict[str, Any]] = {}
+        with ThreadPoolExecutor(max_workers=len(selected), thread_name_prefix="devweave-verify") as executor:
+            futures = {
+                command_id: executor.submit(
+                    _execute_verification_command,
+                    prepared[command_id][0],
+                    prepared[command_id][1],
+                    prepared[command_id][2],
+                )
+                for command_id in selected
+            }
+            for command_id, future in futures.items():
+                executions[command_id] = future.result()
+
+        source = git_snapshot(repo)
+        for command_id in selected:
+            command, _cwd, _timeout = prepared[command_id]
+            evidence = _record_verification_execution(
+                repo,
+                work_id,
+                project=project,
+                command_id=command_id,
+                command=command,
+                execution=executions[command_id],
+                source=source,
+                kind=kind,
+                covers=covers,
+                tasks=tasks,
+                expectation=expectation,
+                batch_id=batch_id,
+                batch_index=command_ids.index(command_id),
+            )
+            status = "passed" if evidence["status"] == "passed" else "failed"
+            statuses[command_id] = status
+            records[command_id] = {
+                "command_id": command_id,
+                "status": status,
+                "duration_ms": evidence["duration_ms"],
+                "evidence_id": evidence["id"],
+                "evidence": evidence,
+            }
+
+    ordered_records = [records[command_id] for command_id in command_ids]
+    ok = all(record["status"] == "passed" for record in ordered_records)
+    return {
+        "ok": ok,
+        "work": work_id,
+        "batch": {
+            "id": batch_id,
+            "profile": profile,
+            "max_parallel": max_parallel,
+            "commands": ordered_records,
+        },
+    }
 
 
 def revise_work(repo: Path, work_id: str, from_phase: str, reason: str) -> dict[str, Any]:

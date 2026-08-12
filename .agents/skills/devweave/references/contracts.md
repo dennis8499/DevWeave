@@ -20,12 +20,12 @@ Machine state is authoritative. Update state, tasks, approvals, evidence, scope,
 `.devweave/project.json` contains:
 
 - `schema_version`, `managed`, and `locale`.
-- `commands[]`, each with unique `id`, string-array `argv`, repo-relative `cwd`, positive `timeout_seconds`, and `required_for[]` risk levels.
+- `commands[]`, each with unique `id`, string-array `argv`, repo-relative `cwd`, positive `timeout_seconds`, and `required_for[]` risk levels. Optional `depends_on[]` lists command IDs that must pass first; optional `exclusive_group` serializes commands that share a mutable build/output boundary.
 - `verification_profiles.low|standard|high`, containing required command IDs.
 - `protected_mutations[]` and evidence storage policy.
 - `knowledge.enabled: true` and the normalized fixed `knowledge.root: wiki`. Missing knowledge settings are supplied in memory and persisted by the next explicit `init` or `start`.
 
-Commands are executed with `shell=false`. Never convert `argv` to a shell string.
+Commands are executed with `shell=false`. Never convert `argv` to a shell string. `verify --profile <risk> --max-parallel <n>` schedules independent profile commands concurrently, respects `depends_on` and `exclusive_group`, and records one normal evidence entry per executed command. A failed dependency blocks its dependents without fabricating passing evidence; `verify --command <id>` remains the compatibility path for one command.
 
 ## Work-item model
 

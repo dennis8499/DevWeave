@@ -224,6 +224,10 @@ def _allow_patch_for_state(
 
 def handle_hook(payload: dict[str, Any], repo: Path | None = None) -> dict[str, Any] | None:
     cwd = payload.get("cwd") or os.getcwd()
+    tool_name = str(payload.get("tool_name") or "")
+    command = _command(payload)
+    if tool_name == "Bash" and _is_read_only(None, command):
+        return None
     try:
         repo = repo or find_repo_root(cwd)
     except DevWeaveError:
@@ -238,8 +242,6 @@ def handle_hook(payload: dict[str, Any], repo: Path | None = None) -> dict[str, 
         return None
 
     session_id = str(payload.get("session_id") or "")
-    tool_name = str(payload.get("tool_name") or "")
-    command = _command(payload)
 
     if tool_name == "Bash" and _is_devweave_cli(command):
         if re.search(r"(?:^|\s)bind(?:\s|$)", command):

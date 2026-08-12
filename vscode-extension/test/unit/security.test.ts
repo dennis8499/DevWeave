@@ -119,7 +119,7 @@ test("P2 preferences and Wiki browsing stay Extension-local and discoverable", (
   assert.match(webview, /case "help"/);
   assert.match(webview, /bootstrap\.complete/);
   assert.match(webview, /初始化／補齊 DevWeave/);
-  assert.match(readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8"), /\.inspect\(bundle, resources, workspace\)/);
+  assert.match(readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8"), /\.inspectPrepared\(preparation\)/);
   assert.doesNotMatch(webview, /Snapshot may be newer than engine-observed state/);
   assert.match(extension, /workspaceState\.get/);
   assert.match(extension, /workspaceState\.update/);

@@ -62,9 +62,12 @@ class MemoryBootstrapWorkspace implements BootstrapWorkspace {
 }
 
 class MemoryBootstrapResources implements BootstrapResourceReader {
+  public reads = 0;
+
   public constructor(private readonly entries: Record<string, string>) {}
 
   public async read(source: string): Promise<Uint8Array> {
+    this.reads += 1;
     const value = this.entries[source];
     if (value === undefined) throw new Error(`Missing resource: ${source}`);
     return new TextEncoder().encode(value);
@@ -200,6 +203,27 @@ test("BootstrapInstaller is idempotent for compatible existing bytes", async () 
   assert.equal(report.status, "already_initialized");
   assert.deepEqual(report.created, []);
   assert.ok(report.adopted.includes(".devweave/project.json"));
+});
+
+test("BootstrapInstaller reuses prepared bundle data and revalidates before writing", async () => {
+  const workspace = new MemoryBootstrapWorkspace();
+  const resources = new MemoryBootstrapResources({ "project.json": '{"managed":true}\n' });
+  const installer = new BootstrapInstaller({ now: () => "2026-08-03" });
+  const prepared = await installer.prepare(bundle(), resources, workspace);
+  const readsAfterPrepare = resources.reads;
+
+  const inspection = installer.inspectPrepared(prepared);
+  assert.equal(inspection.complete, false);
+  assert.equal(resources.reads, readsAfterPrepare);
+
+  workspace.seedFile(".devweave/project.json", '{"managed":false}\n');
+  const report = await installer.installPrepared(prepared, workspace);
+
+  assert.equal(report.ok, false);
+  assert.equal(report.status, "partial");
+  assert.ok(report.conflicts.some((item) => item.path === ".devweave/project.json"));
+  assert.equal(workspace.text(".devweave/project.json"), '{"managed":false}\n');
+  assert.equal(resources.reads, readsAfterPrepare);
 });
 
 test("BootstrapInstaller rejects a bundle integrity mismatch before writing", async () => {

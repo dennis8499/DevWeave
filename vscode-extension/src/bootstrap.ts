@@ -102,37 +102,41 @@ interface PreparedBundle {
 export class BootstrapInstaller {
   public constructor(private readonly options: BootstrapInstallerOptions = {}) {}
 
+  public async prepare(
+    bundle: BootstrapBundle,
+    resources: BootstrapResourceReader,
+    workspace: BootstrapWorkspace
+  ): Promise<PreparedBundle> {
+    try {
+      return await this.prepareInternal(bundle, resources, workspace);
+    } catch (error) {
+      return failedPreparation(error);
+    }
+  }
+
   public async inspect(
     bundle: BootstrapBundle,
     resources: BootstrapResourceReader,
     workspace: BootstrapWorkspace
   ): Promise<BootstrapInspection> {
-    try {
-      const prepared = await this.prepare(bundle, resources, workspace);
-      const missing = [
-        ...prepared.missingDirectories,
-        ...prepared.missingFiles.map((file) => file.destination)
-      ].sort(comparePathDepth);
-      return {
-        complete: missing.length === 0 && prepared.conflicts.length === 0 && prepared.errors.length === 0,
-        expected: [...prepared.normalized.directories, ...prepared.normalized.files.map((file) => file.destination)].sort(comparePathDepth),
-        missing,
-        adopted: prepared.adopted,
-        skipped: prepared.skipped,
-        conflicts: prepared.conflicts,
-        errors: prepared.errors
-      };
-    } catch (error) {
-      return {
-        complete: false,
-        expected: [],
-        missing: [],
-        adopted: [],
-        skipped: [],
-        conflicts: [],
-        errors: [{ path: "manifest.json", reason: errorMessage(error) }]
-      };
-    }
+    const prepared = await this.prepare(bundle, resources, workspace);
+    return this.inspectPrepared(prepared);
+  }
+
+  public inspectPrepared(prepared: PreparedBundle): BootstrapInspection {
+    const missing = [
+      ...prepared.missingDirectories,
+      ...prepared.missingFiles.map((file) => file.destination)
+    ].sort(comparePathDepth);
+    return {
+      complete: missing.length === 0 && prepared.conflicts.length === 0 && prepared.errors.length === 0,
+      expected: [...prepared.normalized.directories, ...prepared.normalized.files.map((file) => file.destination)].sort(comparePathDepth),
+      missing,
+      adopted: prepared.adopted,
+      skipped: prepared.skipped,
+      conflicts: prepared.conflicts,
+      errors: prepared.errors
+    };
   }
 
   public async install(
@@ -140,13 +144,14 @@ export class BootstrapInstaller {
     resources: BootstrapResourceReader,
     workspace: BootstrapWorkspace
   ): Promise<BootstrapReport> {
-    let prepared: PreparedBundle;
-    try {
-      prepared = await this.prepare(bundle, resources, workspace);
-    } catch (error) {
-      return failedReport([], [{ path: "manifest.json", reason: errorMessage(error) }]);
-    }
+    const prepared = await this.prepare(bundle, resources, workspace);
+    return this.installPrepared(prepared, workspace);
+  }
 
+  public async installPrepared(
+    prepared: PreparedBundle,
+    workspace: BootstrapWorkspace
+  ): Promise<BootstrapReport> {
     const missing = [
       ...prepared.missingDirectories,
       ...prepared.missingFiles.map((file) => file.destination)
@@ -155,15 +160,33 @@ export class BootstrapInstaller {
       return failedReport(prepared.adopted, prepared.errors, prepared.conflicts, prepared.skipped, missing);
     }
 
+    const revalidation = await this.revalidate(prepared, workspace);
+    if (revalidation.errors.length > 0) {
+      return failedReport(
+        prepared.adopted,
+        [...prepared.errors, ...revalidation.errors],
+        prepared.conflicts,
+        prepared.skipped,
+        missing
+      );
+    }
+    prepared.conflicts.push(...revalidation.conflicts);
+    const revalidationConflictPaths = new Set(revalidation.conflicts.map((item) => item.path));
+    const blockedByRevalidation = (path: string): boolean => [...revalidationConflictPaths].some(
+      (conflictPath) => path === conflictPath || path.startsWith(`${conflictPath}/`)
+    );
+
     const createdDirectories: string[] = [];
     const createdFiles: string[] = [];
     const rolledBack: string[] = [];
     try {
       for (const directory of prepared.missingDirectories) {
+        if (blockedByRevalidation(directory)) continue;
         await workspace.createDirectory(directory);
         createdDirectories.push(directory);
       }
       for (const file of prepared.missingFiles.sort((left, right) => left.destination.localeCompare(right.destination))) {
+        if (blockedByRevalidation(file.destination)) continue;
         await workspace.writeBytes(file.destination, file.bytes);
         createdFiles.push(file.destination);
       }
@@ -211,7 +234,7 @@ export class BootstrapInstaller {
     };
   }
 
-  private async prepare(
+  private async prepareInternal(
     bundle: BootstrapBundle,
     resources: BootstrapResourceReader,
     workspace: BootstrapWorkspace
@@ -246,14 +269,15 @@ export class BootstrapInstaller {
     }
     const directories = [...new Set(allDirectories)].sort(comparePathDepth);
 
+    const statCache = new Map<string, Promise<BootstrapPathKind>>();
     for (const directory of directories) {
-      const parentIssue = await this.parentIssue(directory, workspace);
+      const parentIssue = await this.parentIssue(directory, workspace, statCache);
       if (parentIssue) {
         conflicts.push({ path: directory, reason: parentIssue });
         hadExistingContent = true;
         continue;
       }
-      const kind = await workspace.stat(directory);
+      const kind = await this.cachedStat(directory, workspace, statCache);
       if (kind === "absent") {
         missingDirectories.push(directory);
       } else if (kind === "directory") {
@@ -265,45 +289,52 @@ export class BootstrapInstaller {
       }
     }
 
-    for (const file of normalized.files) {
+    const fileResults = await Promise.all(normalized.files.map(async (file) => {
+      const result = {
+        missing: [] as PreparedFile[],
+        adopted: [] as string[],
+        conflicts: [] as BootstrapConflict[],
+        errors: [] as BootstrapError[],
+        hadExistingContent: false
+      };
       let sourceBytes: Uint8Array;
       try {
         sourceBytes = await resources.read(file.source);
       } catch (error) {
-        errors.push({ path: file.source, reason: errorMessage(error) });
-        continue;
+        result.errors.push({ path: file.source, reason: errorMessage(error) });
+        return result;
       }
       const actualHash = sha256(sourceBytes);
       if (sourceBytes.byteLength !== file.byteLength || actualHash !== file.sha256) {
-        errors.push({
+        result.errors.push({
           path: file.source,
           reason: `Bundle integrity mismatch (expected ${file.byteLength}/${file.sha256}, actual ${sourceBytes.byteLength}/${actualHash}).`
         });
-        continue;
+        return result;
       }
       const bytes = file.transform === "date"
         ? new TextEncoder().encode(new TextDecoder("utf-8", { fatal: true }).decode(sourceBytes).replaceAll("{date}", date))
         : sourceBytes;
-      const parentIssue = await this.parentIssue(file.destination, workspace);
+      const parentIssue = await this.parentIssue(file.destination, workspace, statCache);
       if (parentIssue) {
-        conflicts.push({ path: file.destination, reason: parentIssue });
-        hadExistingContent = true;
-        continue;
+        result.conflicts.push({ path: file.destination, reason: parentIssue });
+        result.hadExistingContent = true;
+        return result;
       }
-      const kind = await workspace.stat(file.destination);
+      const kind = await this.cachedStat(file.destination, workspace, statCache);
       if (kind === "absent") {
-        missingFiles.push({ ...file, bytes });
+        result.missing.push({ ...file, bytes });
       } else if (kind === "file") {
-        hadExistingContent = true;
+        result.hadExistingContent = true;
         try {
           const existing = await workspace.readBytes(file.destination);
           const semantic = file.existingPolicy === "adopt-compatible"
             ? validateExistingBootstrapContent(file.compatibility as BootstrapCompatibilityKind, existing)
             : { compatible: sameBytes(existing, bytes) };
           if (semantic.compatible) {
-            adopted.push(file.destination);
+            result.adopted.push(file.destination);
           } else {
-            conflicts.push({
+            result.conflicts.push({
               path: file.destination,
               reason: file.existingPolicy === "adopt-compatible"
                 ? `Existing file is not compatible: ${semantic.reason ?? "semantic contract mismatch"}`
@@ -311,15 +342,55 @@ export class BootstrapInstaller {
             });
           }
         } catch (error) {
-          errors.push({ path: file.destination, reason: errorMessage(error) });
+          result.errors.push({ path: file.destination, reason: errorMessage(error) });
         }
       } else {
-        conflicts.push({ path: file.destination, reason: `Expected file but found ${kind}.` });
-        hadExistingContent = true;
+        result.conflicts.push({ path: file.destination, reason: `Expected file but found ${kind}.` });
+        result.hadExistingContent = true;
       }
+      return result;
+    }));
+    for (const result of fileResults) {
+      missingFiles.push(...result.missing);
+      adopted.push(...result.adopted);
+      conflicts.push(...result.conflicts);
+      errors.push(...result.errors);
+      hadExistingContent ||= result.hadExistingContent;
     }
 
     return { normalized, missingDirectories, missingFiles, adopted, skipped, conflicts, errors, hadExistingContent };
+  }
+
+  private async revalidate(
+    prepared: PreparedBundle,
+    workspace: BootstrapWorkspace
+  ): Promise<{ conflicts: BootstrapConflict[]; errors: BootstrapError[] }> {
+    const conflicts: BootstrapConflict[] = [];
+    const errors: BootstrapError[] = [];
+    const statCache = new Map<string, Promise<BootstrapPathKind>>();
+    const paths = [
+      ...prepared.missingDirectories.map((path) => ({ path, expected: "directory" as const })),
+      ...prepared.missingFiles.map((file) => ({ path: file.destination, expected: "file" as const }))
+    ];
+    for (const item of paths) {
+      try {
+        const parentIssue = await this.parentIssue(item.path, workspace, statCache);
+        if (parentIssue) {
+          conflicts.push({ path: item.path, reason: parentIssue });
+          continue;
+        }
+        const kind = await this.cachedStat(item.path, workspace, statCache);
+        if (kind !== "absent") {
+          conflicts.push({
+            path: item.path,
+            reason: `Workspace changed after inspection; expected missing ${item.expected} but found ${kind}.`
+          });
+        }
+      } catch (error) {
+        errors.push({ path: item.path, reason: errorMessage(error) });
+      }
+    }
+    return { conflicts, errors };
   }
 
   private normalizeBundle(bundle: BootstrapBundle): NormalizedBundle | { error: string } {
@@ -374,18 +445,48 @@ export class BootstrapInstaller {
     };
   }
 
-  private async parentIssue(path: string, workspace: BootstrapWorkspace): Promise<string | null> {
+  private async cachedStat(
+    path: string,
+    workspace: BootstrapWorkspace,
+    cache: Map<string, Promise<BootstrapPathKind>>
+  ): Promise<BootstrapPathKind> {
+    let pending = cache.get(path);
+    if (!pending) {
+      pending = workspace.stat(path);
+      cache.set(path, pending);
+    }
+    return pending;
+  }
+
+  private async parentIssue(
+    path: string,
+    workspace: BootstrapWorkspace,
+    cache: Map<string, Promise<BootstrapPathKind>>
+  ): Promise<string | null> {
     const parts = path.split("/");
     let current = "";
     for (const part of parts.slice(0, -1)) {
       current = current ? `${current}/${part}` : part;
-      const kind = await workspace.stat(current);
+      const kind = await this.cachedStat(current, workspace, cache);
       if (kind === "file" || kind === "symlink" || kind === "other") {
         return `Parent path ${current} is ${kind}.`;
       }
     }
     return null;
   }
+}
+
+function failedPreparation(error: unknown): PreparedBundle {
+  return {
+    normalized: { directories: [], files: [] },
+    missingDirectories: [],
+    missingFiles: [],
+    adopted: [],
+    skipped: [],
+    conflicts: [],
+    errors: [{ path: "manifest.json", reason: errorMessage(error) }],
+    hadExistingContent: false
+  };
 }
 
 function failedReport(

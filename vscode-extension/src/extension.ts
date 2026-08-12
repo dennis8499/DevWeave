@@ -7,6 +7,7 @@ import { DashboardPreferences, Diagnostic, DisplayMode, PromptBundle, PublicComm
 import { DevWeavePromptComposer } from "./prompt";
 import { WorkspaceSnapshotReader } from "./snapshot";
 import { RefreshCoordinator } from "./refresh-coordinator";
+import type { RefreshChangeSet } from "./refresh-coordinator";
 import { WorkItemsTreeProvider } from "./tree";
 import { readBootstrapBundle, VscodeBootstrapResourceReader, VscodeBootstrapWorkspace } from "./vscode-bootstrap";
 import { VscodeFileSystemPort } from "./vscode-filesystem";
@@ -64,6 +65,7 @@ class ExtensionController {
   private readonly bootstrapInstaller = new BootstrapInstaller();
   private readonly preferencesKey = "devweave.controlCenter.preferences";
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  private bootstrapTransaction = false;
 
   public constructor(
     private readonly context: vscode.ExtensionContext,
@@ -84,15 +86,15 @@ class ExtensionController {
     for (const pattern of [".devweave/project.json", ".devweave/work-items/**", ".devweave/baseline/**", "wiki/**", ".codex/hooks.json", "AGENTS.md", "skills-lock.json", ".agents/skills/**"]) {
       for (const folder of folders) {
         const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder.uri, pattern));
-        watcher.onDidChange(() => this.scheduleRefresh(), undefined, context.subscriptions);
-        watcher.onDidCreate(() => this.scheduleRefresh(), undefined, context.subscriptions);
-        watcher.onDidDelete(() => this.scheduleRefresh(), undefined, context.subscriptions);
+        watcher.onDidChange((uri) => this.scheduleRefresh(uri), undefined, context.subscriptions);
+        watcher.onDidCreate((uri) => this.scheduleRefresh(uri), undefined, context.subscriptions);
+        watcher.onDidDelete((uri) => this.scheduleRefresh(uri), undefined, context.subscriptions);
         context.subscriptions.push(watcher);
       }
     }
   }
 
-  public async refresh(): Promise<WorkspaceSnapshot> {
+  public async refresh(changes: Partial<RefreshChangeSet> = { forceFull: true }): Promise<WorkspaceSnapshot> {
     const root = await this.resolveRoot(false);
     if (!root) {
       this.snapshot = unavailableSnapshot(this.multipleRootMessage());
@@ -106,7 +108,7 @@ class ExtensionController {
       bundle ? [...bundle.directories, ...bundle.files.map((file) => file.destination)] : undefined,
       bundle?.files
     );
-    await this.refreshCoordinator?.request();
+    await this.refreshCoordinator?.request(changes);
     return this.snapshot;
   }
 
@@ -153,7 +155,7 @@ class ExtensionController {
       bootstrapFiles
     });
     this.refreshCoordinator = new RefreshCoordinator<WorkspaceSnapshot>({
-      read: () => this.reader?.readWorkspace() ?? Promise.reject(new Error("Workspace snapshot reader is unavailable.")),
+      read: (changes) => this.reader?.readWorkspace(changes) ?? Promise.reject(new Error("Workspace snapshot reader is unavailable.")),
       publish: (next) => this.publishSnapshot(next),
       onError: (error) => this.output.appendLine(`[refresh] ${error instanceof Error ? error.message : String(error)}`)
     });
@@ -219,7 +221,8 @@ class ExtensionController {
       return { report, snapshot };
     }
     const workspace = new VscodeBootstrapWorkspace(root);
-    const inspection = await this.bootstrapInstaller.inspect(bundle, resources, workspace);
+    const preparation = await this.bootstrapInstaller.prepare(bundle, resources, workspace);
+    const inspection = this.bootstrapInstaller.inspectPrepared(preparation);
     if (inspection.complete) {
       const report: BootstrapReport = {
         ok: true,
@@ -251,7 +254,9 @@ class ExtensionController {
     }
 
     try {
-      const report = await this.bootstrapInstaller.install(bundle, resources, workspace);
+      this.bootstrapTransaction = true;
+      const report = await this.bootstrapInstaller.installPrepared(preparation, workspace);
+      this.bootstrapTransaction = false;
       const refreshed = await this.refresh();
       this.output.appendLine(`[bootstrap] ${JSON.stringify(report)}`);
       if (report.complete) {
@@ -261,6 +266,7 @@ class ExtensionController {
       }
       return { report, snapshot: refreshed };
     } catch (error) {
+      this.bootstrapTransaction = false;
       const report = bootstrapFailure("bootstrap", error instanceof Error ? error.message : String(error));
       const refreshed = await this.refresh();
       this.output.appendLine(`[bootstrap] ${JSON.stringify(report)}`);
@@ -344,14 +350,44 @@ class ExtensionController {
     await vscode.window.showInformationMessage("DevWeave prompt 已複製到剪貼簿；請在 Codex Chat 審閱並送出。", "開啟控制中心");
   }
 
-  private scheduleRefresh(): void {
+  private pendingRefreshPaths = new Set<string>();
+  private pendingRefreshForceFull = false;
+
+  private scheduleRefresh(uri?: vscode.Uri): void {
+    if (this.bootstrapTransaction) {
+      return;
+    }
+    const relativePath = uri ? this.relativeWorkspacePath(uri) : undefined;
+    if (relativePath) {
+      this.pendingRefreshPaths.add(relativePath);
+    } else {
+      this.pendingRefreshForceFull = true;
+    }
     if (this.refreshTimer) {
       clearTimeout(this.refreshTimer);
     }
     this.refreshTimer = setTimeout(() => {
       this.refreshTimer = undefined;
-      void this.refresh();
+      const changes = {
+        paths: [...this.pendingRefreshPaths].sort(),
+        forceFull: this.pendingRefreshForceFull
+      } satisfies RefreshChangeSet;
+      this.pendingRefreshPaths.clear();
+      this.pendingRefreshForceFull = false;
+      void this.refresh(changes);
     }, 250);
+  }
+
+  private relativeWorkspacePath(uri: vscode.Uri): string | undefined {
+    const root = this.activeRoot;
+    if (!root || uri.scheme !== root.scheme) {
+      return undefined;
+    }
+    const rootPath = root.path.replace(/\/$/, "");
+    if (!uri.path.startsWith(`${rootPath}/`)) {
+      return undefined;
+    }
+    return uri.path.slice(rootPath.length + 1).replaceAll("\\", "/");
   }
 
   private async resolveRoot(promptForChoice: boolean): Promise<vscode.Uri | undefined> {

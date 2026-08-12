@@ -102,7 +102,8 @@
     "package": "node esbuild.mjs --production && node scripts/package-vsix.mjs && node scripts/verify-package.mjs",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"test/unit/**/*.test.ts\"",
-    "test:smoke": "npm run build && tsx test/smoke.test.ts"
+    "test:smoke": "npm run build && tsx test/smoke.test.ts",
+    "test:smoke:current": "tsx test/smoke.test.ts"
   },
   "devDependencies": {
     "@types/vscode": "^1.90.0",

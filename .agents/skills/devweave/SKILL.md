@@ -106,7 +106,7 @@ The decision loop is complete when every material decision has a recorded answer
 
 The knowledge branch is complete only when its ordered context or current promotion plan is recorded, every required page obligation is covered, and the corresponding fingerprint remains current at validation.
 
-When starting work, use `start --kind new|feature|refactor|bug --title <title>`. Set risk with `risk`, scope with `scope`, verification commands with `command set`, tasks with `task`, evidence with `evidence add` or `verify`, baseline decisions with `baseline`, and rejection/rework with `revise`. `scope` replaces the complete scope set: pass every path in one call by repeating `--path`, for example `scope --path src --path tests`. Close only after G3 is current and approved.
+When starting work, use `start --kind new|feature|refactor|bug --title <title>`. Set risk with `risk`, scope with `scope`, verification commands with `command set`, tasks with `task`, evidence with `evidence add` or a profile-batched `verify --profile <low|standard|high> --max-parallel 3`, baseline decisions with `baseline`, and rejection/rework with `revise`. Use individual `verify --command <id>` calls for legacy or intentionally isolated checks. `scope` replaces the complete scope set: pass every path in one call by repeating `--path`, for example `scope --path src --path tests`. Close only after G3 is current and approved.
 
 ## Gate discipline
 

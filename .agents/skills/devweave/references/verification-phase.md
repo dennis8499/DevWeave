@@ -5,7 +5,7 @@ Read this reference only while the work item phase is verification or acceptance
 ## Verify
 
 1. Inspect the full diff against the work item's base source.
-2. Run every command required by the current risk profile through the CLI verify command.
+2. Run every command required by the current risk profile through the CLI verify command. Prefer one profile batch, for example `verify --profile standard --max-parallel 3`, which preserves per-command evidence while running independent commands concurrently; use individual `verify --command <id>` calls only for legacy or intentionally isolated commands.
 3. Add profile evidence: acceptance for new; acceptance plus regression for feature; equivalence plus regression for refactor; regression for bug. Review evidence is separate and is required only for high-risk G3.
 4. Cover every AC with current passing evidence bound to the present source fingerprint.
 5. When all product, Wiki, baseline, diff, scope and existing evidence are stable, high-risk work must run exactly one isolated, read-only Independent Review Agent before the G3 summary. Standard and low-risk work must not start this reviewer. The reviewer must not modify source, Wiki, ledgers or gates, and must not run approve, revise or close.

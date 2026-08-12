@@ -120,6 +120,72 @@ class CliContractTests(unittest.TestCase):
             self.assertFalse(payload["ok"])
             self.assertEqual(7, payload["evidence"]["exit_code"])
 
+    def test_verify_profile_batches_independent_commands_and_respects_dependencies(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            harness.configure_command(
+                "profile-first",
+                argv=[sys.executable, "-c", "print('first')"],
+                required_for=("standard",),
+            )
+            harness.configure_command(
+                "profile-independent",
+                argv=[sys.executable, "-c", "print('independent')"],
+                required_for=("standard",),
+            )
+            harness.configure_command(
+                "profile-dependent",
+                argv=[sys.executable, "-c", "print('dependent')"],
+                required_for=("standard",),
+                depends_on=("profile-first",),
+            )
+            result, payload = invoke(
+                harness.repo,
+                "verify",
+                "--work",
+                state["id"],
+                "--profile",
+                "standard",
+                "--max-parallel",
+                "2",
+                "--kind",
+                "regression",
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertTrue(payload["ok"])
+            batch = payload["batch"]
+            self.assertTrue(batch["id"].startswith("VB-"))
+            records = {item["command_id"]: item for item in batch["commands"]}
+            self.assertEqual("passed", records["profile-first"]["status"])
+            self.assertEqual("passed", records["profile-independent"]["status"])
+            self.assertEqual("passed", records["profile-dependent"]["status"])
+            self.assertEqual(3, len(core.load_state(harness.repo, state["id"])["evidence"]))
+            for record in records.values():
+                evidence = record["evidence"]
+                self.assertEqual(batch["id"], evidence["verification_batch_id"])
+
+    def test_command_set_rejects_unknown_dependency_without_writing_invalid_project(self) -> None:
+        with RepositoryHarness() as harness:
+            harness.init()
+            result, payload = invoke(
+                harness.repo,
+                "command",
+                "set",
+                "--id",
+                "dependent",
+                "--depends-on",
+                "missing",
+                "--required-for",
+                "standard",
+                "--",
+                sys.executable,
+                "-c",
+                "print('never configured')",
+            )
+            self.assertEqual(2, result.returncode)
+            self.assertEqual("validation_failed", payload["error"]["code"])
+            self.assertEqual([], core.load_project(harness.repo)["commands"])
+
     def test_machine_only_review_record_cli_writes_review_evidence(self) -> None:
         with RepositoryHarness() as harness:
             state = harness.prepare_g2(risk="high")
