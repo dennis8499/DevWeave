@@ -6,6 +6,8 @@ export interface WikiSearchDocument {
   status?: string;
   verifiedBy?: string;
   parseErrors?: readonly string[];
+  contentHash?: string;
+  truncated?: boolean;
 }
 
 export interface WikiSearchState {

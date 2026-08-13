@@ -3,17 +3,27 @@ import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { inflateRawSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
-import { join } from "node:path";
+import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 const extensionRoot = fileURLToPath(new URL("../", import.meta.url));
+const artifactPath = parseArtifactPath(process.argv.slice(2));
 const packageJson = JSON.parse(await readFile(join(extensionRoot, "package.json"), "utf8"));
 const version = packageJson.version;
+const execFileAsync = promisify(execFile);
 assert.equal(version, "0.2.3", "package version must be 0.2.3");
 
 const bootstrapRoot = join(extensionRoot, "dist", "bootstrap");
 const manifest = JSON.parse(await readFile(join(bootstrapRoot, "manifest.json"), "utf8"));
 assert.equal(manifest.bundleVersion, version, "bundle and Extension versions must match");
+assert.equal(manifest.packageVersion, version, "manifest package version must match Extension version");
 assert.equal(manifest.files.length, 58, "bootstrap manifest must contain the certified 58 files");
+assert.equal(manifest.bootstrapFileCount, manifest.files.length, "manifest bootstrap file count must match entries");
+const sourceGitHead = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: join(extensionRoot, ".."), encoding: "utf8" })).stdout.trim();
+assert.equal(manifest.sourceGitHead, sourceGitHead, "manifest source Git HEAD must match the current source");
+const manifestPayload = { schemaVersion: manifest.schemaVersion, bundleVersion: manifest.bundleVersion, directories: manifest.directories, files: manifest.files };
+assert.equal(createHash("sha256").update(JSON.stringify(manifestPayload), "utf8").digest("hex"), manifest.manifestSha256, "manifest canonical hash mismatch");
 const bootstrapHook = JSON.parse(await readFile(join(bootstrapRoot, "hooks.json"), "utf8"));
 const repositoryHook = JSON.parse(await readFile(join(extensionRoot, "..", ".codex", "hooks.json"), "utf8"));
 assert.deepEqual(bootstrapHook, repositoryHook, "bootstrap hook must be source-derived from repository .codex/hooks.json");
@@ -79,13 +89,12 @@ for (const file of manifest.files) {
   assert.equal(createHash("sha256").update(sourceBytes).digest("hex"), file.sha256, `hash mismatch for ${file.source}`);
 }
 
-const vsixPath = join(extensionRoot, `devweave-control-center-${version}.vsix`);
-const vsixInfo = await stat(vsixPath);
-assert.ok(vsixInfo.isFile(), "the current VSIX must be a regular file");
-assert.ok(vsixInfo.size > 0, "the current VSIX must be non-empty");
+const vsixInfo = await stat(artifactPath);
+assert.ok(vsixInfo.isFile(), "the candidate VSIX must be a regular file");
+assert.ok(vsixInfo.size > 0, "the candidate VSIX must be non-empty");
 const retainedVsixInfo = await stat(join(extensionRoot, "devweave-control-center-0.2.2.vsix"));
 assert.ok(retainedVsixInfo.isFile(), "the previous 0.2.2 VSIX must remain available");
-const vsixBytes = await readFile(vsixPath);
+const vsixBytes = await readFile(artifactPath);
 const vsixSha256 = createHash("sha256").update(vsixBytes).digest("hex");
 const vsixEntries = readZipEntries(vsixBytes);
 assert.equal(vsixEntries.size, 119, "VSIX must contain the certified 119 entries");
@@ -107,7 +116,23 @@ for (const required of [
 ]) {
   assert.ok(vsixEntries.has(required), `VSIX is missing ${required}`);
 }
-console.log(`Verified ${version}: ${manifest.files.length} bootstrap files and ${vsixEntries.size} VSIX entries. VSIX SHA-256: ${vsixSha256}`);
+console.log(`Verified ${artifactPath}: ${version}, ${manifest.files.length} bootstrap files and ${vsixEntries.size} VSIX entries. Manifest SHA-256: ${manifest.manifestSha256}. VSIX SHA-256: ${vsixSha256}`);
+
+function parseArtifactPath(args) {
+  if (args.length !== 2 || args[0] !== "--artifact" || !args[1]) {
+    throw new Error("Usage: node scripts/verify-package.mjs --artifact <candidate.vsix>");
+  }
+
+  const resolvedArtifact = resolve(extensionRoot, args[1]);
+  const suffix = relative(extensionRoot, resolvedArtifact);
+  if (suffix === "" || suffix === "." || isAbsolute(suffix) || suffix === ".." || suffix.startsWith(`..${sep}`)) {
+    throw new Error("--artifact must point to a file inside the extension root.");
+  }
+  if (extname(resolvedArtifact).toLowerCase() !== ".vsix") {
+    throw new Error("--artifact must use the .vsix extension.");
+  }
+  return resolvedArtifact;
+}
 
 function readZipEntries(bytes) {
   const entries = new Map();

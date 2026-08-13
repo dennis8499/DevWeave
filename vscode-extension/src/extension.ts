@@ -105,7 +105,7 @@ class ExtensionController {
     const bundle = await this.loadBootstrapBundle();
     this.ensureRefreshCoordinator(
       root,
-      bundle ? [...bundle.directories, ...bundle.files.map((file) => file.destination)] : undefined,
+      bundle?.directories,
       bundle?.files
     );
     await this.refreshCoordinator?.request(changes);
@@ -123,13 +123,28 @@ class ExtensionController {
       this.selectedWorkId = workId;
     }
     const snapshot = await this.refresh();
-    await this.dashboard?.show(snapshot, this.selectedWorkId ?? undefined);
+    const selectedSnapshot = workId ? await this.selectWork(workId) : snapshot;
+    await this.dashboard?.show(selectedSnapshot, this.selectedWorkId ?? undefined);
   }
 
-  public selectWork(workId: string | null): void {
+  public async selectWork(workId: string | null): Promise<WorkspaceSnapshot> {
     this.selectedWorkId = resolveWorkSelection(this.snapshot, workId);
-    this.snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
+    if (this.selectedWorkId && this.reader) {
+      const detail = await this.reader.readWorkItemDetail(this.selectedWorkId);
+      if (detail) {
+        this.snapshot = {
+          ...this.snapshot,
+          workItems: this.snapshot.workItems.map((item) => item.id === detail.id ? detail : item),
+          selectedWorkId: this.selectedWorkId
+        };
+      } else {
+        this.snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
+      }
+    } else {
+      this.snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
+    }
     this.tree?.update(this.snapshot);
+    return this.snapshot;
   }
 
   public handleWorkspaceFoldersChanged(): void {
@@ -141,7 +156,7 @@ class ExtensionController {
     void this.refresh();
   }
 
-  private ensureRefreshCoordinator(root: vscode.Uri, bootstrapPaths?: readonly string[], bootstrapFiles?: BootstrapBundleFile[]): void {
+  private ensureRefreshCoordinator(root: vscode.Uri, bootstrapDirectories?: readonly string[], bootstrapFiles?: BootstrapBundleFile[]): void {
     if (this.activeRoot?.toString() === root.toString() && this.refreshCoordinator && this.reader) {
       return;
     }
@@ -151,8 +166,9 @@ class ExtensionController {
     this.reader = new WorkspaceSnapshotReader(port, {
       rootName: root.path.split("/").filter(Boolean).at(-1) ?? "Repository",
       rootPath: root.toString(),
-      bootstrapPaths,
-      bootstrapFiles
+      bootstrapDirectories,
+      bootstrapFiles,
+      initialReadMode: "summary"
     });
     this.refreshCoordinator = new RefreshCoordinator<WorkspaceSnapshot>({
       read: (changes) => this.reader?.readWorkspace(changes) ?? Promise.reject(new Error("Workspace snapshot reader is unavailable.")),
@@ -470,7 +486,7 @@ function unavailableSnapshot(message: string): WorkspaceSnapshot {
     baselineFiles: [],
     hookPresent: false,
     skillPresent: false,
-    bootstrap: { complete: false, expected: [], missing: [], conflicts: [] },
+    bootstrap: { complete: false, expected: [], missing: [], conflicts: [], pathKinds: {}, conflictReasons: {} },
     workItems: [],
     knowledge: {
       root: "wiki",
@@ -511,6 +527,8 @@ function unavailableSnapshot(message: string): WorkspaceSnapshot {
     source: "filesystem",
     authoritative: false,
     engineObservedAt: null,
+    engineGateStatus: "unavailable",
+    projectionReadiness: "attention",
     selectedWorkId: null
   };
 }

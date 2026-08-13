@@ -318,6 +318,10 @@ AC-001、AC-002 對應 TASK-001，證據為 {evidence}，且綁定目前 source 
         required_for: tuple[str, ...] = ("standard",),
         depends_on: tuple[str, ...] = (),
         exclusive_group: str = "",
+        affected_paths: tuple[str, ...] | None = None,
+        writes: str | None = None,
+        outputs: tuple[str, ...] | None = None,
+        release_only: bool = False,
     ) -> dict[str, Any]:
         project = core.load_project(self.repo)
         command = {
@@ -331,6 +335,14 @@ AC-001、AC-002 對應 TASK-001，證據為 {evidence}，且綁定目前 source 
             command["depends_on"] = list(depends_on)
         if exclusive_group:
             command["exclusive_group"] = exclusive_group
+        if affected_paths is not None:
+            command["affected_paths"] = list(affected_paths)
+        if writes is not None:
+            command["writes"] = writes
+        if outputs is not None:
+            command["outputs"] = list(outputs)
+        if release_only:
+            command["release_only"] = True
         project["commands"] = [
             item for item in project.get("commands", []) if item.get("id") != command_id
         ] + [command]

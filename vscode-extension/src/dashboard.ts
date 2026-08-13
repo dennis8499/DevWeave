@@ -12,7 +12,7 @@ export interface DashboardCallbacks {
   copy(bundle: PromptBundle): Promise<PromptBundle>;
   copySuccess?(): Promise<void> | void;
   openFile(relativePath: string): Promise<void>;
-  selectWork(workId: string | null): void;
+  selectWork(workId: string | null): Promise<WorkspaceSnapshot> | void;
   getPreferences?(): DashboardPreferences;
   setDisplayMode?(mode: DisplayMode): Promise<void> | void;
   protocolError(message: string): void;
@@ -120,8 +120,10 @@ export class DashboardPanel implements vscode.Disposable {
           return;
         }
         case "selectWork": {
-          this.callbacks.selectWork(parsed.workId);
-          if (this.lastSnapshot) {
+          const selectedSnapshot = await this.callbacks.selectWork(parsed.workId);
+          if (selectedSnapshot) {
+            await this.sendSnapshot(selectedSnapshot);
+          } else if (this.lastSnapshot) {
             const selectedWorkId = resolveWorkSelection(this.lastSnapshot, parsed.workId);
             await this.sendSnapshot({ ...this.lastSnapshot, selectedWorkId });
           } else {

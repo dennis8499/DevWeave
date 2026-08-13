@@ -77,6 +77,7 @@ function work(overrides: Partial<WorkItemProjection> = {}): WorkItemProjection {
     knowledgeProfile: undefined,
     knowledgeReviewRequired: false,
     knowledge: knowledge(),
+    detailLoaded: true,
     ...overrides
   };
 }
@@ -96,7 +97,7 @@ function snapshot(workItems: WorkItemProjection[] = []): WorkspaceSnapshot {
     baselineFiles: [],
     hookPresent: true,
     skillPresent: true,
-    bootstrap: { complete: true, expected: [], missing: [], conflicts: [] },
+    bootstrap: { complete: true, expected: [], missing: [], conflicts: [], pathKinds: {}, conflictReasons: {} },
     workItems,
     knowledge: knowledge(),
     diagnostics: [],
@@ -104,6 +105,8 @@ function snapshot(workItems: WorkItemProjection[] = []): WorkspaceSnapshot {
     source: "filesystem",
     authoritative: false,
     engineObservedAt: "2026-08-03T01:00:00Z",
+    engineGateStatus: "unavailable",
+    projectionReadiness: "ready",
     selectedWorkId: workItems[0]?.id ?? null
   };
 }

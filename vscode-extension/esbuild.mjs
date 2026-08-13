@@ -2,6 +2,8 @@ import { build } from "esbuild";
 import { createHash } from "node:crypto";
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const production = process.argv.includes("--production");
@@ -14,6 +16,7 @@ const esbuildPath = (value) => value.replaceAll("\\", "/");
 const esbuildRoot = esbuildPath(root);
 const extensionEntry = esbuildPath(join(root, "src", "extension.ts"));
 const webviewEntry = esbuildPath(join(root, "webview", "main.ts"));
+const execFileAsync = promisify(execFile);
 
 await rm(outdir, { recursive: true, force: true });
 await mkdir(outdir, { recursive: true });
@@ -139,12 +142,28 @@ async function createBootstrapBundle(repo, outputRoot) {
       sha256: createHash("sha256").update(bytes).digest("hex")
     });
   }
-  await writeFile(join(bootstrapRoot, "manifest.json"), `${JSON.stringify({
+  const sourceGitHead = await gitHead(repo);
+  const manifestPayload = {
     schemaVersion: 1,
     bundleVersion: version,
     directories,
     files
+  };
+  const manifestSha256 = createHash("sha256").update(JSON.stringify(manifestPayload), "utf8").digest("hex");
+  await writeFile(join(bootstrapRoot, "manifest.json"), `${JSON.stringify({
+    ...manifestPayload,
+    sourceGitHead,
+    manifestSha256,
+    packageVersion: version,
+    bootstrapFileCount: files.length
   }, null, 2)}\n`, "utf8");
+}
+
+async function gitHead(repo) {
+  const result = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" });
+  const head = result.stdout.trim();
+  if (!/^[a-f0-9]{40}$/i.test(head)) throw new Error("Unable to resolve source Git HEAD for the bootstrap manifest.");
+  return head;
 }
 
 async function collectFiles(directory, prefix = "") {

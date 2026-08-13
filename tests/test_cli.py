@@ -120,6 +120,57 @@ class CliContractTests(unittest.TestCase):
             self.assertFalse(payload["ok"])
             self.assertEqual(7, payload["evidence"]["exit_code"])
 
+    def test_verify_records_selection_and_unavailable_usage_metrics(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            harness.configure_command(
+                "metrics-command",
+                argv=[sys.executable, "-c", "print('metrics')"],
+                required_for=(),
+            )
+            result, payload = invoke(
+                harness.repo,
+                "verify",
+                "--work",
+                state["id"],
+                "--command",
+                "metrics-command",
+                "--kind",
+                "diagnostic",
+                "--metrics-json",
+                json.dumps({"usage": {"status": "unavailable"}}),
+            )
+            self.assertEqual(0, result.returncode, result)
+            metrics = payload["evidence"]["metrics"]
+            self.assertEqual("unavailable", metrics["usage"]["status"])
+            self.assertIsNone(metrics["usage"]["input_tokens"])
+            self.assertEqual(1, metrics["verification"]["selected"])
+            self.assertGreaterEqual(metrics["duration_ms"], 0)
+
+    def test_verify_rejects_malformed_metrics_json_as_validation_error(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            harness.configure_command(
+                "metrics-invalid",
+                argv=[sys.executable, "-c", "print('never')"],
+                required_for=(),
+            )
+            result, payload = invoke(
+                harness.repo,
+                "verify",
+                "--work",
+                state["id"],
+                "--command",
+                "metrics-invalid",
+                "--kind",
+                "diagnostic",
+                "--metrics-json",
+                "{",
+            )
+            self.assertEqual(2, result.returncode)
+            self.assertEqual("validation_failed", payload["error"]["code"])
+            self.assertNotIn("JSONDecodeError", result.stdout)
+
     def test_verify_profile_batches_independent_commands_and_respects_dependencies(self) -> None:
         with RepositoryHarness() as harness:
             state = harness.start()
@@ -185,6 +236,160 @@ class CliContractTests(unittest.TestCase):
             self.assertEqual(2, result.returncode)
             self.assertEqual("validation_failed", payload["error"]["code"])
             self.assertEqual([], core.load_project(harness.repo)["commands"])
+
+    def test_command_set_records_and_validates_optional_metadata(self) -> None:
+        with RepositoryHarness() as harness:
+            harness.init()
+            result, payload = invoke(
+                harness.repo,
+                "command",
+                "set",
+                "--id",
+                "metadata-command",
+                "--required-for",
+                "standard",
+                "--affected-path",
+                "src",
+                "--writes",
+                "generated",
+                "--output",
+                "dist",
+                "--release-only",
+                "--",
+                sys.executable,
+                "-c",
+                "print('metadata')",
+            )
+            self.assertEqual(0, result.returncode, payload)
+            command = payload["command"]
+            self.assertEqual(["src"], command["affected_paths"])
+            self.assertEqual("generated", command["writes"])
+            self.assertEqual(["dist"], command["outputs"])
+            self.assertTrue(command["release_only"])
+
+            result, payload = invoke(
+                harness.repo,
+                "command",
+                "set",
+                "--id",
+                "bad-metadata",
+                "--affected-path",
+                "../outside",
+                "--",
+                sys.executable,
+                "-c",
+                "print('never')",
+            )
+            self.assertEqual(2, result.returncode)
+            self.assertEqual("validation_failed", payload["error"]["code"])
+            self.assertEqual(
+                ["metadata-command"],
+                [item["id"] for item in core.load_project(harness.repo)["commands"]],
+            )
+
+    def test_selective_profile_reports_skips_and_dependency_closure(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            harness.configure_command(
+                "selected",
+                argv=[sys.executable, "-c", "print('selected')"],
+                required_for=("standard",),
+                affected_paths=("src",),
+            )
+            harness.configure_command(
+                "dependency",
+                argv=[sys.executable, "-c", "print('dependency')"],
+                required_for=(),
+                affected_paths=("docs",),
+            )
+            project = core.load_project(harness.repo)
+            selected = next(item for item in project["commands"] if item["id"] == "selected")
+            selected["depends_on"] = ["dependency"]
+            project["verification_profiles"]["standard"] = ["selected"]
+            core.atomic_write_json(core.project_path(harness.repo), project)
+            result, payload = invoke(
+                harness.repo,
+                "verify",
+                "--work",
+                state["id"],
+                "--profile",
+                "standard",
+                "--path",
+                "src/app.txt",
+                "--kind",
+                "regression",
+            )
+            self.assertEqual(0, result.returncode, result)
+            selection = payload["batch"]["selection"]
+            self.assertEqual("affected-paths", selection["mode"])
+            self.assertEqual(["dependency"], selection["dependency_closure_added"])
+            self.assertEqual(["dependency", "selected"], selection["selected"])
+            self.assertEqual([], selection["skipped"])
+
+    def test_non_high_profile_does_not_resurrect_release_only_dependency(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            harness.configure_command(
+                "release-package",
+                argv=[sys.executable, "-c", "print('package')"],
+                required_for=("standard",),
+                affected_paths=("src",),
+                release_only=True,
+            )
+            harness.configure_command(
+                "release-smoke",
+                argv=[sys.executable, "-c", "print('smoke')"],
+                required_for=("standard",),
+                depends_on=("release-package",),
+                affected_paths=("src",),
+            )
+            result, payload = invoke(
+                harness.repo,
+                "verify",
+                "--work",
+                state["id"],
+                "--profile",
+                "standard",
+                "--path",
+                "src/app.txt",
+                "--kind",
+                "regression",
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+            selection = payload["batch"]["selection"]
+            self.assertEqual([], selection["selected"])
+            self.assertEqual(
+                {"release-package", "release-smoke"},
+                {item["command_id"] for item in selection["skipped"]},
+            )
+            self.assertIn(
+                "release-only-dependency:release-package",
+                {item["reason"] for item in selection["skipped"]},
+            )
+
+    def test_high_profile_ignores_path_filter_and_legacy_commands_are_explicitly_skipped(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            harness.configure_command(
+                "legacy-high",
+                argv=[sys.executable, "-c", "print('legacy')"],
+                required_for=("high",),
+            )
+            result, payload = invoke(
+                harness.repo,
+                "verify",
+                "--work",
+                state["id"],
+                "--profile",
+                "high",
+                "--path",
+                "unrelated.txt",
+                "--kind",
+                "regression",
+            )
+            self.assertEqual(0, result.returncode, result)
+            self.assertTrue(payload["batch"]["selection"]["high_profile_full_set"])
+            self.assertEqual([], payload["batch"]["selection"]["skipped"])
 
     def test_machine_only_review_record_cli_writes_review_evidence(self) -> None:
         with RepositoryHarness() as harness:

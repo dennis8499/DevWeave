@@ -51,9 +51,9 @@ hook、project state、Wiki 與 baseline 一起運作。
 
 本次提供 0.2.3 VSIX，交付檔為 `vscode-extension/devweave-control-center-0.2.3.vsix`，並保留既有 0.2.2 與 0.2.1 artifact。VSIX 可在 VS Code 的 Extensions 視窗使用「Install from VSIX…」安裝；安裝後開啟 DevWeave repository，即可從 Activity Bar 進入 Control Center。完整流程請看[繁體中文使用手冊](docs/使用手冊.md)與 [Control Center README](vscode-extension/README.md)。
 
-本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 101 項（1 項因 symlink 權限 skipped）與 Extension unit tests 77 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻，不是本次已認證組合的宣告。這個 release 不包含 Marketplace 上架，也不對 macOS/Linux 做支援承諾。
+本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 111 項（1 項因 symlink 權限 skipped）與 Extension unit tests 88 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻，不是本次已認證組合的宣告。這個 release 不包含 Marketplace 上架，也不對 macOS/Linux 做支援承諾。
 
-若發生發布事故，處理方式是立即停止散布並停用或解除安裝 0.2.3；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。應保留 workspace snapshot 與 logs，以新版本修復，並保留已發布的 0.2.2 與 0.2.1 artifact。
+發布流程先建立同目錄唯一 candidate，再以 provenance verifier 驗證，成功後才以 atomic rename promotion current VSIX；verify、promotion 或 cleanup 失敗都保留 current 與 retained artifact bytes，candidate 只做 best-effort cleanup。若發生發布事故，立即停止散布並停用或解除安裝 0.2.3；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。應保留 workspace snapshot 與 logs，以新版本修復，並保留已發布的 0.2.2 與 0.2.1 artifact。
 
 Control Center 的公開操作都遵循「預覽 → 你確認複製 → Codex Chat 審閱並送出 → Refresh」；Refresh、切換 work 或 workspace snapshot 更新後，舊 prompt 必須重新預覽。若 mutation prompt 顯示 Plan Mode handoff，請先切換 Plan Mode，再貼到 Codex Chat；Extension 仍可複製 prompt，但不會嘗試切換 host mode。`devweave.copyNextAction` 仍保留，但現在會開啟 Control Center；多個 active work 時必須先明確選取 work。
 
@@ -118,6 +118,18 @@ py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . instructio
 ```
 
 公開 chat surface 與 machine CLI 的完整差異、參數及範例，請見 [使用手冊](docs/使用手冊.md)。
+
+#### 依變更範圍執行驗證
+
+驗證命令可在 `.devweave/project.json` 宣告 `affected_paths`、`writes`、`outputs`、`release_only` 與 `depends_on`。針對已知變更可只選取相關命令：
+
+```powershell
+py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . verify --work <work-id> --profile standard --path vscode-extension/src --kind regression
+```
+
+選擇結果會回報 `selected`、`skipped` 與 dependency closure；沒有 metadata 的 legacy command 只在明確的完整 profile 中保留。`high` profile 即使指定 `--path` 仍執行完整集合，release-only package/smoke 不會被 low/standard 的依賴閉包偷偷帶回來。
+
+每個 verification evidence 都可帶 bounded `metrics`：duration、context pages/bytes/chars、tool counts、selection/cache 與 usage。engine 目前限制 metrics canonical payload 為 250,000 bytes、數值欄位為非負且最多 10,000,000；Codex host 未提供 exact token/cost 時，CLI 會保存 `usage.status=unavailable` 與 null 欄位，不以 context bytes 推算 Token，也不保存 prompt 或 secret。
 
 ## 三道人工 gate
 

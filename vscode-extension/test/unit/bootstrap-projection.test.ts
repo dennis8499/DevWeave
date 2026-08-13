@@ -6,11 +6,22 @@ import type { BootstrapCompatibilityKind } from "../../src/bootstrap-compat";
 import { WorkspaceSnapshotReader } from "../../src/snapshot";
 
 class ProjectionFileSystem implements FileSystemPort {
-  public constructor(private readonly files: Record<string, string>) {}
+  public constructor(
+    private readonly files: Record<string, string>,
+    private readonly specialKinds: Record<string, "symlink" | "other"> = {}
+  ) {}
 
   public async exists(relativePath: string): Promise<boolean> {
     return Object.prototype.hasOwnProperty.call(this.files, relativePath)
       || Object.keys(this.files).some((path) => path.startsWith(`${relativePath}/`));
+  }
+
+  public async inspectPath(relativePath: string): Promise<{ kind: "missing" | "file" | "directory" | "symlink" | "other" }> {
+    const specialKind = this.specialKinds[relativePath];
+    if (specialKind) return { kind: specialKind };
+    if (Object.prototype.hasOwnProperty.call(this.files, relativePath)) return { kind: "file" };
+    if (Object.keys(this.files).some((path) => path.startsWith(`${relativePath}/`))) return { kind: "directory" };
+    return { kind: "missing" };
   }
 
   public async readText(relativePath: string): Promise<{ text: string; truncated: boolean }> {
@@ -125,4 +136,40 @@ test("snapshot keeps semantic bootstrap conflicts visible", async () => {
 
   assert.equal(snapshot.bootstrap.complete, false);
   assert.deepEqual(snapshot.bootstrap.conflicts, [".devweave/project.json"]);
+});
+
+test("snapshot rejects a regular file where the bootstrap contract expects a directory", async () => {
+  const options = {
+    rootName: "path-kind",
+    rootPath: "file:///path-kind",
+    bootstrapPaths: [],
+    bootstrapDirectories: ["generated"]
+  };
+  const snapshot = await new WorkspaceSnapshotReader(new ProjectionFileSystem({
+    ".devweave/project.json": JSON.stringify({ managed: true, schema_version: 1, commands: [], verification_profiles: {} }),
+    generated: "this is a file"
+  }), options).readWorkspace();
+
+  assert.equal(snapshot.bootstrap.complete, false);
+  assert.deepEqual(snapshot.bootstrap.missing, []);
+  assert.deepEqual(snapshot.bootstrap.conflicts, ["generated"]);
+  assert.equal(snapshot.bootstrap.pathKinds.generated, "file");
+  assert.match(snapshot.bootstrap.conflictReasons.generated ?? "", /directory|file/i);
+});
+
+test("snapshot classifies symlink and unsupported path kinds as conflicts", async () => {
+  const snapshot = await new WorkspaceSnapshotReader(new ProjectionFileSystem(
+    { ".devweave/project.json": JSON.stringify({ managed: true, schema_version: 1, commands: [], verification_profiles: {} }) },
+    { "link": "symlink", "device": "other" }
+  ), {
+    rootName: "special-paths",
+    rootPath: "file:///special-paths",
+    bootstrapPaths: ["link", "device"]
+  }).readWorkspace();
+
+  assert.equal(snapshot.bootstrap.complete, false);
+  assert.deepEqual(snapshot.bootstrap.conflicts, ["device", "link"]);
+  assert.equal(snapshot.bootstrap.pathKinds.link, "symlink");
+  assert.equal(snapshot.bootstrap.pathKinds.device, "other");
+  assert.match(snapshot.bootstrap.conflictReasons.link ?? "", /file|symlink/i);
 });

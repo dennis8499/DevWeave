@@ -1,0 +1,63 @@
+{
+  "argv": [
+    "npm.cmd",
+    "run",
+    "package"
+  ],
+  "binds_current_source": true,
+  "command_id": "extension-package",
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013"
+  ],
+  "created_at": "2026-08-13T12:40:19+00:00",
+  "cwd": "vscode-extension",
+  "duration_ms": 1641,
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-13T12:40:16+00:00",
+  "git_head": "40823cf6e448da9a69667cdf74b2da2923d687d4",
+  "id": "EVID-084",
+  "kind": "regression",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 1641,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 9,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260813-142228-feature-devweave-vs-code-extension/EVID-084.log",
+  "schema_version": 1,
+  "source_fingerprint": "4e652d235dc9017ae862bd146885cba7160c1b5788a0d607533b615635243985",
+  "stale": false,
+  "started_at": "2026-08-13T12:40:15+00:00",
+  "status": "passed",
+  "summary": "> devweave-control-center@0.2.3 package\n> node esbuild.mjs --production && node scripts/release-orchestrator.mjs\n\nCreated C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\devweave-control-center-0.2.3.candidate-22280-03195f77-0e66-443b-bb2b-4eeb72d6d2f2.vsix (305154 bytes, 119 entries)\nVerified C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\devweave-control-center-0.2.3.candidate-22280-03195f77-0e66-443b-bb2b-4eeb72d6d2f2.vsix: 0.2.3, 58 bootstrap files and 119 VSIX entries. Manifest SHA-256: 8a3ea557bc791fc0984aeec9e678387f5b75f585aa96b481f6ab16a4c01cfe51. VSIX SHA-256: f883dc2a85d95c963501bb3b913e67d31d0769f815fd5bfa878f66644dbbcad1\nReleased C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\devweave-control-center-0.2.3.vsix (305154 bytes)\n\n\n  dist\\extension.js  67.2kb\n\nDone in 18ms\n\n  dist\\webview\\main.js  79.4kb\n\nDone in 11ms",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006"
+  ],
+  "timed_out": false,
+  "verification_batch_id": "VB-322c90e4dc04",
+  "verification_batch_index": 0
+}

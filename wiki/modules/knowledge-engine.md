@@ -1,12 +1,12 @@
 ---
 title: Knowledge Engine
 type: module
-sources: [.agents/skills/devweave/scripts, .codex/hooks.json, AGENTS.md, tests/test_repository_contract.py, vscode-extension/scripts/verify-package.mjs]
-last_updated: 2026-08-10
+sources: [.agents/skills/devweave/scripts, tests/devweave_test_support.py, tests/test_cli.py, tests/test_devweave_core.py, tests/test_repository_contract.py]
+last_updated: 2026-08-13
 tags: [module]
 status: active
-source_fingerprint: "sha256:6538512f22216482041a2bc12c617ef2f0e121f41f54558a34faa7d9a8d3d2c2"
-verified_by: 20260810-130022-feature-openai-hooks-windows-shell-pretooluse
+source_fingerprint: "sha256:c422adb540ff1cc910d9705fa7ba1e25697a74ade8232a011717756f3e27f260"
+verified_by: 20260813-142228-feature-devweave-vs-code-extension
 ---
 
 # Knowledge Engine
@@ -27,7 +27,15 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 - `init/start`：在 project lock 外與 lock 內做 Wiki reserved-starter preflight；missing、empty、custom-only root 可補 starter，reserved type/frontmatter conflict 以 `knowledge_conflict` fail closed，且不留下 partial `.devweave` control state。
 - machine-only `review record`：由既有 router 傳入固定 reviewer JSON report 與 opaque reviewer ID；只接受 high-risk G3 的 isolated/read-only review，產生 source-bound `kind: review` evidence 與 redacted report provenance，不是新的 public chat verb。
 
-0.2.3 current-version-only release 不新增 Python public command、CLI schema 或 engine lifecycle。Repository contract 以既有 test surface 機械檢查 README、使用手冊、Extension README 與內嵌 Help 的單一 0.2.3 交付、限定認證環境、Python release baseline、77 項 Extension tests 與 data-preserving incident response；本次 package verifier 以 source-derived 58 個 bootstrap files、119 個 VSIX entries 與 root/embedded hook equality 驗證 current artifact，並保留 0.2.2 與 0.2.1 artifact。Extension 的 PreviewGate、`actionPreview` protocol、legacy `copyNextAction` 與 Wiki DOM mount 都是 projection/client-side seams。Python engine 仍是 work state、multi-work `next/status --all`、bootstrap cancel/failure 與 gate/evidence 的權威來源。
+## Verification and metrics contract
+
+`command set` accepts optional relative `affected_paths`, `writes` (`none|generated|tracked-artifact`), `outputs`, and `release_only`. `verify --profile <low|standard|high> --path <path>` applies path intersection for non-high profiles, reports skipped reasons and dependency closure, and preserves a full command set for high. Release-only commands and their dependents are not silently reintroduced into low/standard selection. Invalid metadata, traversal, duplicate paths, unknown fields, malformed metrics, and oversized payloads fail closed.
+
+Verification evidence remains the single durable metrics surface. The engine records execution duration and bounded verification selection; callers may add bounded context/tool counters and explicit usage. The complete metrics payload is limited to 250,000 bytes and numeric counters to 10,000,000. Usage is status-aware: unavailable host usage is stored as unavailable with null token/cost fields, never inferred from bytes or prompt text. Legacy evidence without `metrics` remains readable.
+
+CLI machine output explicitly reconfigures standard streams to UTF-8 when the host supports it, preserving non-ASCII executable paths and argv values in JSON evidence and command responses; embedded streams that cannot be reconfigured keep their existing transport without changing the schema.
+
+0.2.3 current-version-only release 不新增 Python public command、CLI schema 或 engine lifecycle。Repository contract 以既有 test surface 機械檢查 README、使用手冊、Extension README 與內嵌 Help 的單一 0.2.3 交付、限定認證環境、Python release baseline、88 項 Extension tests 與 data-preserving incident response；package verifier 只接受明確的 candidate artifact，完成 source-derived 58 個 bootstrap files、119 個 VSIX entries、artifact hash 與 hook equality 後才由 release orchestrator promotion，失敗時保留 current 並清理 candidate；並保留 0.2.2 與 0.2.1 artifact。Extension 的 PreviewGate、`actionPreview` protocol、legacy `copyNextAction` 與 Wiki DOM mount 都是 projection/client-side seams。Python engine 仍是 work state、multi-work `next/status --all`、bootstrap cancel/failure 與 gate/evidence 的權威來源。
 
 Release verification 將這個 boundary 綁到 current source fingerprint：Extension bounded walkthrough 需覆蓋 fresh/evolved/conflict/rollback 與 multi-work selection，Python targeted fixtures 需確認 conflict 保留 user bytes；high-risk review 仍只能由 router 透過 machine-only `review record` 記錄，不能由 engine 或 Extension 自行啟動。
 

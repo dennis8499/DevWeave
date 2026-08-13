@@ -2,11 +2,11 @@
 title: DevWeave Knowledge Workflow
 type: architecture
 sources: [.agents/skills, .codex/hooks.json, AGENTS.md, README.md, docs/使用手冊.md]
-last_updated: 2026-08-10
+last_updated: 2026-08-13
 tags: [architecture]
 status: active
-source_fingerprint: "sha256:ae46134844eb53b377027832e480346775856f96bffe14119b24250e6dabaa24"
-verified_by: 20260810-130022-feature-openai-hooks-windows-shell-pretooluse
+source_fingerprint: "sha256:c67339026554e1dfc11e4b2c19d188bfc82fadad14aa6a3bcfdf954a899785ef"
+verified_by: 20260813-142228-feature-devweave-vs-code-extension
 ---
 
 # DevWeave Knowledge Workflow
@@ -26,6 +26,12 @@ Repository contract 以 exact six-governed-Skill set、frontmatter identity、re
 ## Components and Data Flow
 
 1. `$devweave wiki bootstrap` 由 router 轉成 `knowledge bootstrap`。Engine 先評估 active、sourced、current 的 overview、architecture 與 module；完整時回 `already_complete`，否則 resume 或 create bootstrap-profile feature Work Item。
+
+## Verification selection and evidence metrics
+
+Verification remains an engine-owned extension of the existing project command contract. A command may declare `affected_paths`, `writes`, `outputs`, `release_only`, and `depends_on`. A low/standard affected-path run selects only intersecting classified commands, records explicit skip reasons, and closes dependencies without resurrecting release-only commands. A high profile is intentionally a full set even when a path filter is supplied, so efficiency selection never reduces high-risk coverage. Commands without metadata remain compatible in an explicit full-profile run and are skipped from selective non-high runs.
+
+The same evidence pipeline records bounded `duration_ms`, context page/byte/char counts, tool counters, and verification selected/skipped/closure/cache metrics. The complete metrics payload is capped at 250,000 bytes and each numeric counter at 10,000,000. Exact host usage is optional: when Codex does not expose token/cost data, evidence records `usage.status=unavailable` with null usage fields. The engine rejects unknown or oversized metrics and does not store prompts or secrets.
 2. G1 的 `knowledge context` 固定先記錄 index，再記錄最多五頁的 path、status、content hash、stored/computed source fingerprint。Nonfresh、矛盾或不足 knowledge 必須先形成 gap，才允許最小 raw-source fallback；repository 已能證實的事實不轉成使用者問題。
 3. G1 由 `grill-me`/`grilling` 在 Plan Mode 逐題處理 material decisions。Codex host 可見時使用 `request_user_input`，題目提供兩至三個互斥選項、第一項 `(Recommended)`、trade-off 與 host `Other`；不可用時，普通 context 先回到 Plan Mode，只有無法切換或明確 compatibility 才使用相同結構的 numbered fallback。等待有效 answer 後才回流 `brief.md`/`requirements.md`；`validate` 後的問題、範圍、非目標、驗收與剩餘假設才可送 G1 explicit approval。
 4. G2 由 `codebase-design` 在 Plan Mode 逐題處理 design choices，沿用 shared native-question contract。回答回流 `design.md`/`plan.md`，並在 `validate` 後以 Gate Double Check 展示選定/淘汰方案、介面、資料流、失敗處理、回復方式與 immutable task plan；G2 前不修改產品內容或 tracked tests。G2 後普通模式只執行 approved tasks；新的 material requirement/design/scope/task decision 必須停止並 `revise`。
@@ -36,7 +42,7 @@ Repository contract 以 exact six-governed-Skill set、frontmatter identity、re
 9. Verification 的 `knowledge review` 保存 disposition、rationale、affected/covered/uncovered paths 與 product change fingerprint。後續產品 fingerprint 改變會使 knowledge review、plan 與 source-bound review evidence invalid，並要求重新審查。
 10. `promote` 建立一至五個 content upsert/delete；新頁經 canonical scaffold 先成為 placeholder。完成 active 內容後同步 index、append-only log，再 seal source fingerprint 與 Work Item provenance。`no-update` 僅在非 bootstrap、無 affected page、無 Wiki diff 時成立。
 11. G3 重新比對完整 Wiki diff、affected pages、plan、coupling、log、seal、baseline、current evidence 與 Independent Review。`passed` 正常通過；unavailable/advisory 形成 warning；critical security/data-loss/irreversible/scope finding 只有 exact named `review-critical` acceptance waiver 可解除。它只驗證實作是否符合已批准內容，不默默補入新需求或設計。人工核准後才可 close。
-12. 0.2.3 Windows release verification 必須固定記錄 `py -3 -X utf8 -B ... doctor`、Extension tests/typecheck/package/smoke、Python release baseline、symlink 權限結果、disposable walkthrough 與 `git diff --check`；VSIX verifier 只驗證 current 0.2.3，包含 58 個 bootstrap files、119 個 VSIX entries、source length/hash、artifact SHA-256 與 root/embedded hook equality，並保留 0.2.2 artifact。本 work item 的 Extension final run 為 77 tests、Python final run 為 101 tests（1 skipped）。High-risk review 仍只由 router 啟動 exactly one isolated read-only reviewer；failed evidence、未說明的 skip、stale evidence 或非 current `passed` review 都不符合 G3 release bar。
+12. 0.2.3 Windows release verification 必須固定記錄 `py -3 -X utf8 -B ... doctor`、Extension tests/typecheck/package/smoke、Python release baseline、symlink 權限結果、disposable walkthrough 與 `git diff --check`；VSIX verifier 只驗證 current 0.2.3，包含 58 個 bootstrap files、119 個 VSIX entries、source length/hash、artifact SHA-256 與 root/embedded hook equality，並保留 0.2.2 artifact。本 work item 的 Extension final run 為 88 tests、Python final run 為 111 tests（1 skipped）。Release 必須先建立 candidate、完成 verifier，再以 atomic promotion 取代 current；verification 或 promotion 失敗不得破壞 current。High-risk review 仍只由 router 啟動 exactly one isolated read-only reviewer；failed evidence、未說明的 skip、stale evidence 或非 current `passed` review 都不符合 G3 release bar。
 13. Windows Codex 的 PreToolUse launcher 是 bootstrap control contract：exact matcher `^(Bash|apply_patch|Edit|Write)$` 同時提供 POSIX `command` 與 Windows `commandWindows`。Windows path 使用 `powershell.exe -NoLogo -NoProfile -NonInteractive -Command`，先設定 `[Console]::InputEncoding`/`[Console]::OutputEncoding` 為 .NET UTF-8，再以 `py -3 -X utf8 -B` 和 `Join-Path (git rev-parse --show-toplevel)` 從 Git root 執行 `guard.py`；它不依賴 shell-scoped `$OutputEncoding`，可由 `cmd.exe`、Windows PowerShell 5.1、PowerShell 7 與 VS Code terminal 啟動。guard 以 UTF-8 bytes 解析/輸出，程序 exit 與 guard 的 `permissionDecision` JSON 是分離的結果，Extension 不會靜默覆寫既有 exact hook。launcher failure 與正常 process exit 0 的 policy deny 必須分開診斷。
 
 ## VS Code Control Center integration

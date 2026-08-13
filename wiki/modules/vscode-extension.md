@@ -2,18 +2,18 @@
 title: DevWeave VS Code Extension
 type: module
 sources: [.codex/hooks.json, vscode-extension]
-last_updated: 2026-08-10
+last_updated: 2026-08-13
 tags: [module, vscode, control-center]
 status: active
-source_fingerprint: "sha256:bf6410859bf833af74cf9eb7be2f2a74ecb12c7dc1a28d2f2403ca978567a67a"
-verified_by: 20260810-130022-feature-openai-hooks-windows-shell-pretooluse
+source_fingerprint: "sha256:b372563f7cd467ebfbc2b09f8412d37738c07e352307da3c9d6a01610f6aa36f"
+verified_by: 20260813-142228-feature-devweave-vs-code-extension
 ---
 
 # DevWeave VS Code Extension
 
 ## Responsibility
 
-`devweave-control-center` 是 DevWeave 0.2.3 Windows 公開版的唯讀 Control Center，本次提供 `devweave-control-center-0.2.3.vsix` 並保留 `devweave-control-center-0.2.2.vsix` 與 `devweave-control-center-0.2.1.vsix`。認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次 Python full suite 為 101 項（1 項因 symlink 權限 skipped），Extension unit tests 為 77 項。VS Code 1.90+／Python 3.11+ 是技術門檻，不代表其他組合已完成本次認證。Extension host 將 project、Work Item、Wiki、evidence、diagnostics 與 bootstrap completeness 投影給 Webview；workflow decision 仍以 prompt handoff 回到 Codex Chat，Extension 不執行 DevWeave engine、CLI、shell、Git 或 network。
+`devweave-control-center` 是 DevWeave 0.2.3 Windows 公開版的唯讀 Control Center，本次提供 `devweave-control-center-0.2.3.vsix` 並保留 `devweave-control-center-0.2.2.vsix` 與 `devweave-control-center-0.2.1.vsix`。認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次 Python full suite 為 111 項（1 項因 symlink 權限 skipped），Extension unit tests 為 88 項。VS Code 1.90+／Python 3.11+ 是技術門檻，不代表其他組合已完成本次認證。Extension host 將 project、Work Item、Wiki、evidence、diagnostics 與 bootstrap completeness 投影給 Webview；workflow decision 仍以 prompt handoff 回到 Codex Chat，Extension 不執行 DevWeave engine、CLI、shell、Git 或 network。
 
 ## Webview interaction
 
@@ -34,6 +34,8 @@ verified_by: 20260810-130022-feature-openai-hooks-windows-shell-pretooluse
 
 Workspace watcher 保留自動 refresh，事件經 250ms debounce 後交給 `RefreshCoordinator`。Coordinator 只允許一個 read in flight，burst 中只保留最新 pending request；成功 publish 的 snapshot 不會被較舊結果覆蓋。`WorkspaceSnapshotReader` 對獨立的 project、Wiki、Work Item artifacts、evidence 與 events 讀取平行化，最後依固定 path/id 排序合併 diagnostics 與 projection。
 
+初次 workspace read 採 summary-first：Work Item 初始只讀 bounded state summary；`readWorkItemDetail(workId)` 才載入 artifacts、evidence、events 與 bounded raw-log metadata，失敗時保留 summary 並標示 detail unavailable。Wiki page body 受 byte 上限，projection 保存 content hash、truncated 與 frontmatter parse diagnostics。`engineGateStatus=unavailable`、`authoritative=false` 與 `projectionReadiness` 讓 UI 不會把檔案預檢誤稱為 engine Gate passed。
+
 手動 Refresh 與 watcher/snapshot revision 共用同一個 stale boundary：既有 preview/result 不可跨 revision 複製。Codex Chat 操作完成後，使用者回到 Control Center Refresh，重新讀取 filesystem snapshot 並再次預覽下一個 prompt。
 
 ## Bootstrap contract
@@ -44,7 +46,7 @@ Windows Codex 的 PreToolUse hook 是由根目錄 `.codex/hooks.json` 產生的 
 
 `BootstrapInstaller.inspect()` 先驗證 manifest path、byte length 與 SHA-256，再依 `bootstrap-compat.ts` shared validator 檢查 semantic identity。合法 evolved project/baseline/Wiki bytes 會 adopted；AGENTS、skills、hook、lock 與其他 controls 仍以 exact bytes 判定。初始化或修復只建立 missing paths，不同或不合法內容永不覆寫並列為 conflict；只要仍有 missing 或 conflict，report 與 Dashboard 就標示 partial；若中途寫入失敗，僅 rollback 本輪新增內容，既有檔案保持不變。重跑完整 bundle 是 idempotent。
 
-Hook 的 source-derived consistency 由 package verifier 檢查根目錄 hook 與 `dist/bootstrap/hooks.json` 的 exact matcher、POSIX/Windows dual path、explicit UTF-8 console setup、`py -3`、Git-root 與 no-`$repo` contract；0.2.3 VSIX 從 current source 重新產出，其他 VSIX（包含保留的 0.2.2 與 0.2.1 artifact）不屬於 current package 驗收輸入。
+Hook 的 source-derived consistency 由 package verifier 檢查根目錄 hook 與 `dist/bootstrap/hooks.json` 的 exact matcher、POSIX/Windows dual path、explicit UTF-8 console setup、`py -3`、Git-root 與 no-`$repo` contract；0.2.3 release 先以明確 `--output` 建立同目錄 candidate VSIX，再對 candidate 完成 verification，成功才 atomic promotion 取代 current，失敗會保留 current 並清理 candidate。其他 VSIX（包含保留的 0.2.2 與 0.2.1 artifact）不屬於 current package 驗收輸入。
 
 ## Security and compatibility
 
@@ -52,4 +54,6 @@ Runtime 維持 CSP、no process、no shell、no external network 與 preview-fir
 
 ## Verification seams
 
-`WikiSearchModel`、`RenderScheduler`、`RefreshCoordinator`、`PreviewGate`、Wiki result mount adapter、instrumented snapshot reader、`dashboard-sections.ts`、copy transaction boundary、`bootstrap-compat.ts` 與 `BootstrapInstaller.inspect()` 是不依賴 VS Code UI 的測試 seams。package verifier 只讀取 current 0.2.3 VSIX，檢查 manifest 每個 entry 的 destination、byte length、SHA-256、policy/kind、package／bundle version、58 個 bootstrap files、119 個 VSIX entries、required entries、root/embedded hook equality 與 current artifact SHA-256；77 項 Extension tests、typecheck 與 smoke test 再確認 host 可載入 bundle，既有 0.2.2 與 0.2.1 artifact 保留。Configured full-suite raw logs 另保留 Windows walkthrough、accessibility marker 與 101-test/1-symlink-skip result。
+`WikiSearchModel`、`RenderScheduler`、`RefreshCoordinator`、`PreviewGate`、Wiki result mount adapter、instrumented snapshot reader、`dashboard-sections.ts`、copy transaction boundary、`bootstrap-compat.ts` 與 `BootstrapInstaller.inspect()` 是不依賴 VS Code UI 的測試 seams。package verifier 只讀取 current 0.2.3 candidate VSIX，檢查 manifest 每個 entry 的 destination、byte length、SHA-256、policy/kind、package／bundle version、58 個 bootstrap files、119 個 VSIX entries、required entries、root/embedded hook equality 與 current artifact SHA-256；88 項 Extension tests、typecheck 與 smoke test 再確認 host 可載入 bundle，既有 0.2.2 與 0.2.1 artifact 保留。Configured full-suite raw logs 另保留 Windows walkthrough、accessibility marker 與 111-test/1-symlink-skip result。
+
+Evidence metrics projection 顯示 duration、selected/skipped/closure/cache 與 usage availability；metrics payload 上限為 250,000 bytes、numeric counter 上限為 10,000,000；未知 token/cost 顯示 unavailable，不由 Extension 估算。Build seam 先清理 dist，再用 package version、source Git HEAD、manifest hash、bootstrap count 與 VSIX entry count 做 provenance verification；pinned smoke 只接受 cache-only VS Code 1.131.0，缺少 runtime 時 fail with guidance，不下載或 fallback。

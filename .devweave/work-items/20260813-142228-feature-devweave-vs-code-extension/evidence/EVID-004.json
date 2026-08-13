@@ -1,0 +1,63 @@
+{
+  "argv": [
+    "npm.cmd",
+    "run",
+    "test"
+  ],
+  "binds_current_source": true,
+  "command_id": "extension-tests",
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013"
+  ],
+  "created_at": "2026-08-13T08:51:30+00:00",
+  "cwd": "vscode-extension",
+  "duration_ms": 1580,
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-13T08:51:27+00:00",
+  "git_head": "40823cf6e448da9a69667cdf74b2da2923d687d4",
+  "id": "EVID-004",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 1580,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 9,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260813-142228-feature-devweave-vs-code-extension/EVID-004.log",
+  "schema_version": 1,
+  "source_fingerprint": "a0d3e299d4c4ad5e9cdd321258406b0d531b716dc408bb3c1ba0b9220d3d8204",
+  "stale": false,
+  "started_at": "2026-08-13T08:51:26+00:00",
+  "status": "passed",
+  "summary": "ms)\n✔ Dashboard preview protocol preserves the exact intent and revision (0.7347ms)\n✔ legacy copyNextAction command opens the Control Center preview flow (1.9347ms)\n✔ release package derives and verifies only the current 0.2.3 artifact (2.56ms)\n✔ command catalog groups all nine public commands in task language (2.0138ms)\n✔ snapshot guidance is explicitly non-authoritative and hands off next to Codex (0.8842ms)\n✔ snapshot guidance handles an empty active-work state without selecting closed history (0.3395ms)\n✔ snapshot guidance marks G1 and G2 work with a required Plan Mode stage (2.7836ms)\n✔ snapshot guidance does not block post-G2 work with an initial Plan Mode prompt (0.7755ms)\n✔ snapshot guidance makes initialization and bootstrap write boundary explicit (0.8347ms)\n✔ review readiness explains gate, blocker, stale evidence, task and Wiki checks (1.3121ms)\n✔ review readiness can be ready for a pending gate without pretending the gate is approved (0.4963ms)\n✔ high-risk acceptance readiness projects independent review states (0.7659ms)\n✔ closed work is explicitly not reviewable (0.7201ms)\n✔ diagnostics and audit events become readable while preserving technical raw data (0.7604ms)\n✔ display mode protocol accepts only the typed preference message (0.5453ms)\n✔ readiness and bootstrap statuses are presented in Traditional Chinese (0.2703ms)\n✔ PreviewGate stages and consumes only a matching ticket once (1.3556ms)\n✔ PreviewGate rejects mismatched panel, intent, or revision without consuming (0.2894ms)\n✔ PreviewGate compares typed intent fields without delimiter collisions (0.1629ms)\n✔ PreviewGate invalidation makes a ticket stale and prevents restore (0.2267ms)\n✔ PreviewGate restores only the consumed current ticket for clipboard retry (0.216ms)\n✔ host preview messages carry intent and the snapshot revision (1.8452ms)\n✔ RefreshCoordinator never overlaps reads and publishes the newest pending snapshot (5.4904ms)\n✔ RefreshCoordinator reports a read failure and accepts a later retry (0.9751ms)\n✔ RefreshCoordinator forwards incremental paths and escalates a pending full refresh (0.6151ms)\n✔ Extension runtime has no process, shell, or external-network path and confines writes to bootstrap (3.4706ms)\n✔ package and Webview keep the approved dependency and CSP boundary (1.2035ms)\n✔ workflow mutations remain preview-first and bootstrap uses explicit confirmation (0.9025ms)\n✔ Wiki bootstrap has three prompt-only entrances with one public intent (0.8832ms)\n✔ P2 preferences and Wiki browsing stay Extension-local and discoverable (1.5132ms)\n[walkthrough] multi-active implicit-selection=blocked explicit-selection=active-2\n✔ selection never promotes closed history to the implicit current work (0.66ms)\n✔ multiple active works require an explicit choice (0.3951ms)\n✔ work grouping exposes active work and closed history as separate collections (0.522ms)\n✔ snapshot reader parallelizes independent text reads while keeping diagnostics sorted (33.179ms)\n✔ snapshot reader reuses unchanged Wiki pages for an incremental refresh (55.246ms)\n✔ snapshot reader exposes bounded Wiki provenance and keeps engine observation unavailable (13.4297ms)\n[accessibility] tabs=5 panels=5 hidden-inactive=4 keyboard=arrows/Home/End focus-restore=section-key forced-colors=checked\n✔ Wiki result mount writes rendered markup into the dedicated result host (0.512ms)\n✔ Webview contract keeps preview metadata, stale reset, and accessible five-tab navigation (2.2151ms)\n✔ WikiSearchModel keeps draft input separate until Enter commits it (1.3902ms)\n✔ WikiSearchModel matches title, path, and body case-insensitively with contains semantics (0.1892ms)\n✔ WikiSearchModel applies exact type filtering and show-all state (0.1967ms)\n✔ RenderScheduler coalesces local renders into one frame (0.129ms)\nℹ tests 83\nℹ suites 0\nℹ pass 83\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 1063.268",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006"
+  ],
+  "timed_out": false,
+  "verification_batch_id": "VB-fdfa51b58fdf",
+  "verification_batch_index": 2
+}

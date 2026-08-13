@@ -1,0 +1,38 @@
+{
+  "result": "critical",
+  "severity": "critical",
+  "summary": "EVID-032–041 均為 current、passed、同一 HEAD/fingerprint；Python 分拆合計 111 個測試案例（1 個 Windows symlink privilege skip），Extension EVID-041 為 83/83 通過。但存在核准 scope 漂移與 VSIX 非原子覆寫風險，阻擋 G3。",
+  "source_fingerprint": "e9def1cab23b54bc03418fbff98a98151f1addaaf524a9bfa5818b10d94af8cc",
+  "covers": ["AC-001", "AC-002", "AC-003", "AC-004", "AC-005", "AC-006", "AC-007", "AC-008", "AC-009", "AC-010", "AC-011", "AC-012", "AC-013"],
+  "tasks": ["TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005", "TASK-006"],
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "critical",
+      "title": "Final diff 包含核准 scope 外的變更",
+      "evidence": "state.scope.paths 未涵蓋 docs/使用手冊.md、tests/ 根目錄測試、vscode-extension/src/dashboard.ts、extension.ts、vscode-filesystem.ts、wiki-search.ts、webview/help-content.ts、webview/main.ts 與目前 VSIX；git diff 均顯示這些檔案已變更，且 base_source.dirty_paths 為空。",
+      "recommendation": "在 G3 前從最早受影響階段 revise scope，重新核准 G1/G2 並重跑 current high verification/Knowledge Review；或移除所有未核准變更。"
+    },
+    {
+      "id": "F-002",
+      "severity": "critical",
+      "title": "Verifier 失敗時可能覆寫目前 VSIX",
+      "evidence": "vscode-extension/package.json 的 package 順序是 build → package-vsix → verify；scripts/package-vsix.mjs 直接以 writeFile(outputPath, archive) 寫入 0.2.3 VSIX，再執行 verifier。design.md 明確要求 provenance mismatch 時保留既有 VSIX、不得覆寫 current artifact；EVID-032 僅覆蓋成功路徑。",
+      "recommendation": "先將 VSIX 寫入候選暫存路徑並完成 verifier，只有驗證成功後才原子替換 current artifact；補充 verifier 失敗時保留舊 artifact 的回歸證據。"
+    },
+    {
+      "id": "F-003",
+      "severity": "advisory",
+      "title": "AC-013 缺少效率改善或未達成原因證據",
+      "evidence": "AC-013 要求低風險驗證時間、重複 context bytes 與 snapshot latency 的基線比較及改善目標或未達成原因；EVID-032–041 僅保存 duration/selection 指標，沒有前後基線或原因記錄。",
+      "recommendation": "在 acceptance/evidence 中補記同一 commands/evals 的基線、結果與未達成原因，並確認 high-risk coverage 未降低。"
+    },
+    {
+      "id": "F-004",
+      "severity": "advisory",
+      "title": "預設 verification evidence 未保存 usage unavailable",
+      "evidence": "EVID-032–041 的 metrics 只有 duration 與 verification selection，沒有 usage.status=unavailable 及 null token/cost；run_verification_profile 的預設 metrics 也只建立 verification 物件。現有測試只驗證 caller 顯式傳入 unavailable 的情況。",
+      "recommendation": "讓未提供 host usage 的預設 evidence 明確寫入 unavailable/null 欄位，重新產生並核對 current source-bound evidence。"
+    }
+  ]
+}

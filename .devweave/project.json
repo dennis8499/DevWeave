@@ -1,6 +1,12 @@
 {
   "commands": [
     {
+      "affected_paths": [
+        "vscode-extension/src",
+        "vscode-extension/webview",
+        "vscode-extension/esbuild.mjs",
+        "vscode-extension/scripts"
+      ],
       "argv": [
         "npm.cmd",
         "run",
@@ -8,33 +14,48 @@
       ],
       "cwd": "vscode-extension",
       "id": "extension-package",
+      "outputs": [
+        "vscode-extension/dist",
+        "vscode-extension/devweave-control-center-0.2.3.vsix"
+      ],
+      "release_only": true,
       "required_for": [
         "high",
         "low",
         "standard"
       ],
-      "exclusive_group": "vscode-dist",
-      "timeout_seconds": 120
+      "timeout_seconds": 120,
+      "writes": "tracked-artifact"
     },
     {
+      "affected_paths": [
+        "vscode-extension/src",
+        "vscode-extension/webview",
+        "vscode-extension/test"
+      ],
       "argv": [
         "npm.cmd",
         "run",
         "test:smoke:current"
       ],
       "cwd": "vscode-extension",
+      "depends_on": [
+        "extension-package"
+      ],
       "id": "extension-smoke",
       "required_for": [
         "high",
         "standard"
       ],
-      "depends_on": [
-        "extension-package"
-      ],
-      "exclusive_group": "vscode-dist",
-      "timeout_seconds": 300
+      "timeout_seconds": 120,
+      "writes": "none"
     },
     {
+      "affected_paths": [
+        "vscode-extension/src",
+        "vscode-extension/webview",
+        "vscode-extension/test"
+      ],
       "argv": [
         "npm.cmd",
         "run",
@@ -47,9 +68,15 @@
         "low",
         "standard"
       ],
-      "timeout_seconds": 120
+      "timeout_seconds": 120,
+      "writes": "none"
     },
     {
+      "affected_paths": [
+        "vscode-extension/src",
+        "vscode-extension/webview",
+        "vscode-extension/test"
+      ],
       "argv": [
         "npm.cmd",
         "run",
@@ -62,9 +89,14 @@
         "low",
         "standard"
       ],
-      "timeout_seconds": 120
+      "timeout_seconds": 120,
+      "writes": "none"
     },
     {
+      "affected_paths": [
+        "tests",
+        ".agents/skills/devweave/scripts"
+      ],
       "argv": [
         "python",
         "-B",
@@ -84,75 +116,14 @@
         "low",
         "standard"
       ],
-      "timeout_seconds": 180
+      "timeout_seconds": 180,
+      "writes": "none"
     },
     {
-      "argv": [
-        "python",
-        "-B",
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
+      "affected_paths": [
         "tests",
-        "-p",
-        "test_devweave_core.py",
-        "-v"
+        ".agents/skills/devweave/scripts"
       ],
-      "cwd": ".",
-      "id": "unit-tests-core",
-      "required_for": [
-        "high",
-        "low",
-        "standard"
-      ],
-      "timeout_seconds": 360
-    },
-    {
-      "argv": [
-        "python",
-        "-B",
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
-        "tests",
-        "-p",
-        "test_guard.py",
-        "-v"
-      ],
-      "cwd": ".",
-      "id": "unit-tests-guard",
-      "required_for": [
-        "high",
-        "low",
-        "standard"
-      ],
-      "timeout_seconds": 180
-    },
-    {
-      "argv": [
-        "python",
-        "-B",
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
-        "tests",
-        "-p",
-        "test_knowledge.py",
-        "-v"
-      ],
-      "cwd": ".",
-      "id": "unit-tests-knowledge",
-      "required_for": [
-        "high",
-        "low",
-        "standard"
-      ],
-      "timeout_seconds": 360
-    },
-    {
       "argv": [
         "python",
         "-B",
@@ -172,7 +143,89 @@
         "low",
         "standard"
       ],
-      "timeout_seconds": 180
+      "timeout_seconds": 180,
+      "writes": "none"
+    },
+    {
+      "affected_paths": [
+        "tests",
+        ".agents/skills/devweave/scripts"
+      ],
+      "argv": [
+        "python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_devweave_core.py",
+        "-v"
+      ],
+      "cwd": ".",
+      "id": "unit-tests-core",
+      "required_for": [
+        "high",
+        "low",
+        "standard"
+      ],
+      "timeout_seconds": 360,
+      "writes": "none"
+    },
+    {
+      "affected_paths": [
+        "tests",
+        ".agents/skills/devweave/scripts"
+      ],
+      "argv": [
+        "python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_guard.py",
+        "-v"
+      ],
+      "cwd": ".",
+      "id": "unit-tests-guard",
+      "required_for": [
+        "high",
+        "low",
+        "standard"
+      ],
+      "timeout_seconds": 180,
+      "writes": "none"
+    },
+    {
+      "affected_paths": [
+        "tests",
+        ".agents/skills/devweave/scripts"
+      ],
+      "argv": [
+        "python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_knowledge.py",
+        "-v"
+      ],
+      "cwd": ".",
+      "id": "unit-tests-knowledge",
+      "required_for": [
+        "high",
+        "low",
+        "standard"
+      ],
+      "timeout_seconds": 360,
+      "writes": "none"
     }
   ],
   "evidence": {

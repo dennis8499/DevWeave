@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { DirectoryEntry, FileSystemPort, normalizeRelativePath } from "./filesystem";
+import { DirectoryEntry, FileSystemPort, FileSystemPathKind, normalizeRelativePath, PathInspection } from "./filesystem";
 
 export class VscodeFileSystemPort implements FileSystemPort {
   public constructor(private readonly root: vscode.Uri) {}
@@ -9,6 +9,21 @@ export class VscodeFileSystemPort implements FileSystemPort {
       () => true,
       () => false
     );
+  }
+
+  public async inspectPath(relativePath: string): Promise<PathInspection> {
+    try {
+      const type = await vscode.workspace.fs.stat(this.uri(relativePath));
+      return { kind: pathKind(type.type) };
+    } catch (error) {
+      if (!isFileNotFound(error)) {
+        return {
+          kind: "other",
+          diagnostic: error instanceof Error ? error.message : String(error)
+        };
+      }
+      return { kind: "missing" };
+    }
   }
 
   public async readBytes(relativePath: string): Promise<Uint8Array> {
@@ -43,4 +58,15 @@ export class VscodeFileSystemPort implements FileSystemPort {
     }
     return vscode.Uri.joinPath(this.root, ...normalized.split("/"));
   }
+}
+
+function pathKind(type: vscode.FileType): FileSystemPathKind {
+  if ((type & vscode.FileType.SymbolicLink) !== 0) return "symlink";
+  if ((type & vscode.FileType.Directory) !== 0) return "directory";
+  if ((type & vscode.FileType.File) !== 0) return "file";
+  return "other";
+}
+
+function isFileNotFound(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === "FileNotFound");
 }

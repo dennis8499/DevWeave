@@ -1,0 +1,70 @@
+{
+  "argv": [
+    "python",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-p",
+    "test_repository_contract.py",
+    "-v"
+  ],
+  "binds_current_source": true,
+  "command_id": "unit-tests-contract",
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013"
+  ],
+  "created_at": "2026-08-13T10:47:51+00:00",
+  "cwd": ".",
+  "duration_ms": 21116,
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-13T10:47:18+00:00",
+  "git_head": "40823cf6e448da9a69667cdf74b2da2923d687d4",
+  "id": "EVID-037",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 21116,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 9,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260813-142228-feature-devweave-vs-code-extension/EVID-037.log",
+  "schema_version": 1,
+  "source_fingerprint": "e9def1cab23b54bc03418fbff98a98151f1addaaf524a9bfa5818b10d94af8cc",
+  "stale": false,
+  "started_at": "2026-08-13T10:46:56+00:00",
+  "status": "passed",
+  "summary": "test_codebase_wiki_and_current_release_contracts_are_documented (test_repository_contract.RepositoryContractTests.test_codebase_wiki_and_current_release_contracts_are_documented) ... ok\r\ntest_companion_skill_precedence_policy_covers_side_effect_boundaries (test_repository_contract.RepositoryContractTests.test_companion_skill_precedence_policy_covers_side_effect_boundaries) ... ok\r\ntest_companion_skill_provenance_and_relative_links_are_complete (test_repository_contract.RepositoryContractTests.test_companion_skill_provenance_and_relative_links_are_complete) ... ok\r\ntest_devweave_is_the_only_router_with_expected_companions (test_repository_contract.RepositoryContractTests.test_devweave_is_the_only_router_with_expected_companions) ... ok\r\ntest_doctor_passes_for_an_initialized_fixture_with_hook (test_repository_contract.RepositoryContractTests.test_doctor_passes_for_an_initialized_fixture_with_hook) ... ok\r\ntest_high_risk_review_stays_on_the_single_router_and_read_only_extension (test_repository_contract.RepositoryContractTests.test_high_risk_review_stays_on_the_single_router_and_read_only_extension) ... ok\r\ntest_hook_contract_is_json_and_resolves_from_git_root (test_repository_contract.RepositoryContractTests.test_hook_contract_is_json_and_resolves_from_git_root) ... ok\r\ntest_hook_launcher_matrix_keeps_read_only_bash_silent (test_repository_contract.RepositoryContractTests.test_hook_launcher_matrix_keeps_read_only_bash_silent) ... ok\r\ntest_hook_launcher_matrix_preserves_utf8_deny_json (test_repository_contract.RepositoryContractTests.test_hook_launcher_matrix_preserves_utf8_deny_json) ... ok\r\ntest_hook_launcher_matrix_returns_valid_deny_json_for_malformed_utf8_json (test_repository_contract.RepositoryContractTests.test_hook_launcher_matrix_returns_valid_deny_json_for_malformed_utf8_json) ... ok\r\ntest_initial_plan_mode_preflight_and_control_center_handoff_are_documented (test_repository_contract.RepositoryContractTests.test_initial_plan_mode_preflight_and_control_center_handoff_are_documented) ... ok\r\ntest_interactive_decision_policy_is_explicit (test_repository_contract.RepositoryContractTests.test_interactive_decision_policy_is_explicit) ... ok\r\ntest_maintenance_only_skill_is_excluded_from_governed_sets_and_bundle (test_repository_contract.RepositoryContractTests.test_maintenance_only_skill_is_excluded_from_governed_sets_and_bundle) ... ok\r\ntest_native_question_contract_is_shared_without_host_or_engine_adapters (test_repository_contract.RepositoryContractTests.test_native_question_contract_is_shared_without_host_or_engine_adapters) ... ok\r\ntest_runtime_has_no_openspec_or_third_party_imports (test_repository_contract.RepositoryContractTests.test_runtime_has_no_openspec_or_third_party_imports) ... ok\r\ntest_skill_frontmatter_metadata_and_invocation_policy_are_explicit (test_repository_contract.RepositoryContractTests.test_skill_frontmatter_metadata_and_invocation_policy_are_explicit) ... ok\r\n\r\n----------------------------------------------------------------------\r\nRan 16 tests in 20.805s\r\n\r\nOK",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006"
+  ],
+  "timed_out": false,
+  "verification_batch_id": "VB-3daf96a1bfef",
+  "verification_batch_index": 5
+}

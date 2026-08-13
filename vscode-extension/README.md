@@ -2,7 +2,7 @@
 
 DevWeave Control Center 是以新手為先的 VS Code Extension。它把 DevWeave repository 的檔案狀態整理成五個區域：`總覽`、`工作項目`、`知識`、`驗證與稽核`、`說明`，讓你先知道目前狀態與下一步，再按需要查看治理細節。
 
-本頁對應 DevWeave 0.2.3 Windows 公開版；本次提供 0.2.3 VSIX，並保留 0.2.2 與 0.2.1 artifact。本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 101 項（1 項因 symlink 權限 skipped）與 Extension unit tests 77 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。交付方式是 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。
+本頁對應 DevWeave 0.2.3 Windows 公開版；本次提供 0.2.3 VSIX，並保留 0.2.2 與 0.2.1 artifact。本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 111 項（1 項因 symlink 權限 skipped）與 Extension unit tests 88 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。交付方式是 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。
 
 若發生發布事故，立即停止散布並停用或解除安裝 0.2.3；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。保留 workspace snapshot 與 logs，0.2.2 與 0.2.1 artifact 可作為回溯參考，修復後產生新版本。
 
@@ -78,6 +78,8 @@ Dashboard 用任務語言分組，旁邊仍保留技術命令名稱：
 
 「驗證與稽核」區域會先顯示目前 gate、reviewer readiness、blocker、未完成 task、failed/stale evidence 與 Knowledge 待處理項目，再提供 command metadata、evidence、baseline/Wiki 詳細資料與可展開的 raw event。High-risk G3 另顯示 `Independent Review` readiness：missing、unavailable 或 advisory 是 attention，critical finding 是 not-ready；passed 且綁定目前 source 才會顯示 ready。Extension 只投影 snapshot、raw report path/hash 與 findings，不會啟動 Agent、執行 engine 或自行判定／核准 gate。沒有 verification command/profile 時，介面會明確標示需要設定，不會宣稱已完成驗證。
 
+Verification metrics 會在 evidence 的 bounded projection 中顯示 duration、profile selected/skipped 與 usage availability。`usage.status=unavailable` 是合法且預期的結果：Extension 不接觸 Codex host token/cost，也不從 snapshot bytes 猜測 Token。要降低低風險驗證成本，可在 CLI 以 `verify --profile low|standard --path <repo-relative-path>` 做 affected-path selection；high profile 仍保留完整 package、smoke 與 Python suite coverage。選擇器會顯示跳過原因與 dependency closure，release-only package 不會因間接依賴被非 high profile 執行。
+
 ## 顯示與操作
 
 - 預設是「簡潔模式」；可切換「進階資訊」，偏好只儲存在 Extension 的 workspaceState，不寫入 repository。
@@ -103,8 +105,8 @@ npm run test:smoke
 npx --yes @vscode/vsce package --allow-missing-repository
 ```
 
-`npm run package` 會從 `package.json` 產生 0.2.3 production bundle、完整 bootstrap manifest 與 `devweave-control-center-0.2.3.vsix`，並保留 0.2.2 artifact；`npm run test:smoke` 會使用 VS Code Extension Host 驗證 activation、Activity Bar view 與公開 commands。Extension unit tests 與 package evidence 以本次實際結果為準。
+`npm run package` 會從 `package.json` 產生 0.2.3 production bundle 與完整 bootstrap manifest，接著以 `package-vsix.mjs --output <candidate.vsix>` 建立同目錄 candidate，交由 `verify-package.mjs --artifact <candidate.vsix>` 檢查後才 promotion current artifact。Verifier 或 promotion 失敗時保留 current 與 0.2.2／0.2.1 retained artifacts，candidate 只做 best-effort cleanup；`npm run test:smoke` 會使用 accepted VS Code 1.131.0 cache 驗證 activation、Activity Bar view 與公開 commands。Extension unit tests 與 package evidence 以本次實際結果為準。
 
 ## 打包 VSIX
 
-Package verification 只處理 current `devweave-control-center-0.2.3.vsix`，並檢查 package／bundle version、58 個 bootstrap files、119 個 VSIX entries、必要 entries、source byte length／SHA-256、current artifact SHA-256，以及嵌入 hook 與 root `.codex/hooks.json` 的一致性；既有 0.2.2 VSIX 保留但不作為 current package。其他 VSIX 不是本次封裝、驗收或回復條件。
+Package verification 必須明確接收 `--artifact`，只讀取 extension root 內的 candidate；builder 必須明確接收 `--output`，並以 `wx` 防止覆寫。Verifier 會檢查 package／bundle version、58 個 bootstrap files、119 個 VSIX entries、必要 entries、source byte length／SHA-256、candidate VSIX SHA-256，以及嵌入 hook 與 root `.codex/hooks.json` 的一致性。Release transaction 只有在 candidate 通過驗證後才同目錄 atomic rename promotion current；既有 0.2.2 與 0.2.1 VSIX 保留作為 retained artifacts，其他 VSIX 不是本次封裝、驗收或回復條件。

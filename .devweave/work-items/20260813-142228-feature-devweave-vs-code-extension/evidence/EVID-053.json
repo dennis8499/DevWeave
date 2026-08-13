@@ -1,0 +1,47 @@
+{
+  "argv": [
+    "npm.cmd",
+    "run",
+    "package"
+  ],
+  "binds_current_source": true,
+  "command_id": "extension-package",
+  "covers": [
+    "AC-005",
+    "AC-006",
+    "AC-011",
+    "AC-012"
+  ],
+  "created_at": "2026-08-13T12:06:30+00:00",
+  "cwd": "vscode-extension",
+  "duration_ms": 836,
+  "execution_error": null,
+  "exit_code": 1,
+  "expectation": "zero",
+  "finished_at": "2026-08-13T12:06:28+00:00",
+  "git_head": "40823cf6e448da9a69667cdf74b2da2923d687d4",
+  "id": "EVID-053",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 836,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 1,
+      "skipped": 0
+    }
+  },
+  "observed_result": "failure",
+  "raw_log": ".devweave/cache/logs/20260813-142228-feature-devweave-vs-code-extension/EVID-053.log",
+  "schema_version": 1,
+  "source_fingerprint": "334134bea0dec75a2fa2222f0a97f6b031d51caeabe47d0751e816f1189505c0",
+  "stale": false,
+  "started_at": "2026-08-13T12:06:27+00:00",
+  "status": "failed",
+  "summary": "> devweave-control-center@0.2.3 package\n> node esbuild.mjs --production && node scripts/release-orchestrator.mjs\n\n\n\n  dist\\extension.js  67.2kb\n\nDone in 11ms\n\n  dist\\webview\\main.js  79.1kb\n\nDone in 7ms\nCommand failed: C:\\Program Files\\nodejs\\node.exe C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\scripts\\verify-package.mjs --artifact C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\devweave-control-center-0.2.3.candidate-6524-a13ce045-f195-4d73-b717-e38de2be17f3.vsix\nnode:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: VSIX must contain the certified 119 entries\r\n\r\n121 !== 119\r\n\r\n    at file:///C:/Users/%E5%B0%8F%E8%B1%AC%E7%9A%84%E9%9B%BB%E8%85%A6/Desktop/Project/DevWeave/vscode-extension/scripts/verify-package.mjs:100:8 {\r\n  generatedMessage: false,\r\n  code: 'ERR_ASSERTION',\r\n  actual: 121,\r\n  expected: 119,\r\n  operator: 'strictEqual',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.17.0",
+  "tasks": [
+    "TASK-003"
+  ],
+  "timed_out": false
+}

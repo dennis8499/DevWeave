@@ -31,6 +31,7 @@ from devweave_core import (
     list_work,
     load_project,
     normalize_relpath,
+    normalize_command_metadata,
     project_path,
     record_review,
     resolve_work,
@@ -54,6 +55,34 @@ from devweave_core import (
 
 def emit(payload: Any) -> None:
     print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+
+
+def configure_utf8_stdio() -> None:
+    """Keep machine-readable CLI output lossless on Windows console hosts."""
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="strict")
+        except (OSError, ValueError):
+            # Embedded/test streams may not support reconfiguration.
+            continue
+
+
+def parse_metrics_json(value: str | None) -> dict[str, Any] | None:
+    if not value:
+        return None
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValidationError(
+            "Metrics JSON is invalid.",
+            {"position": exc.pos},
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise ValidationError("Metrics JSON must decode to an object.")
+    return parsed
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
@@ -325,6 +354,7 @@ def command_evidence(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
         tasks=args.task,
         observed_result=args.observed_result,
         binds_current_source=args.binds_current_source,
+        metrics=parse_metrics_json(args.metrics),
     )
     return {"ok": True, "work": state["id"], "evidence": evidence}
 
@@ -354,6 +384,8 @@ def command_verify(args: argparse.Namespace, repo: Path) -> tuple[dict[str, Any]
             tasks=args.task,
             expectation=args.expect,
             max_parallel=args.max_parallel,
+            changed_paths=args.path if args.path else None,
+            metrics=parse_metrics_json(args.metrics),
         )
         return payload, 0 if payload["ok"] else 4
     evidence = run_verification(
@@ -364,6 +396,7 @@ def command_verify(args: argparse.Namespace, repo: Path) -> tuple[dict[str, Any]
         covers=args.covers,
         tasks=args.task,
         expectation=args.expect,
+        metrics=parse_metrics_json(args.metrics),
     )
     payload = {"ok": evidence["status"] == "passed", "work": state["id"], "evidence": evidence}
     return payload, 0 if payload["ok"] else 4
@@ -455,6 +488,16 @@ def command_command(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
             raise ValidationError("Command cwd must stay inside the repository.") from exc
         if not command_cwd.is_dir():
             raise ValidationError("Command cwd must be an existing directory.")
+        metadata_input: dict[str, Any] = {}
+        if args.affected_path:
+            metadata_input["affected_paths"] = args.affected_path
+        if args.writes is not None:
+            metadata_input["writes"] = args.writes
+        if args.output:
+            metadata_input["outputs"] = args.output
+        if args.release_only:
+            metadata_input["release_only"] = True
+        metadata = normalize_command_metadata(metadata_input)
         entry = {
             "id": args.id,
             "argv": argv,
@@ -462,6 +505,7 @@ def command_command(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
             "timeout_seconds": args.timeout,
             "required_for": sorted(set(args.required_for)),
         }
+        entry.update(metadata)
         if args.depends_on:
             entry["depends_on"] = sorted(set(args.depends_on))
         if args.exclusive_group:
@@ -639,6 +683,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("success", "failure", "neutral"),
         default="neutral",
     )
+    evidence_parser.add_argument(
+        "--metrics-json",
+        dest="metrics",
+        help="Optional bounded metrics JSON; token/cost values are preserved only when explicitly supplied.",
+    )
     binding_group = evidence_parser.add_mutually_exclusive_group()
     binding_group.add_argument(
         "--binds-current-source",
@@ -675,6 +724,17 @@ def build_parser() -> argparse.ArgumentParser:
     verify_parser.add_argument("--task", action="append", default=[])
     verify_parser.add_argument("--expect", choices=("zero", "nonzero", "any"), default="zero")
     verify_parser.add_argument("--max-parallel", type=int, default=3)
+    verify_parser.add_argument(
+        "--metrics-json",
+        dest="metrics",
+        help="Optional bounded metrics JSON supplied by the caller.",
+    )
+    verify_parser.add_argument(
+        "--path",
+        action="append",
+        default=[],
+        help="Optional repo-relative changed path or glob used for selective profile verification.",
+    )
     verify_parser.set_defaults(handler=command_verify)
 
     waiver_parser = subparsers.add_parser("waiver")
@@ -733,6 +793,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     command_set.add_argument("--depends-on", action="append", default=[])
     command_set.add_argument("--exclusive-group", default="")
+    command_set.add_argument(
+        "--affected-path",
+        action="append",
+        default=[],
+        help="Optional repo-relative path or glob affected by this verification command.",
+    )
+    command_set.add_argument(
+        "--writes",
+        choices=("none", "generated", "tracked-artifact"),
+        help="Optional write classification for selective verification.",
+    )
+    command_set.add_argument(
+        "--output",
+        action="append",
+        default=[],
+        help="Optional repo-relative generated or tracked output path.",
+    )
+    command_set.add_argument(
+        "--release-only",
+        action="store_true",
+        help="Run this command only for a full/high or release verification selection.",
+    )
     command_set.add_argument("argv", nargs=argparse.REMAINDER)
     command_set.set_defaults(handler=command_command)
 
@@ -740,6 +822,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    configure_utf8_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

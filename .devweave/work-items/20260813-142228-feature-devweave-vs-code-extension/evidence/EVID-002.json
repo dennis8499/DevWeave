@@ -1,0 +1,27 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-009"
+  ],
+  "created_at": "2026-08-13T07:39:28+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "40823cf6e448da9a69667cdf74b2da2923d687d4",
+  "id": "EVID-002",
+  "kind": "test",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "c819cab04f13da012a4d9f6d4a0785cc6390f3ed08b9fda058a709b8d0d1e60f",
+  "stale": false,
+  "status": "passed",
+  "summary": "TASK-002 summary-first reader, selected detail seam, Wiki hash/truncation provenance and projection-only readiness passed typecheck plus 83 Extension unit tests.",
+  "tasks": [
+    "TASK-002"
+  ]
+}

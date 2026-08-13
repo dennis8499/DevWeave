@@ -4,6 +4,7 @@ import fnmatch
 import getpass
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -15,7 +16,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Sequence
 
 import knowledge_core as knowledge
@@ -24,6 +25,8 @@ import knowledge_core as knowledge
 SCHEMA_VERSION = 1
 KINDS = ("new", "feature", "refactor", "bug")
 RISK_LEVELS = ("low", "standard", "high")
+COMMAND_WRITES = ("none", "generated", "tracked-artifact")
+COMMAND_METADATA_FIELDS = ("affected_paths", "writes", "outputs", "release_only")
 GATES = ("scope", "build", "acceptance")
 PHASES = (
     "requirements",
@@ -66,6 +69,8 @@ FRAMEWORK_PREFIXES = (
     ".codex/",
 )
 MAX_RAW_LOG_BYTES = 5_000_000
+MAX_METRIC_COUNT = 10_000_000
+MAX_METRIC_BYTES = 250_000
 REVIEW_RESULTS = ("passed", "unavailable", "critical")
 REVIEW_SEVERITIES = ("none", "advisory", "critical")
 REVIEW_CONTEXT_MODE = "isolated_read_only"
@@ -140,6 +145,116 @@ def canonical_json(value: Any) -> bytes:
     ).encode("utf-8")
 
 
+def _bounded_nonnegative_int(value: Any, *, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValidationError(
+            "Evidence metric must be a non-negative integer.",
+            {"metric": label, "value": value},
+        )
+    if value > MAX_METRIC_COUNT:
+        raise ValidationError(
+            "Evidence metric exceeds the bounded maximum.",
+            {"metric": label, "maximum": MAX_METRIC_COUNT},
+        )
+    return value
+
+
+def normalize_evidence_metrics(metrics: Any | None) -> dict[str, Any] | None:
+    if metrics is None:
+        return None
+    if not isinstance(metrics, dict):
+        raise ValidationError("Evidence metrics must be an object.")
+    allowed = {"context", "tools", "verification", "usage", "duration_ms"}
+    unknown = sorted(set(metrics) - allowed)
+    if unknown:
+        raise ValidationError(
+            "Evidence metrics contain unsupported fields.",
+            {"fields": unknown},
+        )
+    normalized: dict[str, Any] = {}
+    if "duration_ms" in metrics:
+        normalized["duration_ms"] = _bounded_nonnegative_int(
+            metrics["duration_ms"], label="duration_ms"
+        )
+    context = metrics.get("context")
+    if context is not None:
+        if not isinstance(context, dict):
+            raise ValidationError("Evidence metrics.context must be an object.")
+        unknown = sorted(set(context) - {"pages", "bytes", "chars"})
+        if unknown:
+            raise ValidationError("Evidence metrics.context contains unsupported fields.", {"fields": unknown})
+        normalized["context"] = {
+            key: _bounded_nonnegative_int(context[key], label=f"context.{key}")
+            for key in ("pages", "bytes", "chars")
+            if key in context
+        }
+    tools = metrics.get("tools")
+    if tools is not None:
+        if not isinstance(tools, dict):
+            raise ValidationError("Evidence metrics.tools must be an object.")
+        unknown = sorted(set(tools) - {"read", "search", "write", "test"})
+        if unknown:
+            raise ValidationError("Evidence metrics.tools contains unsupported fields.", {"fields": unknown})
+        normalized["tools"] = {
+            key: _bounded_nonnegative_int(tools[key], label=f"tools.{key}")
+            for key in ("read", "search", "write", "test")
+            if key in tools
+        }
+    verification = metrics.get("verification")
+    if verification is not None:
+        if not isinstance(verification, dict):
+            raise ValidationError("Evidence metrics.verification must be an object.")
+        item: dict[str, Any] = {}
+        for key in ("selected", "skipped", "dependency_closure_added"):
+            if key in verification:
+                item[key] = _bounded_nonnegative_int(
+                    verification[key], label=f"verification.{key}"
+                )
+        if "cache_hit" in verification:
+            if not isinstance(verification["cache_hit"], bool):
+                raise ValidationError("Evidence metrics.verification.cache_hit must be boolean.")
+            item["cache_hit"] = verification["cache_hit"]
+        unknown = sorted(set(verification) - {"selected", "skipped", "dependency_closure_added", "cache_hit"})
+        if unknown:
+            raise ValidationError("Evidence metrics.verification contains unsupported fields.", {"fields": unknown})
+        normalized["verification"] = item
+    usage = metrics.get("usage")
+    if usage is not None:
+        if not isinstance(usage, dict):
+            raise ValidationError("Evidence metrics.usage must be an object.")
+        unknown = sorted(set(usage) - {"status", "input_tokens", "output_tokens", "cached_tokens", "cost"})
+        if unknown:
+            raise ValidationError("Evidence metrics.usage contains unsupported fields.", {"fields": unknown})
+        status = usage.get("status", "unavailable")
+        if status not in ("available", "unavailable"):
+            raise ValidationError("Evidence metrics.usage.status is invalid.")
+        item = {"status": status}
+        if status == "available":
+            for key in ("input_tokens", "output_tokens", "cached_tokens"):
+                if key in usage:
+                    item[key] = _bounded_nonnegative_int(usage[key], label=f"usage.{key}")
+            if "cost" in usage:
+                cost = usage["cost"]
+                if (
+                    isinstance(cost, bool)
+                    or not isinstance(cost, (int, float))
+                    or not math.isfinite(float(cost))
+                    or cost < 0
+                ):
+                    raise ValidationError("Evidence metrics.usage.cost must be non-negative.")
+                item["cost"] = float(cost)
+        else:
+            item.update({"input_tokens": None, "output_tokens": None, "cached_tokens": None, "cost": None})
+        normalized["usage"] = item
+    encoded = canonical_json(normalized)
+    if len(encoded) > MAX_METRIC_BYTES:
+        raise ValidationError(
+            "Evidence metrics exceed the bounded payload size.",
+            {"maximum_bytes": MAX_METRIC_BYTES},
+        )
+    return normalized
+
+
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
@@ -170,6 +285,120 @@ def path_matches_scope(path: str, patterns: Sequence[str]) -> bool:
         ):
             return True
     return False
+
+
+def _normalize_command_path(value: str) -> str:
+    normalized = value.strip().replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    if not normalized:
+        raise ValueError("path must not be empty")
+    if normalized.startswith("/") or re.match(r"^[A-Za-z]:($|/)", normalized):
+        raise ValueError("path must be repository-relative")
+    parts = PurePosixPath(normalized).parts
+    if ".." in parts:
+        raise ValueError("path must not contain '..'")
+    return normalized
+
+
+def _command_metadata_errors(
+    command: dict[str, Any], *, label: str = "command"
+) -> tuple[list[str], dict[str, Any]]:
+    errors: list[str] = []
+    normalized: dict[str, Any] = {}
+    for field in ("affected_paths", "outputs"):
+        if field not in command:
+            continue
+        values = command.get(field)
+        if not isinstance(values, list) or not all(isinstance(item, str) for item in values):
+            errors.append(f"{label}.{field} must be a string array")
+            continue
+        converted: list[str] = []
+        for item in values:
+            try:
+                converted.append(_normalize_command_path(item))
+            except ValueError as exc:
+                errors.append(f"{label}.{field} contains invalid path: {item!r} ({exc})")
+        if len(converted) != len(set(converted)):
+            errors.append(f"{label}.{field} must not contain duplicate paths")
+        normalized[field] = converted
+    if "writes" in command:
+        writes = command.get("writes")
+        if not isinstance(writes, str) or writes not in COMMAND_WRITES:
+            errors.append(
+                f"{label}.writes must be one of: {', '.join(COMMAND_WRITES)}"
+            )
+        else:
+            normalized["writes"] = writes
+    if "release_only" in command:
+        release_only = command.get("release_only")
+        if not isinstance(release_only, bool):
+            errors.append(f"{label}.release_only must be a boolean")
+        else:
+            normalized["release_only"] = release_only
+    return errors, normalized
+
+
+def _command_metadata_present(command: dict[str, Any]) -> bool:
+    return any(field in command for field in COMMAND_METADATA_FIELDS)
+
+
+def normalize_command_metadata(
+    command: dict[str, Any], *, label: str = "command"
+) -> dict[str, Any]:
+    errors, normalized = _command_metadata_errors(command, label=label)
+    if errors:
+        raise ValidationError("Invalid verification command metadata.", {"errors": errors})
+    return normalized
+
+
+def _command_path_patterns(command: dict[str, Any]) -> list[str]:
+    return [
+        *command.get("affected_paths", []),
+        *command.get("outputs", []),
+    ]
+
+
+def _command_path_intersects(changed: str, pattern: str) -> bool:
+    changed_normalized = normalize_relpath(changed).replace("\\", "/")
+    pattern_normalized = pattern.replace("\\", "/")
+    if path_matches_scope(changed_normalized, [pattern_normalized]):
+        return True
+    if pattern_normalized.endswith("/**") and path_matches_scope(
+        changed_normalized, [pattern_normalized[:-3]]
+    ):
+        return True
+    # A caller may provide a directory or glob while command metadata names a
+    # concrete output. Checking both directions keeps directory-level impact
+    # selection conservative without treating unrelated siblings as affected.
+    return path_matches_scope(pattern_normalized, [changed_normalized])
+
+
+def _command_matches_paths(command: dict[str, Any], paths: Sequence[str]) -> bool:
+    patterns = _command_path_patterns(command)
+    return bool(patterns) and any(
+        _command_path_intersects(path, pattern)
+        for path in paths
+        for pattern in patterns
+    )
+
+
+def _normalize_verification_paths(paths: Sequence[str]) -> list[str]:
+    normalized: list[str] = []
+    for path in paths:
+        try:
+            normalized.append(_normalize_command_path(path))
+        except ValueError as exc:
+            raise ValidationError(
+                "Verification --path values must be repository-relative paths or globs.",
+                {"path": path, "reason": str(exc)},
+            ) from exc
+    if len(normalized) != len(set(normalized)):
+        raise ValidationError(
+            "Verification --path values must not contain duplicates.",
+            {"paths": normalized},
+        )
+    return normalized
 
 
 def ensure_within(root: Path, candidate: Path) -> Path:
@@ -394,6 +623,10 @@ def load_project(repo: Path) -> dict[str, Any]:
         exclusive_group = command.get("exclusive_group", "")
         if not isinstance(exclusive_group, str):
             errors.append(f"commands[{index}].exclusive_group must be a string")
+        metadata_errors, _ = _command_metadata_errors(
+            command, label=f"commands[{index}]"
+        )
+        errors.extend(metadata_errors)
     if len(command_ids) != len(set(command_ids)):
         errors.append("command IDs must be unique")
     known_command_ids = set(command_ids)
@@ -3390,6 +3623,7 @@ def add_evidence(
     tasks: Sequence[str] = (),
     observed_result: str = "neutral",
     binds_current_source: bool | None = None,
+    metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if kind == "review":
         raise ValidationError(
@@ -3404,6 +3638,7 @@ def add_evidence(
         )
     if not summary.strip():
         raise ValidationError("Evidence summary must not be empty.")
+    normalized_metrics = normalize_evidence_metrics(metrics)
     with WorkLock(repo, work_id):
         state = load_state(repo, work_id)
         sync_state_unlocked(repo, state)
@@ -3433,6 +3668,8 @@ def add_evidence(
             "raw_log": None,
             "log_truncated": False,
         }
+        if normalized_metrics is not None:
+            evidence["metrics"] = normalized_metrics
         _write_evidence_unlocked(repo, state, evidence)
         if evidence["status"] == "passed" and evidence["binds_current_source"]:
             state["last_verification"] = {
@@ -3546,6 +3783,7 @@ def _record_verification_execution(
     expectation: str,
     batch_id: str | None = None,
     batch_index: int | None = None,
+    metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     exit_code = execution["exit_code"]
     timed_out = execution["timed_out"]
@@ -3603,6 +3841,25 @@ def _record_verification_execution(
         if batch_id is not None:
             evidence["verification_batch_id"] = batch_id
             evidence["verification_batch_index"] = batch_index
+        metrics_with_duration = dict(metrics or {})
+        metrics_with_duration["duration_ms"] = execution["duration_ms"]
+        normalized_metrics = normalize_evidence_metrics(metrics_with_duration) or {}
+        verification_metrics = normalized_metrics.setdefault("verification", {})
+        if batch_id is None:
+            verification_metrics.update(
+                {
+                    "selected": 1,
+                    "skipped": 0,
+                    "dependency_closure_added": 0,
+                    "cache_hit": False,
+                }
+            )
+        else:
+            verification_metrics.setdefault("selected", 1)
+            verification_metrics.setdefault("skipped", 0)
+            verification_metrics.setdefault("dependency_closure_added", 0)
+            verification_metrics.setdefault("cache_hit", False)
+        evidence["metrics"] = normalized_metrics
         _write_evidence_unlocked(repo, state, evidence)
         if evidence["status"] == "passed" and evidence["binds_current_source"]:
             state["last_verification"] = {
@@ -3628,6 +3885,7 @@ def run_verification(
     covers: Sequence[str] = (),
     tasks: Sequence[str] = (),
     expectation: str = "zero",
+    metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if kind == "review":
         raise ValidationError(
@@ -3636,6 +3894,8 @@ def run_verification(
     _validate_evidence_id_syntax(covers, tasks)
     if expectation not in ("zero", "nonzero", "any"):
         raise ValidationError("Unknown exit expectation.", {"expectation": expectation})
+    if metrics is not None:
+        metrics = normalize_evidence_metrics(metrics)
     project = load_project(repo)
     command, cwd, timeout = _verification_command(repo, project, command_id)
     execution = _execute_verification_command(command, cwd, timeout)
@@ -3652,46 +3912,190 @@ def run_verification(
         covers=covers,
         tasks=tasks,
         expectation=expectation,
+        metrics=metrics,
     )
 
 
 def _verification_profile_commands(
-    repo: Path, project: dict[str, Any], profile: str
-) -> tuple[list[str], dict[str, tuple[dict[str, Any], Path, int]]]:
+    repo: Path,
+    project: dict[str, Any],
+    profile: str,
+    changed_paths: Sequence[str] | None = None,
+) -> tuple[list[str], dict[str, tuple[dict[str, Any], Path, int]], dict[str, Any]]:
     if profile not in RISK_LEVELS:
         raise ValidationError("Unknown verification profile.", {"profile": profile})
-    command_ids = list(project.get("verification_profiles", {}).get(profile, []))
+    configured_ids = list(project.get("verification_profiles", {}).get(profile, []))
+    command_ids = list(configured_ids)
     if len(command_ids) != len(set(command_ids)):
         raise ValidationError("Verification profile contains duplicate command IDs.", {"profile": profile})
     prepared = {
         command_id: _verification_command(repo, project, command_id)
         for command_id in command_ids
     }
+    skipped: list[dict[str, str]] = []
+    selection_mode = "full"
+    if changed_paths is not None:
+        selection_mode = "affected-paths"
+        normalized_paths = _normalize_verification_paths(changed_paths)
+        high_profile = profile == "high"
+        if not high_profile:
+            retained: list[str] = []
+            for command_id in configured_ids:
+                command = prepared[command_id][0]
+                if command.get("release_only"):
+                    skipped.append(
+                        {"command_id": command_id, "reason": "release-only"}
+                    )
+                elif not _command_metadata_present(command):
+                    skipped.append(
+                        {"command_id": command_id, "reason": "legacy-unclassified"}
+                    )
+                elif not _command_matches_paths(command, normalized_paths):
+                    skipped.append(
+                        {"command_id": command_id, "reason": "no-affected-path-intersection"}
+                    )
+                else:
+                    retained.append(command_id)
+            command_ids = retained
+            prepared = {command_id: prepared[command_id] for command_id in command_ids}
+        # High profile is intentionally a full set even when paths are given.
+        # Keep the metadata in the batch so callers can see that path filtering
+        # was requested but policy did not reduce coverage.
+    elif profile != "high":
+        retained = []
+        for command_id in command_ids:
+            command = prepared[command_id][0]
+            if command.get("release_only"):
+                skipped.append({"command_id": command_id, "reason": "release-only"})
+            else:
+                retained.append(command_id)
+        command_ids = retained
+        prepared = {command_id: prepared[command_id] for command_id in command_ids}
+    if profile != "high":
+        # A non-high selection must never resurrect a release-only command via
+        # dependency closure. Resolve the complete dependency graph first so a
+        # release-only command nested more than one level deep is handled just
+        # like a direct dependency.
+        command_cache: dict[str, dict[str, Any]] = {}
+        for command_id in configured_ids:
+            if command_id in prepared:
+                command_cache[command_id] = prepared[command_id][0]
+            else:
+                command_cache[command_id] = _verification_command(
+                    repo, project, command_id
+                )[0]
+        release_dependency_cache: dict[str, str | None] = {}
+        release_dependency_visiting: set[str] = set()
+
+        def command_for_dependency(command_id: str) -> dict[str, Any]:
+            command = command_cache.get(command_id)
+            if command is None:
+                command, _cwd, _timeout = _verification_command(
+                    repo, project, command_id
+                )
+                command_cache[command_id] = command
+            return command
+
+        def release_only_dependency(command_id: str) -> str | None:
+            if command_id in release_dependency_cache:
+                return release_dependency_cache[command_id]
+            if command_id in release_dependency_visiting:
+                raise ValidationError(
+                    "Verification command dependencies contain a cycle.",
+                    {"command": command_id},
+                )
+            release_dependency_visiting.add(command_id)
+            result: str | None = None
+            for dependency in command_for_dependency(command_id).get("depends_on", []):
+                dependency_command = command_for_dependency(dependency)
+                if dependency_command.get("release_only"):
+                    result = dependency
+                    break
+                result = release_only_dependency(dependency)
+                if result is not None:
+                    break
+            release_dependency_visiting.remove(command_id)
+            release_dependency_cache[command_id] = result
+            return result
+
+        release_blocked: set[str] = set()
+        for command_id in list(command_ids):
+            dependency = release_only_dependency(command_id)
+            if dependency is not None:
+                release_blocked.add(command_id)
+                skipped.append(
+                    {
+                        "command_id": command_id,
+                        "reason": f"release-only-dependency:{dependency}",
+                    }
+                )
+        if release_blocked:
+            command_ids = [
+                command_id
+                for command_id in command_ids
+                if command_id not in release_blocked
+            ]
+            prepared = {
+                command_id: prepared[command_id] for command_id in command_ids
+            }
     selected = set(command_ids)
-    for command_id in command_ids:
-        dependencies = prepared[command_id][0].get("depends_on", [])
-        if any(dependency not in selected for dependency in dependencies):
-            raise ValidationError(
-                "Verification command dependency must be in the selected profile.",
-                {"command": command_id, "depends_on": dependencies, "profile": profile},
-            )
+    closure_added: list[str] = []
     visiting: set[str] = set()
     visited: set[str] = set()
 
-    def visit(command_id: str) -> None:
+    def add_dependency(command_id: str) -> None:
         if command_id in visiting:
-            raise ValidationError("Verification command dependencies contain a cycle.", {"command": command_id})
+            raise ValidationError(
+                "Verification command dependencies contain a cycle.",
+                {"command": command_id},
+            )
         if command_id in visited:
             return
         visiting.add(command_id)
-        for dependency in prepared[command_id][0].get("depends_on", []):
-            visit(dependency)
+        command, cwd, timeout = _verification_command(repo, project, command_id)
+        prepared[command_id] = (command, cwd, timeout)
+        for dependency in command.get("depends_on", []):
+            if dependency not in selected:
+                selected.add(dependency)
+                command_ids.append(dependency)
+                closure_added.append(dependency)
+            add_dependency(dependency)
         visiting.remove(command_id)
         visited.add(command_id)
 
-    for command_id in command_ids:
-        visit(command_id)
-    return command_ids, prepared
+    for command_id in list(command_ids):
+        add_dependency(command_id)
+    # Dependencies are executed before their dependents. Preserve profile order
+    # for independent commands while moving closure additions ahead of users.
+    ordered: list[str] = []
+    emitted: set[str] = set()
+
+    def emit_dependencies(command_id: str) -> None:
+        if command_id in emitted:
+            return
+        for dependency in prepared[command_id][0].get("depends_on", []):
+            emit_dependencies(dependency)
+        emitted.add(command_id)
+        ordered.append(command_id)
+
+    for command_id in list(command_ids):
+        emit_dependencies(command_id)
+    command_ids = ordered
+    selected_after_closure = set(command_ids)
+    skipped = [
+        item for item in skipped if item["command_id"] not in selected_after_closure
+    ]
+    # A selective run may retain a command whose dependency is legacy/untyped;
+    # dependency closure always wins over path filtering. High policy is kept
+    # explicit in the returned selection metadata for reviewers.
+    return command_ids, prepared, {
+        "mode": selection_mode,
+        "requested_paths": list(changed_paths or []),
+        "selected": list(command_ids),
+        "skipped": skipped,
+        "dependency_closure_added": closure_added,
+        "high_profile_full_set": profile == "high",
+    }
 
 
 def run_verification_profile(
@@ -3704,6 +4108,8 @@ def run_verification_profile(
     tasks: Sequence[str] = (),
     expectation: str = "zero",
     max_parallel: int = 3,
+    changed_paths: Sequence[str] | None = None,
+    metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if kind == "review":
         raise ValidationError(
@@ -3714,8 +4120,29 @@ def run_verification_profile(
         raise ValidationError("Unknown exit expectation.", {"expectation": expectation})
     if max_parallel <= 0:
         raise ValidationError("Verification max parallel must be greater than zero.")
+    if metrics is not None:
+        metrics = normalize_evidence_metrics(metrics)
     project = load_project(repo)
-    command_ids, prepared = _verification_profile_commands(repo, project, profile)
+    command_ids, prepared, selection = _verification_profile_commands(
+        repo, project, profile, changed_paths
+    )
+    selection_metrics = {
+        "verification": {
+            "selected": len(selection["selected"]),
+            "skipped": len(selection["skipped"]),
+            "dependency_closure_added": len(selection["dependency_closure_added"]),
+            "cache_hit": False,
+        }
+    }
+    if metrics is not None:
+        normalized_input_metrics = normalize_evidence_metrics(metrics) or {}
+        normalized_input_metrics["verification"] = {
+            **dict(normalized_input_metrics.get("verification", {})),
+            **selection_metrics["verification"],
+        }
+        metrics = normalized_input_metrics
+    else:
+        metrics = selection_metrics
     batch_id = f"VB-{uuid.uuid4().hex[:12]}"
     statuses: dict[str, str] = {command_id: "pending" for command_id in command_ids}
     records: dict[str, dict[str, Any]] = {}
@@ -3794,6 +4221,7 @@ def run_verification_profile(
                 expectation=expectation,
                 batch_id=batch_id,
                 batch_index=command_ids.index(command_id),
+                metrics=metrics,
             )
             status = "passed" if evidence["status"] == "passed" else "failed"
             statuses[command_id] = status
@@ -3814,6 +4242,7 @@ def run_verification_profile(
             "id": batch_id,
             "profile": profile,
             "max_parallel": max_parallel,
+            "selection": selection,
             "commands": ordered_records,
         },
     }

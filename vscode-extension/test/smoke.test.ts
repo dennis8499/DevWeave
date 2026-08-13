@@ -1,5 +1,21 @@
 import { runTests } from "@vscode/test-electron";
-import { resolve } from "node:path";
+import { access } from "node:fs/promises";
+import { constants } from "node:fs";
+import { join, resolve } from "node:path";
+
+const ACCEPTED_VSCODE_VERSION = "1.131.0";
+
+async function cachedExecutable(): Promise<string> {
+  const platform = process.platform === "win32" ? "win32-x64-archive" : process.platform;
+  const executable = process.platform === "win32" ? "Code.exe" : "code";
+  const path = join(process.cwd(), ".vscode-test", `vscode-${platform}-${ACCEPTED_VSCODE_VERSION}`, executable);
+  try {
+    await access(path, constants.X_OK);
+    return path;
+  } catch {
+    throw new Error(`Accepted VS Code ${ACCEPTED_VSCODE_VERSION} runtime is not cached at ${path}; smoke is cache-only and will not download or fallback.`);
+  }
+}
 
 async function main(): Promise<void> {
   const inheritedKeys = [
@@ -20,9 +36,12 @@ async function main(): Promise<void> {
   }
 
   try {
+    const vscodeExecutablePath = await cachedExecutable();
     await runTests({
       extensionDevelopmentPath: resolve(process.cwd()),
       extensionTestsPath: resolve(process.cwd(), "test", "suite", "index.js"),
+      vscodeExecutablePath,
+      reuseMachineInstall: false,
       launchArgs: ["--disable-gpu"]
     });
   } finally {

@@ -1,0 +1,63 @@
+{
+  "argv": [
+    "npm.cmd",
+    "run",
+    "test:smoke:current"
+  ],
+  "binds_current_source": true,
+  "command_id": "extension-smoke",
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013"
+  ],
+  "created_at": "2026-08-13T09:09:12+00:00",
+  "cwd": "vscode-extension",
+  "duration_ms": 3310,
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-13T09:08:40+00:00",
+  "git_head": "40823cf6e448da9a69667cdf74b2da2923d687d4",
+  "id": "EVID-024",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 3310,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 9,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260813-142228-feature-devweave-vs-code-extension/EVID-024.log",
+  "schema_version": 1,
+  "source_fingerprint": "af900504eb1596bca9f3561b59eeaca895f83039f2e97573de968d4b0b397420",
+  "stale": false,
+  "started_at": "2026-08-13T09:08:37+00:00",
+  "status": "passed",
+  "summary": "> devweave-control-center@0.2.3 test:smoke:current\n> tsx test/smoke.test.ts\n\n\r\n[main 2026-08-13T09:08:38.242Z] StorageMainService: creating application shared storage\n[main 2026-08-13T09:08:38.314Z] [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)\n[main 2026-08-13T09:08:38.316Z] [shared storage] Initializing fallback application storage (path: in-memory)\n[main 2026-08-13T09:08:38.337Z] [shared storage] Fallback application storage initialized with 3 items\n[main 2026-08-13T09:08:38.337Z] update#setState disabled\n[main 2026-08-13T09:08:38.337Z] update#ctor - updates are disabled by the environment\nStarted local extension host with pid 28940.\nLoading development extension at c:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\nSettings Sync: Account status changed from uninitialized to unavailable\n[main 2026-08-13T09:08:40.325Z] Extension host with pid 28940 exited with code: 0, signal: unknown.\nExit code:   0\n\n(node:25608) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n[vscode.mermaid-markdown-features]: Extension 'vscode.mermaid-markdown-features' CANNOT use 'legacyToolReferenceFullNames' without the 'chatParticipantPrivate' API proposal enabled",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006"
+  ],
+  "timed_out": false,
+  "verification_batch_id": "VB-c8703b89506e",
+  "verification_batch_index": 1
+}

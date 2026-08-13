@@ -1532,6 +1532,45 @@ class IndependentReviewTests(unittest.TestCase):
             log = harness.repo / Path(large["raw_log"])
             self.assertLessEqual(log.stat().st_size, 128)
 
+    def test_evidence_metrics_are_bounded_backward_compatible_and_usage_safe(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            metrics = {
+                "context": {"pages": 3, "bytes": 1200, "chars": 800},
+                "tools": {"read": 4, "search": 2, "write": 0, "test": 1},
+                "usage": {"status": "unavailable"},
+            }
+            evidence = core.add_evidence(
+                harness.repo,
+                state["id"],
+                kind="diagnostic",
+                status="passed",
+                summary="Bounded metrics recorded.",
+                metrics=metrics,
+            )
+            self.assertEqual("unavailable", evidence["metrics"]["usage"]["status"])
+            self.assertIsNone(evidence["metrics"]["usage"]["input_tokens"])
+            self.assertEqual(3, evidence["metrics"]["context"]["pages"])
+
+            legacy = core.add_evidence(
+                harness.repo,
+                state["id"],
+                kind="manual",
+                status="passed",
+                summary="Legacy payload remains valid.",
+            )
+            self.assertNotIn("metrics", legacy)
+
+            with self.assertRaises(core.ValidationError):
+                core.add_evidence(
+                    harness.repo,
+                    state["id"],
+                    kind="diagnostic",
+                    status="passed",
+                    summary="Invalid metrics.",
+                    metrics={"usage": {"status": "available", "cost": float("nan")}},
+                )
+
     def test_missing_executable_is_failed_evidence_not_an_internal_crash(self) -> None:
         with RepositoryHarness() as harness:
             state = harness.start()

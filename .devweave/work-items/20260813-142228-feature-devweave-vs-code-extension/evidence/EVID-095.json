@@ -1,0 +1,108 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013"
+  ],
+  "created_at": "2026-08-13T13:01:26+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "40823cf6e448da9a69667cdf74b2da2923d687d4",
+  "id": "EVID-095",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260813-142228-feature-devweave-vs-code-extension/EVID-095.log",
+  "review": {
+    "context_mode": "isolated_read_only",
+    "covers": [
+      "AC-001",
+      "AC-002",
+      "AC-003",
+      "AC-004",
+      "AC-005",
+      "AC-006",
+      "AC-007",
+      "AC-008",
+      "AC-009",
+      "AC-010",
+      "AC-011",
+      "AC-012",
+      "AC-013"
+    ],
+    "findings": [
+      {
+        "evidence": "EVID-084 through EVID-094 metrics contain duration_ms and verification only; none contains context, tools, or usage.status=unavailable with null token/cost. The default verification-profile path also creates only selection metrics when no metrics input is supplied.",
+        "id": "F-001",
+        "recommendation": "Add current source-bound evidence containing bounded context/tool metrics and explicit unavailable/null usage, or narrow the acceptance claim and record the residual limitation.",
+        "severity": "advisory",
+        "title": "specification: AC-008 current evidence omits context/tool and explicit unavailable usage"
+      },
+      {
+        "evidence": "baseline/quality.md states that numeric metrics must be finite, non-negative, and no greater than 10,000,000. normalize_evidence_metrics applies that ceiling to integer counters and tokens, but usage.cost only checks finiteness and non-negativity.",
+        "id": "F-002",
+        "recommendation": "Apply the documented ceiling to usage.cost, or document a separate bounded cost policy and add a regression.",
+        "severity": "advisory",
+        "title": "standards: usage.cost is outside the documented metric ceiling"
+      },
+      {
+        "evidence": "snapshot.ts applies a per-file default read limit to artifacts and evidence JSON, but evidence-file count and aggregate artifact/evidence bytes are unbounded. VscodeFileSystemPort reads the full file before slicing to maxBytes, so the production read is not I/O-bounded.",
+        "id": "F-003",
+        "recommendation": "Enforce explicit aggregate count/byte budgets and bounded reads during I/O, with a large-detail regression.",
+        "severity": "advisory",
+        "title": "specification: AC-003 has no aggregate detail-read bound"
+      },
+      {
+        "evidence": "parseFrontmatter and parseWikiPage only diagnose a missing block or missing title/type/status. A non-array sources value becomes an empty array, and wrong-typed fingerprint fields are discarded without parseErrors, contrary to the unsupported-frontmatter diagnostic requirement.",
+        "id": "F-004",
+        "recommendation": "Validate supported frontmatter types, emit parse diagnostics, and add a regression proving malformed fields cannot appear as a clean projection.",
+        "severity": "advisory",
+        "title": "specification: AC-004 silently drops unsupported frontmatter types"
+      },
+      {
+        "evidence": "EVID-090 is passed but reports one Windows symlink-privilege skip; acceptance.md records that complete symlink coverage requires a privileged rerun. Therefore the accepted evidence does not execute every stated symlink adapter case.",
+        "id": "F-005",
+        "recommendation": "Run the same high-profile verification with symlink privilege, or keep AC-001 explicitly bounded by this documented residual limitation.",
+        "severity": "advisory",
+        "title": "standards: AC-001 symlink coverage is unavailable in the accepted run"
+      }
+    ],
+    "report_sha256": "7cf62de9a0668da48183d42d6fd756beba4e8be3a5b9384e6aa8627db1fbf609",
+    "result": "passed",
+    "reviewer_id": "019ffb2b-cfd3-7582-9de5-8e3e5b69735e",
+    "severity": "advisory",
+    "tasks": [
+      "TASK-001",
+      "TASK-002",
+      "TASK-003",
+      "TASK-004",
+      "TASK-005",
+      "TASK-006"
+    ]
+  },
+  "schema_version": 1,
+  "source_fingerprint": "4e652d235dc9017ae862bd146885cba7160c1b5788a0d607533b615635243985",
+  "stale": false,
+  "status": "passed",
+  "summary": "整體通過，未發現 critical security、data-loss、irreversible 或 scope 問題；但有五項 specification/standards advisory。AC-013 的歷史 baseline 限制已正確記錄，未另行要求未支持的百分比。",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006"
+  ]
+}

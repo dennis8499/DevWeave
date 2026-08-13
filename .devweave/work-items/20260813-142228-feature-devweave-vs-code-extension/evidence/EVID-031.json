@@ -1,0 +1,129 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013"
+  ],
+  "created_at": "2026-08-13T10:36:33+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "40823cf6e448da9a69667cdf74b2da2923d687d4",
+  "id": "EVID-031",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260813-142228-feature-devweave-vs-code-extension/EVID-031.log",
+  "review": {
+    "context_mode": "isolated_read_only",
+    "covers": [
+      "AC-001",
+      "AC-002",
+      "AC-003",
+      "AC-004",
+      "AC-005",
+      "AC-006",
+      "AC-007",
+      "AC-008",
+      "AC-009",
+      "AC-010",
+      "AC-011",
+      "AC-012",
+      "AC-013"
+    ],
+    "findings": [
+      {
+        "evidence": "_verification_profile_commands() 在 changed_paths 為 None 且 profile 非 high 時仍移除 release_only；目前 standard profile 的 extension-package 因此被排除，依賴它的 extension-smoke 也被阻擋。批准設計則要求省略 --path 時執行完整 profile。",
+        "id": "F-001",
+        "recommendation": "明確區分未指定 path 的完整 standard profile 與指定 path 的 selective profile，並補上兩種行為的 CLI contract test。",
+        "severity": "advisory",
+        "title": "未指定 --path 時 non-high profile 仍排除 release-only 命令"
+      },
+      {
+        "evidence": "_command_metadata_errors() 只驗證已知欄位，load_project() 未拒絕其它 command keys；拼寫錯誤或未支援欄位可能被靜默忽略，與批准 Wiki/engine contract 宣稱的 unknown fields fail closed 不一致。",
+        "id": "F-002",
+        "recommendation": "在 project command normalization 時拒絕未知 metadata keys，並以 malformed metadata regression 固定 fail-closed 行為。",
+        "severity": "advisory",
+        "title": "未知 command metadata 欄位未 fail closed"
+      },
+      {
+        "evidence": "summary 與 detail 讀取會列舉所有 Work Items，detail 會讀取所有 artifacts 與 evidence；目前只有單檔預設上限及 events 上限，沒有 evidence 數量或整體 bytes 上限。AC-003 要求單項與總量上限。",
+        "id": "F-003",
+        "recommendation": "增加 selected detail 的 evidence/artifact 數量與累計 bytes 上限，超限時保留 bounded diagnostics 而不繼續載入。",
+        "severity": "advisory",
+        "title": "Work Item detail 缺少總量上限"
+      },
+      {
+        "evidence": "parseFrontmatter()/parseWikiPage() 主要只診斷缺少 frontmatter、title、type、status；未知或錯誤格式欄位可能被忽略。readKnowledge() 只保存 stale page paths，WikiPageProjection 也沒有 staleReason 欄位。",
+        "id": "F-004",
+        "recommendation": "保留 frontmatter unknown/invalid field diagnostics，並在 Wiki projection 保存可操作的 stale reason。",
+        "severity": "advisory",
+        "title": "Wiki malformed frontmatter 與 stale reason 診斷不足"
+      },
+      {
+        "evidence": "smoke.test.ts 的 cachedExecutable() 只對 .vscode-test/vscode-win32-x64-archive-1.131.0/Code.exe 做 access() 檢查，未驗證 executable 實際回報的 VS Code 版本；EVID-024 通過但未在摘要中證明 runtime identity。",
+        "id": "F-005",
+        "recommendation": "在 smoke startup 讀取並比對 VS Code runtime identity，將實際版本寫入 bounded evidence summary。",
+        "severity": "advisory",
+        "title": "Pinned smoke 只驗證版本命名路徑"
+      },
+      {
+        "evidence": "baseline、Wiki 與文件宣稱 Python full suite 101 項；EVID-025 至 EVID-029 的 split runs 分別為 22、16、45、12、16，合計 111 項且 EVID-027 skipped 1。AC-012 的 docs/baseline/evidence reconciliation 尚未一致。",
+        "id": "F-006",
+        "recommendation": "建立一次 current full-suite count，並以該結果同步 README、使用手冊、baseline、Wiki 與 acceptance matrix。",
+        "severity": "advisory",
+        "title": "Python test count 與 current evidence 不一致"
+      },
+      {
+        "evidence": "EVID-021 至 EVID-030 主要記錄 duration 與 verification selection；未提供 context/tool baseline、低風險前後比較、snapshot latency 比較，亦未記錄 AC-013 未達成原因。",
+        "id": "F-007",
+        "recommendation": "下一個 feature work item 建立固定代表性 workload 的 before/after baseline，並在 acceptance 中明確記錄未達 30% 目標的原因。",
+        "severity": "advisory",
+        "title": "效率改善目標缺少比較證據"
+      },
+      {
+        "evidence": "esbuild.mjs 與 verify-package.mjs 只以 git rev-parse HEAD 產生及驗證 sourceGitHead；目前 review fingerprint 未寫入 manifest。相同 HEAD 下工作樹變更後，單獨執行 verifier 仍可能接受先前產物。",
+        "id": "F-008",
+        "recommendation": "將 source fingerprint 或等價的 clean-source digest 納入 manifest 與 verifier，避免相同 HEAD 的 dirty worktree 產物混用。",
+        "severity": "advisory",
+        "title": "Package provenance 未綁定 current dirty source fingerprint"
+      }
+    ],
+    "report_sha256": "7bc88f730b14a26c0156ab4c53ba71fed0960b5cb600d4010878a87bb40424c1",
+    "result": "passed",
+    "reviewer_id": "codex-independent-review-019ffaa7",
+    "severity": "advisory",
+    "tasks": [
+      "TASK-001",
+      "TASK-002",
+      "TASK-003",
+      "TASK-004",
+      "TASK-005",
+      "TASK-006"
+    ]
+  },
+  "schema_version": 1,
+  "source_fingerprint": "af900504eb1596bca9f3561b59eeaca895f83039f2e97573de968d4b0b397420",
+  "stale": false,
+  "status": "passed",
+  "summary": "EVID-021 至 EVID-030 均通過，Git HEAD 與 source fingerprint 一致；未發現具名 critical security、data-loss、irreversible 或 scope finding。以下為 advisory gaps。",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006"
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "argv": [
+    "npm.cmd",
+    "run",
+    "package"
+  ],
+  "binds_current_source": true,
+  "command_id": "extension-package",
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013"
+  ],
+  "created_at": "2026-08-13T09:02:50+00:00",
+  "cwd": "vscode-extension",
+  "duration_ms": 1583,
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-13T09:02:48+00:00",
+  "git_head": "40823cf6e448da9a69667cdf74b2da2923d687d4",
+  "id": "EVID-012",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 1583,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 9,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260813-142228-feature-devweave-vs-code-extension/EVID-012.log",
+  "schema_version": 1,
+  "source_fingerprint": "098d982fde8ff61f5bfddfea398403c42ce0464fafb13ad4ca4915c0db624f31",
+  "stale": false,
+  "started_at": "2026-08-13T09:02:46+00:00",
+  "status": "passed",
+  "summary": "> devweave-control-center@0.2.3 package\n> node esbuild.mjs --production && node scripts/package-vsix.mjs && node scripts/verify-package.mjs\n\nCreated C:\\Users\\小豬的電腦\\Desktop\\Project\\DevWeave\\vscode-extension\\devweave-control-center-0.2.3.vsix (303160 bytes, 119 entries)\nVerified 0.2.3: 58 bootstrap files and 119 VSIX entries. VSIX SHA-256: badb002630bed53d1b2488d7ff766f823758af70083b1bc2da6c1fb707e157d1\n\n\n  dist\\extension.js  67.2kb\n\nDone in 15ms\n\n  dist\\webview\\main.js  79.1kb\n\nDone in 12ms",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006"
+  ],
+  "timed_out": false,
+  "verification_batch_id": "VB-b2180913f493",
+  "verification_batch_index": 0
+}

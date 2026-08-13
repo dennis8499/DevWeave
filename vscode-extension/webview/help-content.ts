@@ -27,9 +27,10 @@ export const helpContent: readonly HelpSection[] = [
     title: "Windows 安裝與認證範圍",
     paragraphs: [
       "本次提供 0.2.3 VSIX。請在 VS Code Extensions 的 `...` 選單選擇 Install from VSIX…，安裝 repository 內的 `devweave-control-center-0.2.3.vsix`；既有 0.2.2 與 0.2.1 artifact 保留，再從 Activity Bar 開啟 Control Center。",
-      "本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 101 項（1 項因 symlink 權限 skipped）與 Extension unit tests 77 項。",
+      "本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 111 項（1 項因 symlink 權限 skipped）與 Extension unit tests 88 項。",
       "VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。本公開版不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。",
       "PreToolUse 只匹配 `Bash`、`apply_patch`、`Edit`、`Write`；`.codex/hooks.json` 同時提供 POSIX `command` 與 Windows `commandWindows`。Windows handler 先設定不依賴 shell variable 的 .NET UTF-8 console input/output，再由 `py -3 -X utf8 -B` 啟動 guard。",
+      "Package 先建立同目錄 candidate，再由 verifier 檢查 provenance；只有驗證成功才 promotion current。verify 或 promotion 失敗會保留 current 與 retained 0.2.2／0.2.1 artifacts，candidate 只做 best-effort cleanup。",
       "若發生發布事故，立即停止散布並停用或解除安裝 0.2.3；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。"
     ]
   },

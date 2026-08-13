@@ -1,12 +1,12 @@
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { deflateRawSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
-import { join, relative } from "node:path";
+import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 const extensionRoot = fileURLToPath(new URL("../", import.meta.url));
 const packageJson = JSON.parse(await readFile(join(extensionRoot, "package.json"), "utf8"));
 const version = packageJson.version;
-const outputPath = join(extensionRoot, `devweave-control-center-${version}.vsix`);
+const outputPath = parseOutputPath(process.argv.slice(2));
 const crcTable = Array.from({ length: 256 }, (_, index) => {
   let value = index;
   for (let bit = 0; bit < 8; bit += 1) value = (value & 1) ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
@@ -21,11 +21,35 @@ const entries = [
 ];
 
 const archive = createZip(entries);
-await writeFile(outputPath, archive);
+await writeFile(outputPath, archive, { flag: "wx" });
 console.log(`Created ${outputPath} (${archive.byteLength} bytes, ${entries.length} entries)`);
+
+function parseOutputPath(args) {
+  if (args.length !== 2 || args[0] !== "--output" || !args[1]) {
+    throw new Error("Usage: node scripts/package-vsix.mjs --output <candidate.vsix>");
+  }
+
+  const resolvedOutput = resolve(extensionRoot, args[1]);
+  const suffix = relative(extensionRoot, resolvedOutput);
+  if (suffix === "" || suffix === "." || isAbsolute(suffix) || suffix === ".." || suffix.startsWith(`..${sep}`)) {
+    throw new Error("--output must point to a file inside the extension root.");
+  }
+  if (extname(resolvedOutput).toLowerCase() !== ".vsix") {
+    throw new Error("--output must use the .vsix extension.");
+  }
+  if (!resolvedOutput.includes(".candidate-")) {
+    throw new Error("--output must name a unique candidate artifact.");
+  }
+  const currentArtifact = resolve(extensionRoot, `devweave-control-center-${version}.vsix`);
+  if (resolvedOutput === currentArtifact) {
+    throw new Error("--output cannot overwrite the current VSIX artifact.");
+  }
+  return resolvedOutput;
+}
 
 async function collectFiles(directory) {
   const entries = [];
+  const excludedFiles = new Set(["scripts/release-orchestrator.mjs", "test/unit/release-transaction.test.ts"]);
   for (const entry of (await readdir(directory, { withFileTypes: true })).sort((left, right) => left.name.localeCompare(right.name))) {
     if (["node_modules", ".vscode-test", ".git"].includes(entry.name)) continue;
     const absolute = join(directory, entry.name);
@@ -35,6 +59,7 @@ async function collectFiles(directory) {
     }
     if (!entry.isFile() || entry.name.endsWith(".vsix")) continue;
     const name = relative(extensionRoot, absolute).replaceAll("\\", "/");
+    if (excludedFiles.has(name)) continue;
     if (name === "README.md") {
       entries.push({ name: "readme.md", bytes: await readFile(absolute) });
     } else {

@@ -20,6 +20,13 @@ class InstrumentedFileSystem implements FileSystemPort {
     return this.files.has(path) || [...this.files.keys()].some((file) => file.startsWith(`${path}/`));
   }
 
+  public async inspectPath(relativePath: string): Promise<{ kind: "missing" | "file" | "directory" | "symlink" | "other" }> {
+    const path = relativePath.replaceAll("\\", "/");
+    if (this.files.has(path)) return { kind: "file" };
+    if ([...this.files.keys()].some((file) => file.startsWith(`${path}/`))) return { kind: "directory" };
+    return { kind: "missing" };
+  }
+
   public async readText(relativePath: string, maxBytes = 1_000_000): Promise<{ text: string; truncated: boolean }> {
     const path = relativePath.replaceAll("\\", "/");
     const text = this.files.get(path);
@@ -92,4 +99,24 @@ test("snapshot reader reuses unchanged Wiki pages for an incremental refresh", a
 
   assert.equal(files.readCounts.get("wiki/a.md"), 2);
   assert.equal(files.readCounts.get("wiki/b.md"), 1);
+});
+
+test("snapshot reader exposes bounded Wiki provenance and keeps engine observation unavailable", async () => {
+  const files = new InstrumentedFileSystem({
+    ".devweave/project.json": validProject,
+    ".codex/hooks.json": "{}",
+    ".agents/skills/devweave/SKILL.md": "# DevWeave",
+    "wiki/a.md": "---\ntitle: A\ntype: module\nstatus: active\nsources: [src/a.ts]\nsource_fingerprint: old\n---\n# A\ncontent"
+  });
+  const snapshot = await new WorkspaceSnapshotReader(files, {
+    rootName: "fixture",
+    rootPath: "file:///fixture"
+  }).readWorkspace();
+
+  const page = snapshot.knowledge.pages[0];
+  assert.equal(snapshot.engineObservedAt, null);
+  assert.equal(page?.path, "wiki/a.md");
+  assert.equal(page?.truncated, false);
+  assert.match(page?.contentHash ?? "", /^[a-f0-9]{64}$/);
+  assert.equal(page?.sourceFingerprint, "old");
 });

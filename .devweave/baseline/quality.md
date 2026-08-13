@@ -21,18 +21,25 @@
 - Windows public release certification：本次提供 0.2.3 VSIX，並保留 0.2.2 與 0.2.1 artifacts；認證範圍限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host。VS Code 1.90+、Python 3.11+ 僅為技術門檻，不提供 Marketplace、跨平台或舊版 binary rollback 承諾。
 - Windows launcher contract：根 `.codex/hooks.json` 的 exact matcher、POSIX/Windows dual launcher、handler 的 .NET UTF-8 console input/output normalization、UTF-8 deny output、Git-root path resolution 與 30 秒 timeout 必須由 repository contract、`doctor` 的 CMD/PowerShell 5.1/PowerShell 7 probes，以及 root/nested cwd matrix 共同驗證；launcher failure 必須與 guard policy deny 分開呈現，且不得以 shell-scoped `$OutputEncoding` 取代 handler 的 explicit console setup。
 - Windows walkthrough bar：fresh install/init、合法 evolved adoption、reserved conflict/failure fail-closed 與 multiple active work 四條 disposable fixture walkthrough 必須通過；取消/失敗不得留下 partial state，未確認 prompt 不得複製，Refresh 後舊 preview 必須重新預覽。
+- VSIX release transaction：production package 先以 `package-vsix.mjs --output <candidate>` 建立同目錄唯一 candidate，再以 `verify-package.mjs --artifact <candidate>` 驗證 provenance；只有成功後才 atomic rename promotion current。verify、promotion 或 cleanup failure 必須保留 current/retained bytes，builder/verifier 缺少 artifact 參數時 fail closed。
+- Verification impact selection：command metadata 可宣告 affected paths、write class、outputs、release-only 與 dependencies；low/standard 的 `verify --profile --path` 只執行受影響且可安全閉包的命令，會保存 selected/skipped/closure reasons，high profile 仍執行完整集合。
+- Evidence metrics boundary：verification evidence 可保存 bounded duration、context/tool/selection metrics；Codex host 未提供 exact usage 時必須保存 `usage.status=unavailable` 與 null token/cost 欄位，不以 bytes 估算 Token、不保存 prompt 或 secrets。
+- Projection efficiency boundary：Extension 初次 refresh 使用 summary-first work-item read，selected detail 才載入 artifacts/evidence/events；Wiki body 受 bounded byte limit 並保存 content hash/truncation/parse diagnostics，projection 不得推導 engine Gate passed。
 
 ## Verification Commands
 
-- `python -B -m unittest discover -s tests -v`：101 項通過，另有一項因 Windows symlink privilege 不可用而 skipped；涵蓋 Wiki reserved preflight、bootstrap G1→G3、review/no-update、context currentness、coverage、九種 scaffold、seal、CLI/guard、legacy 與 repository contract coverage。該 skip 是環境權限限制，不能解讀為產品失敗。
+- `python -B -m unittest discover -s tests -v`：111 項通過，另有一項因 Windows symlink privilege 不可用而 skipped；涵蓋 Wiki reserved preflight、bootstrap G1→G3、review/no-update、context currentness、coverage、九種 scaffold、seal、CLI/guard、legacy 與 repository contract coverage。該 skip 是環境權限限制，不能解讀為產品失敗。
 - Repository contract tests：目前契約測試全部通過，包含 single-router Codebase Wiki 閉環、Windows hook launcher matrix、current-only release contract、maintenance-only exclusion、metadata 與 invocation policy 契約。
 - `npx skills@latest list -a codex`：只列出唯一 local `devweave` router 與五個 `mattpocock/skills` companions。
 - `python -X utf8 -B <skill-creator>/scripts/quick_validate.py`：`devweave`、`codebase-design`、`diagnosing-bugs`、`grilling`、`tdd` 通過；`grill-me` 保留必要的 `disable-model-invocation`，由 repository contract 補驗目前 validator 未支援的欄位。
 - Isolated forward-test：通過 managed Wiki-first feature、G1 one-question grilling、G2 interface/seam/adapter design、bug red-capable/G2 regression boundary 與 TDD public-seam independent-oracle vertical-slice scenarios。
 - `git diff --check`：無 whitespace error；Windows checkout 僅回報既有 LF/CRLF conversion warnings。
-- `vscode-extension/npm.cmd run test`：77 項通過，涵蓋 PlanModeGuidance mapping、overview/preview/copy handoff、PreviewGate 的結構化 typed-intent 比較與控制字元拒絕、actionPreview protocol、Wiki DOM mount、ARIA/keyboard、legacy/multi-work、shared semantic validator、BootstrapInstaller、prompt 與 security regression。
-- `vscode-extension/npm.cmd run typecheck`：通過；`npm.cmd run package` 產生並驗證 0.2.3 production bundle，manifest 具 58 個 bootstrap files、119 個 VSIX entries，root/embedded hook、source hash/length、package／bundle version、required entries、compatibility declarations 與 current artifact SHA-256 全數匹配，0.2.2 與 0.2.1 artifacts 保留。
+- `python -B -m unittest discover -s tests -p test_cli.py -v`：22 項通過，涵蓋 malformed metrics、metadata fail-closed、affected-path selection、dependency closure、release-only skip 與 high full-set policy。
+- `python -B -m unittest discover -s tests -p test_devweave_core.py -v`：45 項通過，另有一項因 Windows symlink privilege 不可用而 skipped；涵蓋 bounded metrics、evidence compatibility、state/gate/review 與 repository-safe validation。
+- `vscode-extension/npm.cmd run test`：88 項通過，涵蓋 PlanModeGuidance mapping、overview/preview/copy handoff、PreviewGate 的結構化 typed-intent 比較與控制字元拒絕、actionPreview protocol、Wiki DOM mount、ARIA/keyboard、legacy/multi-work、shared semantic validator、BootstrapInstaller、candidate release transaction、bounded metrics projection、prompt 與 security regression。
+- `vscode-extension/npm.cmd run typecheck`：通過；`npm.cmd run package` 先建立並驗證 candidate，再 promotion 0.2.3 current artifact。manifest 具 58 個 bootstrap files、119 個 VSIX entries，root/embedded hook、source hash/length、package／bundle version、required entries、compatibility declarations 與 candidate/current artifact SHA-256 全數匹配，0.2.2 與 0.2.1 retained artifacts 保留；verify/promotion failure transaction tests 會確認 current bytes 不變。
 - `vscode-extension/npm.cmd run test:smoke`：Windows VS Code Extension Host activation、Activity Bar view 與公開 commands 通過。
+- Metrics limits：canonical metrics payload 上限 250,000 bytes；數值欄位必須是有限、非負且不超過 10,000,000。未提供 exact host usage 時只保存 `usage.status=unavailable` 與 null token/cost，禁止以 bytes 推算 Token 或保存 prompt/secrets。
 - Independent Review targeted coverage：Python/CLI 覆蓋 passed、unavailable、advisory、critical、timeout/malformed-shaped fallback、waiver、stale source、report containment/size/redaction/hash/provenance；Extension 覆蓋 missing、passed、advisory、unavailable、critical 與 legacy projection。
 - High-risk DevWeave verification：`extension-package`、`extension-smoke`、`extension-tests`、`extension-typecheck` 與 root `unit-tests` 均由 CLI verify 登錄為 current passing evidence。
 
@@ -41,7 +48,7 @@
 - Python 3.11+、Git repository、UTF-8、無第三方 runtime dependencies。
 - Source pages 預期維持 1–5 個核心 sources；health payload 限制 page/finding summaries 數量。
 - Repository 必須信任 hook；外部 editor 或停用 hook 的修改只能在 G3 reconciliation 被偵測。
-- 完整 101 項 current Windows suite 的 `unit-tests` verification timeout 為 600 秒；本 work item 的 EVID-006 以 318.181 秒通過並有一項因 Windows symlink privilege 不可用而 skipped。若要宣稱完整 symlink coverage，須在同一 build、具 symlink 權限的隔離執行中補驗並保存 current evidence。
+- 完整 111 項 current Windows suite 的 `unit-tests` verification timeout 為 600 秒；本 work item 的 current full-suite run 以 299.633 秒通過並有一項因 Windows symlink privilege 不可用而 skipped。若要宣稱完整 symlink coverage，須在同一 build、具 symlink 權限的隔離執行中補驗並保存 current evidence。
 - Companion Skills 僅增加 Markdown、YAML 與一個未自動執行的 Bash template；Node.js／npx 與 network 只在人工安裝或更新時需要，不是 DevWeave runtime dependency。
 - Extension bootstrap 的 VSIX package source 是 build-time source-derived；runtime 僅使用內嵌 manifest/resource reader 與 VS Code workspace API，不啟動 Python、shell、Git、network 或任意 child process。
 

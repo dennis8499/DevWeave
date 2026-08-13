@@ -5,8 +5,16 @@ export interface DirectoryEntry {
   kind: EntryKind;
 }
 
+export type FileSystemPathKind = "missing" | "file" | "directory" | "symlink" | "other";
+
+export interface PathInspection {
+  kind: FileSystemPathKind;
+  diagnostic?: string;
+}
+
 export interface FileSystemPort {
   exists(relativePath: string): Promise<boolean>;
+  inspectPath(relativePath: string): Promise<PathInspection>;
   readBytes?(relativePath: string): Promise<Uint8Array>;
   readText(relativePath: string, maxBytes?: number): Promise<{ text: string; truncated: boolean }>;
   readDirectory(relativePath: string): Promise<DirectoryEntry[]>;

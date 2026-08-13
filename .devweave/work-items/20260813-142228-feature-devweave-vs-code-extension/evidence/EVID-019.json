@@ -1,0 +1,70 @@
+{
+  "argv": [
+    "python",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-p",
+    "test_guard.py",
+    "-v"
+  ],
+  "binds_current_source": true,
+  "command_id": "unit-tests-guard",
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013"
+  ],
+  "created_at": "2026-08-13T09:05:58+00:00",
+  "cwd": ".",
+  "duration_ms": 17747,
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-13T09:03:47+00:00",
+  "git_head": "40823cf6e448da9a69667cdf74b2da2923d687d4",
+  "id": "EVID-019",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 17747,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 9,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260813-142228-feature-devweave-vs-code-extension/EVID-019.log",
+  "schema_version": 1,
+  "source_fingerprint": "098d982fde8ff61f5bfddfea398403c42ce0464fafb13ad4ca4915c0db624f31",
+  "stale": false,
+  "started_at": "2026-08-13T09:03:30+00:00",
+  "status": "passed",
+  "summary": "test_baseline_write_is_limited_to_verification (test_guard.GuardTests.test_baseline_write_is_limited_to_verification) ... ok\r\ntest_bound_session_can_edit_artifacts_but_not_product_before_g2 (test_guard.GuardTests.test_bound_session_can_edit_artifacts_but_not_product_before_g2) ... ok\r\ntest_cli_bind_command_binds_hook_session (test_guard.GuardTests.test_cli_bind_command_binds_hook_session) ... ok\r\ntest_devweave_name_inside_arbitrary_command_is_not_a_guard_bypass (test_guard.GuardTests.test_devweave_name_inside_arbitrary_command_is_not_a_guard_bypass) ... ok\r\ntest_g2_allows_product_write_and_stale_design_reblocks_it (test_guard.GuardTests.test_g2_allows_product_write_and_stale_design_reblocks_it) ... ok\r\ntest_g2_still_blocks_known_out_of_scope_patch (test_guard.GuardTests.test_g2_still_blocks_known_out_of_scope_patch) ... ok\r\ntest_managed_repository_blocks_unbound_writes (test_guard.GuardTests.test_managed_repository_blocks_unbound_writes) ... ok\r\ntest_patch_move_destination_is_also_scope_checked (test_guard.GuardTests.test_patch_move_destination_is_also_scope_checked) ... ok\r\ntest_read_only_bash_short_circuits_before_repository_loading (test_guard.GuardTests.test_read_only_bash_short_circuits_before_repository_loading) ... ok\r\ntest_read_only_is_unbound_but_configured_command_requires_binding (test_guard.GuardTests.test_read_only_is_unbound_but_configured_command_requires_binding) ... ok\r\ntest_uninitialized_repository_does_not_activate (test_guard.GuardTests.test_uninitialized_repository_does_not_activate) ... ok\r\ntest_wiki_write_requires_verification_and_exact_knowledge_plan (test_guard.GuardTests.test_wiki_write_requires_verification_and_exact_knowledge_plan) ... ok\r\n\r\n----------------------------------------------------------------------\r\nRan 12 tests in 17.517s\r\n\r\nOK",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006"
+  ],
+  "timed_out": false,
+  "verification_batch_id": "VB-b2180913f493",
+  "verification_batch_index": 7
+}

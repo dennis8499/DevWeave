@@ -181,6 +181,7 @@ export function buildReviewReadiness(snapshot: WorkspaceSnapshot, work: WorkItem
       gate: null,
       status: "closed",
       summary: "沒有可核准的進行中工作；歷史 work 僅供唯讀瀏覽。",
+      authority: "projection",
       checks: []
     };
   }
@@ -202,11 +203,11 @@ export function buildReviewReadiness(snapshot: WorkspaceSnapshot, work: WorkItem
       ? "not_ready"
       : "attention";
   const summary = status === "ready"
-    ? `${presentGate(gate)} 的審查條件目前看起來已備妥；這是檔案快照投影，送出 approve 前仍由 engine 驗證。`
+    ? `${presentGate(gate)} 的 projection 預檢條件目前看起來已備妥；這不是 engine 通過結果，送出 approve 前仍由 engine 驗證。`
     : status === "not_ready"
       ? `${presentGate(gate)} 目前未就緒，尚未具備完整審查條件，請先處理下方標示的問題。`
       : `${presentGate(gate)} 有需要留意的 task、evidence 或 Knowledge 狀態，建議先確認再審查。`;
-  return { gate, status, summary, checks };
+  return { gate, status, summary, authority: "projection", checks };
 }
 
 export function presentDiagnostic(diagnostic: Diagnostic): DiagnosticPresentation {

@@ -20,6 +20,13 @@ class MemoryFileSystem implements FileSystemPort {
     return path === "." || this.files.has(path) || [...this.files.keys()].some((file) => file.startsWith(path + "/"));
   }
 
+  public async inspectPath(relativePath: string): Promise<{ kind: "missing" | "file" | "directory" | "symlink" | "other" }> {
+    const path = this.normalize(relativePath);
+    if (this.files.has(path)) return { kind: "file" };
+    if (path === "." || [...this.files.keys()].some((file) => file.startsWith(path + "/"))) return { kind: "directory" };
+    return { kind: "missing" };
+  }
+
   public async readText(relativePath: string, maxBytes = 1_000_000): Promise<{ text: string; truncated: boolean }> {
     const value = this.files.get(this.normalize(relativePath));
     if (value === undefined) {
@@ -112,7 +119,7 @@ function snapshotFixture(): WorkspaceSnapshot {
     baselineFiles: [],
     hookPresent: true,
     skillPresent: true,
-    bootstrap: { complete: true, expected: [], missing: [], conflicts: [] },
+    bootstrap: { complete: true, expected: [], missing: [], conflicts: [], pathKinds: {}, conflictReasons: {} },
     workItems: [],
     knowledge: {
       root: "wiki",
@@ -135,6 +142,8 @@ function snapshotFixture(): WorkspaceSnapshot {
     source: "filesystem",
     authoritative: false,
     engineObservedAt: null,
+    engineGateStatus: "unavailable",
+    projectionReadiness: "ready",
     selectedWorkId: null
   };
 }
@@ -196,6 +205,67 @@ test("snapshot reader projects nested independent review evidence and keeps lega
   assert.equal(review?.review?.result, "passed");
   assert.equal(review?.review?.contextMode, "isolated_read_only");
   assert.equal(snapshot.workItems[0]?.evidence.find((item) => item.id === "evidence-1")?.review, undefined);
+});
+
+test("snapshot reader projects bounded execution metrics without prompt or secret data", async () => {
+  const entries = managedEntries();
+  entries[".devweave/work-items/demo/evidence/metrics-available.json"] = JSON.stringify({
+    id: "EVID-003",
+    kind: "diagnostic",
+    status: "passed",
+    summary: "Available metrics",
+    covers: ["AC-013"],
+    tasks: ["TASK-005"],
+    stale: false,
+    binds_current_source: true,
+    prompt: "do-not-project",
+    metrics: {
+      duration_ms: 120,
+      context: { pages: 2, bytes: 120, chars: 80 },
+      tools: { read: 3, search: 1, write: 0, test: 2 },
+      verification: { selected: 2, skipped: 7, dependency_closure_added: 1, cache_hit: false },
+      usage: { status: "available", input_tokens: 12, output_tokens: 8, cached_tokens: 4, cost: 0.01 }
+    }
+  });
+  entries[".devweave/work-items/demo/evidence/metrics-unavailable.json"] = JSON.stringify({
+    id: "EVID-004",
+    kind: "diagnostic",
+    status: "passed",
+    summary: "Unavailable metrics",
+    covers: ["AC-013"],
+    tasks: ["TASK-005"],
+    stale: false,
+    binds_current_source: true,
+    prompt: "do-not-project",
+    metrics: {
+      usage: { status: "unavailable", input_tokens: null, output_tokens: null, cached_tokens: null, cost: null }
+    }
+  });
+
+  const snapshot = await new WorkspaceSnapshotReader(new MemoryFileSystem(entries), {
+    rootName: "metrics-evidence",
+    rootPath: "file:///metrics-evidence"
+  }).readWorkspace();
+
+  const available = snapshot.workItems[0]?.evidence.find((item) => item.id === "EVID-003");
+  const unavailable = snapshot.workItems[0]?.evidence.find((item) => item.id === "EVID-004");
+  const legacy = snapshot.workItems[0]?.evidence.find((item) => item.id === "evidence-1");
+  assert.deepEqual(available?.metrics, {
+    durationMs: 120,
+    context: { pages: 2, bytes: 120, chars: 80 },
+    tools: { read: 3, search: 1, write: 0, test: 2 },
+    verification: { selected: 2, skipped: 7, dependencyClosureAdded: 1, cacheHit: false },
+    usage: { status: "available", inputTokens: 12, outputTokens: 8, cachedTokens: 4, cost: 0.01 }
+  });
+  assert.deepEqual(unavailable?.metrics?.usage, {
+    status: "unavailable",
+    inputTokens: null,
+    outputTokens: null,
+    cachedTokens: null,
+    cost: null
+  });
+  assert.equal(legacy?.metrics, undefined);
+  assert.equal(JSON.stringify(snapshot).includes("do-not-project"), false);
 });
 
 test("snapshot reader reports an uninitialized workspace without invoking an engine", async () => {

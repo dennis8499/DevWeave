@@ -61,7 +61,27 @@ export interface EvidenceProjection {
   stale: boolean;
   bindsCurrentSource: boolean;
   sourceFingerprint?: string;
+  metrics?: EvidenceMetricsProjection;
   review?: IndependentReviewProjection;
+}
+
+export interface EvidenceMetricsProjection {
+  durationMs?: number;
+  context?: { pages?: number; bytes?: number; chars?: number };
+  tools?: { read?: number; search?: number; write?: number; test?: number };
+  verification?: {
+    selected?: number;
+    skipped?: number;
+    dependencyClosureAdded?: number;
+    cacheHit?: boolean;
+  };
+  usage?: {
+    status: "available" | "unavailable" | string;
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+    cachedTokens?: number | null;
+    cost?: number | null;
+  };
 }
 
 export interface WaiverProjection {
@@ -91,6 +111,8 @@ export interface WikiPageProjection {
   verifiedBy?: string;
   parseErrors: string[];
   bodyPreview: string;
+  contentHash: string;
+  truncated: boolean;
 }
 
 export interface KnowledgeBootstrapProjection {
@@ -144,6 +166,8 @@ export interface BootstrapCompletenessProjection {
   expected: string[];
   missing: string[];
   conflicts: string[];
+  pathKinds: Record<string, "missing" | "file" | "directory" | "symlink" | "other">;
+  conflictReasons: Record<string, string>;
 }
 
 export interface WorkItemProjection {
@@ -170,6 +194,8 @@ export interface WorkItemProjection {
   knowledgeProfile?: "bootstrap";
   knowledgeReviewRequired: boolean;
   knowledge: KnowledgeProjection;
+  detailLoaded: boolean;
+  detailUnavailable?: string;
 }
 
 export interface CommandProjection {
@@ -202,6 +228,8 @@ export interface WorkspaceSnapshot {
   source: "filesystem";
   authoritative: false;
   engineObservedAt: string | null;
+  engineGateStatus: "observed" | "unavailable";
+  projectionReadiness: "ready" | "attention" | "blocked";
   selectedWorkId: string | null;
 }
 
@@ -260,6 +288,7 @@ export interface ReviewReadiness {
   gate: GateName | null;
   status: ReviewReadinessStatus;
   summary: string;
+  authority: "projection";
   checks: ReviewCheck[];
 }
 

@@ -2,11 +2,11 @@
 title: Wiki Activity Log
 type: log
 sources: []
-last_updated: 2026-08-10
+last_updated: 2026-08-13
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260810-130022-feature-openai-hooks-windows-shell-pretooluse
+verified_by: 20260813-142228-feature-devweave-vs-code-extension
 ---
 
 # Activity Log
@@ -98,3 +98,10 @@ verified_by: 20260810-130022-feature-openai-hooks-windows-shell-pretooluse
 
 - Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，補記 Windows handler 先設定 .NET console input/output 為 UTF-8、避免 shell-scoped encoding variable、以及最後一輪 source-derived hook/package contract。
 - 維持四頁 content upsert 與 index/log coupling；本次只更新已規劃的 Wiki targets，既有 activity log body 保持 append-only。
+
+## [2026-08-13] promote | 20260813-142228-feature-devweave-vs-code-extension
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]] 與 [[vscode-extension]]，補記 summary-first Work Item projection、bounded Wiki provenance、projection-only engine authority 與 affected-path verification。
+- 記錄 command metadata、release-only dependency exclusion、high full-set policy、bounded evidence metrics 與 Codex usage unavailable 語意；build provenance 與 cache-only VS Code 1.131.0 smoke contract 維持 source-bound。
+- 將 0.2.3 package provenance 固定為 candidate → verify → atomic promotion；verification 或 promotion failure 保留 current artifact 並清理 candidate，Extension final run 更新為 88 tests。
+- 將 metrics contract 的 250,000-byte payload／10,000,000 numeric bounds 與 usage unavailable/null semantics 同步到 engine、Extension 與驗證投影。
