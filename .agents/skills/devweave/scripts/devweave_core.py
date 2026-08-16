@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import unicodedata
 import uuid
@@ -20,6 +21,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Sequence
 
 import knowledge_core as knowledge
+import command_policy
 
 
 SCHEMA_VERSION = 1
@@ -84,6 +86,7 @@ HEADING_PATTERN = re.compile(
 )
 TODO_PATTERN = re.compile(r"(?:<!--\s*TODO|\[TODO\]|TODO:)", re.IGNORECASE)
 DEPENDENCIES_PATTERN = re.compile(r"^-\s*Dependencies:\s*(.+?)\s*$", re.MULTILINE | re.IGNORECASE)
+_EXECUTABLE_HASH_CACHE: dict[tuple[str, int, int], str] = {}
 
 
 class DevWeaveError(Exception):
@@ -257,6 +260,19 @@ def normalize_evidence_metrics(metrics: Any | None) -> dict[str, Any] | None:
 
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
+
+
+def _executable_hash(path: Path) -> str:
+    """Hash a trusted executable once per unchanged (path, size, mtime) tuple."""
+
+    stat = path.stat()
+    key = (str(path.resolve()).lower(), stat.st_size, stat.st_mtime_ns)
+    cached = _EXECUTABLE_HASH_CACHE.get(key)
+    if cached is not None:
+        return cached
+    digest = sha256_bytes(path.read_bytes())
+    _EXECUTABLE_HASH_CACHE[key] = digest
+    return digest
 
 
 def normalize_relpath(path: str | Path) -> str:
@@ -574,6 +590,10 @@ def load_project(repo: Path) -> dict[str, Any]:
             {"expected": SCHEMA_VERSION, "actual": project.get("schema_version")},
         )
     errors: list[str] = []
+    try:
+        project = command_policy.normalize_project_policy(project, repo)
+    except command_policy.PolicyError as exc:
+        errors.append(f"command policy: {exc}")
     if not isinstance(project.get("managed"), bool):
         errors.append("managed must be a boolean")
     if not isinstance(project.get("locale"), str) or not project.get("locale"):
@@ -621,14 +641,65 @@ def load_project(repo: Path) -> dict[str, Any]:
         ):
             errors.append(f"commands[{index}].depends_on contains invalid command IDs")
         exclusive_group = command.get("exclusive_group", "")
-        if not isinstance(exclusive_group, str):
-            errors.append(f"commands[{index}].exclusive_group must be a string")
+        if exclusive_group is not None and not isinstance(exclusive_group, str):
+            errors.append(f"commands[{index}].exclusive_group must be a string or null")
         metadata_errors, _ = _command_metadata_errors(
             command, label=f"commands[{index}]"
         )
         errors.extend(metadata_errors)
+        if isinstance(command, dict):
+            resolved_executable = command.get("resolved_executable")
+            executable_sha256 = command.get("executable_sha256")
+            if not isinstance(resolved_executable, str) or not resolved_executable:
+                errors.append(f"commands[{index}].resolved_executable is required")
+            else:
+                executable_path = Path(resolved_executable).expanduser()
+                if not executable_path.is_absolute():
+                    errors.append(f"commands[{index}].resolved_executable must be absolute")
+                elif executable_path.is_file() and isinstance(executable_sha256, str):
+                    actual_hash = _executable_hash(executable_path)
+                    if actual_hash.lower() != executable_sha256.lower():
+                        errors.append(
+                            f"commands[{index}].executable_sha256 does not match the executable"
+                        )
+                elif executable_path.is_file():
+                    errors.append(f"commands[{index}].executable_sha256 is required")
+                argv = command.get("argv", [])
+                if isinstance(argv, list) and argv:
+                    argv_executable = Path(str(argv[0])).expanduser()
+                    if not argv_executable.is_absolute() or argv_executable.resolve() != executable_path.resolve():
+                        errors.append(
+                            f"commands[{index}].argv[0] must equal resolved_executable"
+                        )
     if len(command_ids) != len(set(command_ids)):
         errors.append("command IDs must be unique")
+    trusted = project.get("trusted_executables", [])
+    trusted_by_path: dict[str, str] = {}
+    if isinstance(trusted, list):
+        for index, entry in enumerate(trusted):
+            if not isinstance(entry, dict):
+                errors.append(f"trusted_executables[{index}] must be an object")
+                continue
+            path = entry.get("path")
+            digest = entry.get("sha256")
+            if not isinstance(path, str) or not isinstance(digest, str):
+                errors.append(f"trusted_executables[{index}] requires path and sha256")
+                continue
+            canonical = str(Path(path).expanduser().resolve()).lower()
+            if canonical in trusted_by_path and trusted_by_path[canonical] != digest.lower():
+                errors.append(f"trusted_executables has conflicting hashes for {path}")
+            trusted_by_path[canonical] = digest.lower()
+    for index, command in enumerate(commands):
+        if not isinstance(command, dict):
+            continue
+        path = command.get("resolved_executable")
+        digest = command.get("executable_sha256")
+        if isinstance(path, str) and isinstance(digest, str):
+            trusted_digest = trusted_by_path.get(str(Path(path).expanduser().resolve()).lower())
+            if trusted_digest != digest.lower():
+                errors.append(
+                    f"commands[{index}].resolved_executable is not present in trusted_executables"
+                )
     known_command_ids = set(command_ids)
     for index, command in enumerate(commands):
         if not isinstance(command, dict):
@@ -641,6 +712,14 @@ def load_project(repo: Path) -> dict[str, Any]:
                 )
             if dependency == command_id:
                 errors.append(f"commands[{index}].depends_on cannot reference itself")
+    command_graph = {
+        command.get("id"): list(command.get("depends_on", []))
+        for command in commands
+        if isinstance(command, dict) and isinstance(command.get("id"), str)
+    }
+    cycle = _dependency_cycle(command_graph)
+    if cycle:
+        errors.append("command dependency cycle: " + " -> ".join(cycle))
     profiles = project.get("verification_profiles")
     if not isinstance(profiles, dict):
         errors.append("verification_profiles must be an object")
@@ -689,12 +768,64 @@ def load_project(repo: Path) -> dict[str, Any]:
     return project
 
 
+def invalidate_active_verification_plans(
+    repo: Path,
+    *,
+    previous_policy_digest: str,
+    current_policy_digest: str,
+    reason: str = "project_policy_mutation",
+) -> list[str]:
+    """Stale all post-G2 verification state after a typed policy mutation."""
+
+    invalidated: list[str] = []
+    for candidate in list_work(repo, include_closed=False):
+        if candidate.get("gates", {}).get("build", {}).get("status") != "approved":
+            continue
+        if not isinstance(candidate.get("verification_plan"), dict):
+            continue
+        work_id = candidate["id"]
+        with WorkLock(repo, work_id):
+            state = load_state(repo, work_id)
+            plan = state.get("verification_plan")
+            if not isinstance(plan, dict) or plan.get("stale"):
+                continue
+            plan["stale"] = True
+            plan["stale_reason"] = reason
+            plan["stale_at"] = utc_now()
+            plan["current_project_policy_digest"] = current_policy_digest
+            plan["previous_project_policy_digest"] = previous_policy_digest
+            for evidence in state.get("evidence", {}).values():
+                if evidence.get("command_id"):
+                    evidence["stale"] = True
+                    evidence["gate_eligible"] = False
+                    evidence["eligibility_reason"] = reason
+            state["last_verification"] = None
+            _mark_gate_stale(state["gates"]["build"])
+            _mark_gate_stale(state["gates"]["acceptance"])
+            state["phase"] = "design"
+            save_state_unlocked(repo, state)
+            append_event_unlocked(
+                repo,
+                work_id,
+                "verification_policy_invalidated",
+                {
+                    "reason": reason,
+                    "previous_policy_digest": previous_policy_digest,
+                    "current_policy_digest": current_policy_digest,
+                },
+            )
+            invalidated.append(work_id)
+    return invalidated
+
+
 def project_defaults() -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
+        "command_policy_version": command_policy.POLICY_VERSION,
         "managed": True,
         "locale": "zh-TW",
         "commands": [],
+        "trusted_executables": [],
         "verification_profiles": {
             "low": [],
             "standard": [],
@@ -1303,6 +1434,24 @@ def load_state(repo: Path, work_id: str) -> dict[str, Any]:
             isinstance(item, dict) for item in value.values()
         ):
             errors.append(f"{ledger} must be an object")
+    verification_plan = state.get("verification_plan")
+    if verification_plan is not None:
+        if not isinstance(verification_plan, dict):
+            errors.append("verification_plan must be an object")
+        else:
+            for key in ("plan_id", "plan_digest", "project_policy_digest"):
+                if not isinstance(verification_plan.get(key), str) or not verification_plan.get(key):
+                    errors.append(f"verification_plan.{key} must be a non-empty string")
+            if not isinstance(verification_plan.get("required_commands"), list) or not all(
+                isinstance(item, str) for item in verification_plan.get("required_commands", [])
+            ):
+                errors.append("verification_plan.required_commands must be a string array")
+            if not isinstance(verification_plan.get("selected_commands"), list) or not all(
+                isinstance(item, str) for item in verification_plan.get("selected_commands", [])
+            ):
+                errors.append("verification_plan.selected_commands must be a string array")
+            if not isinstance(verification_plan.get("stale", False), bool):
+                errors.append("verification_plan.stale must be boolean")
     if not isinstance(state.get("waivers"), list) or not all(
         isinstance(item, dict) for item in state.get("waivers", [])
     ):
@@ -1492,6 +1641,151 @@ def acceptance_fingerprint(
     return sha256_bytes(material)
 
 
+def _verification_plan_for_state(
+    repo: Path,
+    state: dict[str, Any],
+    project: dict[str, Any],
+    *,
+    affected_paths: Sequence[str] = (),
+    release_stage: str | None = None,
+) -> dict[str, Any]:
+    source = git_snapshot(repo)
+    plan = command_policy.build_effective_plan(
+        project,
+        {
+            "id": state["id"],
+            "risk": state["risk"]["level"],
+            "phase": state.get("phase"),
+            "source_fingerprint": source["fingerprint"],
+        },
+        profile=state["risk"]["level"],
+        affected_paths=affected_paths,
+        release_stage=release_stage,
+    )
+    plan.update(
+        {
+            "policy_version": project.get("command_policy_version"),
+            "frozen_at": utc_now(),
+            "source_fingerprint_at_freeze": source["fingerprint"],
+            "stale": False,
+            "stale_reason": None,
+        }
+    )
+    return plan
+
+
+def _has_plan_bound_evidence(state: dict[str, Any]) -> bool:
+    return any(
+        isinstance(item, dict)
+        and item.get("command_id")
+        and item.get("effective_plan_digest")
+        for item in state.get("evidence", {}).values()
+    )
+
+
+def _mark_verification_plan_stale(
+    state: dict[str, Any],
+    *,
+    reason: str,
+    current_policy_digest: str | None = None,
+) -> bool:
+    plan = state.get("verification_plan")
+    changed = False
+    if isinstance(plan, dict) and not plan.get("stale"):
+        plan["stale"] = True
+        plan["stale_reason"] = reason
+        plan["stale_at"] = utc_now()
+        if current_policy_digest:
+            plan["current_project_policy_digest"] = current_policy_digest
+        changed = True
+    for item in state.get("evidence", {}).values():
+        if item.get("command_id") and not item.get("stale"):
+            item["stale"] = True
+            item["gate_eligible"] = False
+            item["eligibility_reason"] = reason
+            changed = True
+    if changed:
+        state["last_verification"] = None
+        _mark_gate_stale(state["gates"]["build"])
+        _mark_gate_stale(state["gates"]["acceptance"])
+        if state.get("phase") not in ("requirements", "scope_review", "design", "build_review"):
+            state["phase"] = "design"
+    return changed
+
+
+def _ensure_effective_plan_unlocked(
+    repo: Path,
+    state: dict[str, Any],
+    *,
+    project: dict[str, Any] | None = None,
+    affected_paths: Sequence[str] = (),
+    release_stage: str | None = None,
+    allow_selective_replan: bool = False,
+) -> dict[str, Any] | None:
+    project = project or load_project(repo)
+    if state.get("gates", {}).get("build", {}).get("status") != "approved":
+        return None
+    plan = state.get("verification_plan")
+    if not isinstance(plan, dict):
+        plan = _verification_plan_for_state(
+            repo,
+            state,
+            project,
+            affected_paths=affected_paths,
+            release_stage=release_stage,
+        )
+        state["verification_plan"] = plan
+        save_state_unlocked(repo, state)
+        append_event_unlocked(
+            repo,
+            state["id"],
+            "verification_plan_created",
+            {"plan_id": plan["plan_id"], "plan_digest": plan["plan_digest"]},
+        )
+        return plan
+    current_digest = command_policy.policy_digest(project)
+    if plan.get("stale"):
+        raise ValidationError(
+            "The Effective Verification Plan is stale; revise or re-approve G2 before verification.",
+            {"reason": plan.get("stale_reason"), "plan_digest": plan.get("plan_digest")},
+        )
+    if plan.get("project_policy_digest") != current_digest:
+        raise ValidationError(
+            "The project command policy changed after G2; the Effective Verification Plan is stale.",
+            {
+                "plan_policy_digest": plan.get("project_policy_digest"),
+                "current_policy_digest": current_digest,
+            },
+        )
+    normalized_paths = list(affected_paths)
+    if normalized_paths and plan.get("selection_basis_paths", []) != normalized_paths:
+        if not allow_selective_replan or _has_plan_bound_evidence(state):
+            raise ValidationError(
+                "Selective verification paths do not match the frozen Effective Verification Plan.",
+                {
+                    "plan_paths": plan.get("selection_basis_paths", []),
+                    "requested_paths": normalized_paths,
+                },
+            )
+        plan = _verification_plan_for_state(
+            repo,
+            state,
+            project,
+            affected_paths=normalized_paths,
+            release_stage=release_stage,
+        )
+        plan["replanned_from"] = state["verification_plan"].get("plan_digest")
+        state["verification_plan"] = plan
+        save_state_unlocked(repo, state)
+        append_event_unlocked(
+            repo,
+            state["id"],
+            "verification_plan_selected",
+            {"plan_id": plan["plan_id"], "plan_digest": plan["plan_digest"], "paths": normalized_paths},
+        )
+    return plan
+
+
 def _mark_gate_stale(gate: dict[str, Any]) -> None:
     if gate.get("status") == "approved":
         gate["status"] = "stale"
@@ -1523,6 +1817,55 @@ def sync_state_unlocked(repo: Path, state: dict[str, Any]) -> bool:
             state["phase"] = "design"
             invalidated_from = "build"
             changed = True
+
+    if state.get("gates", {}).get("build", {}).get("status") == "approved":
+        project = load_project(repo)
+        current_policy_digest = command_policy.policy_digest(project)
+        plan = state.get("verification_plan")
+        if isinstance(plan, dict) and plan.get("stale"):
+            pass
+        elif not isinstance(plan, dict):
+            state["verification_plan"] = _verification_plan_for_state(
+                repo, state, project
+            )
+            changed = True
+            append_event_unlocked(
+                repo,
+                state["id"],
+                "verification_plan_created",
+                {
+                    "plan_id": state["verification_plan"]["plan_id"],
+                    "plan_digest": state["verification_plan"]["plan_digest"],
+                },
+            )
+        elif plan.get("project_policy_digest") != current_policy_digest:
+            # A typed policy mutation marks the plan stale immediately.  Raw
+            # fixture/bootstrap edits made before any command evidence are
+            # deterministically re-planned so old work items can migrate into
+            # the frozen-plan schema without silently keeping old evidence.
+            if _has_plan_bound_evidence(state):
+                if _mark_verification_plan_stale(
+                    state,
+                    reason="project_policy_digest_changed",
+                    current_policy_digest=current_policy_digest,
+                ):
+                    invalidated_from = invalidated_from or "verification_policy"
+                    changed = True
+            else:
+                state["verification_plan"] = _verification_plan_for_state(
+                    repo, state, project
+                )
+                changed = True
+                append_event_unlocked(
+                    repo,
+                    state["id"],
+                    "verification_plan_replanned",
+                    {
+                        "previous_plan_digest": plan.get("plan_digest"),
+                        "plan_id": state["verification_plan"]["plan_id"],
+                        "plan_digest": state["verification_plan"]["plan_digest"],
+                    },
+                )
 
     current_source = git_snapshot(repo)
     review = state.get("knowledge_review", {})
@@ -2242,16 +2585,35 @@ def validate_work(
             errors.append(f"Incomplete tasks: {', '.join(incomplete)}")
 
         current_source = git_snapshot(repo)
+        project = load_project(repo)
+        effective_plan = state.get("verification_plan")
+        current_policy_digest = command_policy.policy_digest(project)
+        if not isinstance(effective_plan, dict):
+            errors.append("No frozen Effective Verification Plan is recorded for G3.")
+        else:
+            if effective_plan.get("stale"):
+                errors.append(
+                    "Effective Verification Plan is stale: "
+                    + str(effective_plan.get("stale_reason") or "unspecified")
+                )
+            if effective_plan.get("project_policy_digest") != current_policy_digest:
+                errors.append("Project command policy digest does not match the frozen Effective Verification Plan.")
         passing_evidence = [
             item
             for item in state.get("evidence", {}).values()
-            if item.get("status") == "passed" and not item.get("stale")
+            if item.get("status") == "passed"
+            and item.get("gate_eligible") is True
+            and not item.get("stale")
         ]
         source_bound_evidence = [
             item
             for item in passing_evidence
             if item.get("binds_current_source")
             and item.get("source_fingerprint") == current_source["fingerprint"]
+            and (
+                not item.get("command_id")
+                or item.get("effective_plan_digest") == (effective_plan or {}).get("plan_digest")
+            )
         ]
         coverage = {
             covered
@@ -2378,21 +2740,41 @@ def validate_work(
             if evidence_id not in acceptance:
                 errors.append(f"acceptance.md does not account for {evidence_id}.")
 
-        project = load_project(repo)
         commands = {item.get("id"): item for item in project.get("commands", [])}
-        required_commands = project.get("verification_profiles", {}).get(
-            state["risk"]["level"], []
-        )
+        required_commands = list((effective_plan or {}).get("required_commands", []))
+        selected_commands = set((effective_plan or {}).get("selected_commands", []))
+        skipped_by_id = {
+            item.get("id"): item.get("reason")
+            for item in [
+                *((effective_plan or {}).get("skipped", [])),
+                *((effective_plan or {}).get("not_applicable", [])),
+            ]
+        }
         for command_id in required_commands:
             if command_id not in commands:
                 if not _waiver_exists(state, "missing-command", command_id):
                     errors.append(f"Required verification command is undefined: {command_id}")
                 continue
+            if command_id not in selected_commands:
+                reason = skipped_by_id.get(command_id, "not-selected")
+                if reason in (
+                    "release-only",
+                    "no-affected-path-intersection",
+                    "legacy-unclassified",
+                ) or reason.startswith("release-only-dependency:"):
+                    continue
+                if not _waiver_exists(state, "missing-command", command_id):
+                    errors.append(
+                        f"Required verification command is not in the Effective Verification Plan: {command_id} ({reason})"
+                    )
+                continue
             current_pass = any(
                 item.get("command_id") == command_id
                 and item.get("status") == "passed"
+                and item.get("gate_eligible") is True
                 and not item.get("stale")
                 and item.get("source_fingerprint") == current_source["fingerprint"]
+                and item.get("effective_plan_digest") == (effective_plan or {}).get("plan_digest")
                 for item in passing_evidence
             )
             if not current_pass and not _waiver_exists(
@@ -2524,6 +2906,13 @@ def approve_gate(
                 }
                 for task_id in _task_ids_from_plan(repo, state)
             }
+            project = load_project(repo)
+            state["verification_plan"] = _verification_plan_for_state(
+                repo,
+                state,
+                project,
+                affected_paths=(),
+            )
         else:
             source = git_snapshot(repo)
             fingerprint = acceptance_fingerprint(repo, state, source)
@@ -3578,6 +3967,10 @@ def record_review(
             "expectation": None,
             "raw_log": normalize_relpath(log_path.relative_to(repo)),
             "log_truncated": False,
+            "gate_eligible": result == "passed",
+            "eligibility_reason": (
+                "independent_review_passed" if result == "passed" else "review_not_passed"
+            ),
             "review": {
                 "result": result,
                 "severity": report["severity"],
@@ -3667,11 +4060,23 @@ def add_evidence(
             "expectation": None,
             "raw_log": None,
             "log_truncated": False,
+            "gate_eligible": bool(
+                status == "passed"
+                and binds_current_source is not False
+                and kind not in ("reproduction", "diagnostic", "baseline")
+            ),
+            "eligibility_reason": (
+                "manual_current_source_evidence"
+                if status == "passed"
+                and binds_current_source is not False
+                and kind not in ("reproduction", "diagnostic", "baseline")
+                else "manual_evidence_not_gate_eligible"
+            ),
         }
         if normalized_metrics is not None:
             evidence["metrics"] = normalized_metrics
         _write_evidence_unlocked(repo, state, evidence)
-        if evidence["status"] == "passed" and evidence["binds_current_source"]:
+        if evidence["gate_eligible"] and evidence["binds_current_source"]:
             state["last_verification"] = {
                 "evidence_id": evidence_id,
                 "source_fingerprint": source["fingerprint"],
@@ -3727,16 +4132,86 @@ def _as_bytes(value: bytes | str | None) -> bytes:
     return value.encode("utf-8", errors="replace")
 
 
-def _execute_verification_command(
-    command: dict[str, Any], cwd: Path, timeout: int
-) -> dict[str, Any]:
+def _execution_snapshot(repo: Path) -> dict[str, str]:
+    files: dict[str, str] = {}
+    for root, directories, names in os.walk(repo, topdown=True, followlinks=False):
+        root_path = Path(root)
+        relative_root = root_path.relative_to(repo)
+        if any(
+            part in {"node_modules", ".vscode-test", "__pycache__", ".pytest_cache", ".mypy_cache"}
+            for part in relative_root.parts
+        ) or relative_root.parts[:2] == (".devweave", "cache"):
+            directories[:] = []
+            continue
+        directories[:] = [
+            name
+            for name in directories
+            if name != ".git"
+            and name not in {"node_modules", ".vscode-test", "__pycache__", ".pytest_cache", ".mypy_cache"}
+            and not (relative_root.parts == (".devweave",) and name == "cache")
+        ]
+        for name in names:
+            path = root_path / name
+            relative = normalize_relpath(path.relative_to(repo))
+            if path.is_symlink():
+                value = "symlink:" + os.readlink(path)
+                files[relative] = sha256_bytes(value.encode("utf-8", errors="surrogateescape"))
+            elif path.is_file():
+                try:
+                    files[relative] = sha256_bytes(path.read_bytes())
+                except OSError:
+                    files[relative] = "<unreadable>"
+    return dict(sorted(files.items()))
+
+
+def _execution_path_matches(path: str, pattern: str) -> bool:
+    normalized_path = normalize_relpath(path).rstrip("/")
+    normalized_pattern = normalize_relpath(pattern).rstrip("/")
+    if normalized_pattern.endswith("/**"):
+        normalized_pattern = normalized_pattern[:-3].rstrip("/")
+    return normalized_path == normalized_pattern or normalized_path.startswith(normalized_pattern + "/")
+
+
+def _promote_declared_outputs(
+    sandbox_repo: Path,
+    repo: Path,
+    outputs: Sequence[str],
+    changed_paths: Sequence[str],
+) -> None:
+    for output in outputs:
+        source = ensure_within(sandbox_repo, sandbox_repo / output)
+        target = ensure_within(repo, repo / output)
+        if source.is_file():
+            atomic_write_bytes(target, source.read_bytes())
+            continue
+        if source.is_dir():
+            for candidate in sorted(source.rglob("*")):
+                if candidate.is_file():
+                    relative = Path(output) / Path(
+                        os.path.relpath(str(candidate), str(source))
+                    )
+                    atomic_write_bytes(
+                        ensure_within(repo, repo / relative), candidate.read_bytes()
+                    )
+            continue
+        # A declared output may have been deleted by a successful command.
+        if target.exists() and any(
+            _execution_path_matches(path, output) for path in changed_paths
+        ):
+            if target.is_dir() and not target.is_symlink():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+
+
+def _run_process(argv: Sequence[str], cwd: Path, timeout: int) -> dict[str, Any]:
     started_at = utc_now()
     started_monotonic = time.monotonic()
     timed_out = False
     execution_error: str | None = None
     try:
         result = subprocess.run(
-            command["argv"],
+            list(argv),
             cwd=cwd,
             capture_output=True,
             shell=False,
@@ -3768,6 +4243,76 @@ def _execute_verification_command(
     }
 
 
+def _execute_verification_command(
+    repo: Path, command: dict[str, Any], cwd: Path, timeout: int
+) -> dict[str, Any]:
+    before = _execution_snapshot(repo)
+    writes = command.get("writes", "none")
+    declared_outputs = command.get("outputs", [])
+    if writes == "none":
+        execution = _run_process(command["argv"], cwd, timeout)
+        after = _execution_snapshot(repo)
+        reconciliation = command_policy.reconcile_changed_paths(
+            before, after, declared_outputs, writes
+        )
+        execution.update(
+            {
+                "execution_channel": command_policy.EXECUTOR_CHANNEL,
+                "before_snapshot": before,
+                "after_snapshot": after,
+                "actual_changed_paths": reconciliation["actual_changed_paths"],
+                "undeclared_paths": reconciliation["undeclared_paths"],
+                "input_fingerprint": sha256_bytes(canonical_json(before)),
+                "output_fingerprint": sha256_bytes(canonical_json(after)),
+                "promotion_ok": True,
+                "postcondition_ok": not reconciliation["violation"],
+            }
+        )
+        return execution
+
+    started_at = utc_now()
+    with tempfile.TemporaryDirectory(prefix="devweave-verify-") as temporary:
+        sandbox_repo = Path(temporary) / "repo"
+        shutil.copytree(repo, sandbox_repo, symlinks=True, ignore=shutil.ignore_patterns(".git"))
+        sandbox_cwd = ensure_within(sandbox_repo, sandbox_repo / command.get("cwd", "."))
+        sandbox_before = _execution_snapshot(sandbox_repo)
+        execution = _run_process(command["argv"], sandbox_cwd, timeout)
+        sandbox_after = _execution_snapshot(sandbox_repo)
+        reconciliation = command_policy.reconcile_changed_paths(
+            sandbox_before, sandbox_after, declared_outputs, writes
+        )
+        promotion_ok = True
+        if not reconciliation["violation"] and execution["exit_code"] == 0 and not execution["timed_out"] and not execution["execution_error"]:
+            try:
+                _promote_declared_outputs(
+                    sandbox_repo,
+                    repo,
+                    declared_outputs,
+                    reconciliation["actual_changed_paths"],
+                )
+            except OSError as exc:
+                promotion_ok = False
+                execution["execution_error"] = f"promotion {type(exc).__name__}: {exc}"
+        after = _execution_snapshot(repo)
+        execution.update(
+            {
+                "started_at": execution.get("started_at", started_at),
+                "execution_channel": command_policy.EXECUTOR_CHANNEL,
+                "before_snapshot": before,
+                "after_snapshot": after,
+                "sandbox_before_snapshot": sandbox_before,
+                "sandbox_after_snapshot": sandbox_after,
+                "actual_changed_paths": reconciliation["actual_changed_paths"],
+                "undeclared_paths": reconciliation["undeclared_paths"],
+                "input_fingerprint": sha256_bytes(canonical_json(before)),
+                "output_fingerprint": sha256_bytes(canonical_json(after)),
+                "promotion_ok": promotion_ok,
+                "postcondition_ok": not reconciliation["violation"],
+            }
+        )
+        return execution
+
+
 def _record_verification_execution(
     repo: Path,
     work_id: str,
@@ -3775,6 +4320,7 @@ def _record_verification_execution(
     project: dict[str, Any],
     command_id: str,
     command: dict[str, Any],
+    plan: dict[str, Any] | None,
     execution: dict[str, Any],
     source: dict[str, Any],
     kind: str,
@@ -3783,6 +4329,7 @@ def _record_verification_execution(
     expectation: str,
     batch_id: str | None = None,
     batch_index: int | None = None,
+    execution_sequence: int | None = None,
     metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     exit_code = execution["exit_code"]
@@ -3804,6 +4351,29 @@ def _record_verification_execution(
     limit = int(project.get("evidence", {}).get("raw_log_limit_bytes", MAX_RAW_LOG_BYTES))
     truncated = len(raw) > limit
     stored_raw = raw[-limit:] if truncated else raw
+    plan_entry = (plan or {}).get("commands", {}).get(command_id, {})
+    observation = {
+        "command_id": command_id,
+        "evidence_kind": kind,
+        "status": "passed" if expectation_met and not timed_out else "failed",
+        "execution_channel": execution.get("execution_channel"),
+        "expectation": expectation,
+        "exit_code": exit_code,
+        "timed_out": timed_out,
+        "execution_error": execution.get("execution_error"),
+        "plan_digest": (plan or {}).get("plan_digest"),
+        "project_policy_digest": (plan or {}).get("project_policy_digest"),
+        "command_definition_digest": command_policy.command_definition_digest(command),
+        "source_fingerprint": source["fingerprint"],
+        "current_source_fingerprint": source["fingerprint"],
+        "actual_changed_paths": execution.get("actual_changed_paths", []),
+        "undeclared_paths": execution.get("undeclared_paths", []),
+        "declared_outputs": command.get("outputs", []),
+        "writes": command.get("writes", "none"),
+        "postcondition_ok": execution.get("postcondition_ok", True),
+        "promotion_ok": execution.get("promotion_ok", True),
+    }
+    eligibility = command_policy.derive_evidence_eligibility(plan or {}, observation)
     with WorkLock(repo, work_id):
         state = load_state(repo, work_id)
         sync_state_unlocked(repo, state)
@@ -3815,7 +4385,7 @@ def _record_verification_execution(
             "schema_version": SCHEMA_VERSION,
             "id": evidence_id,
             "kind": kind,
-            "status": "passed" if expectation_met and not timed_out else "failed",
+            "status": observation["status"] if observation["postcondition_ok"] and observation["promotion_ok"] else "failed",
             "summary": _redact(tail.strip() or f"{command_id} produced no output."),
             "covers": sorted(set(covers)),
             "tasks": sorted(set(tasks)),
@@ -3837,10 +4407,23 @@ def _record_verification_execution(
             "execution_error": execution["execution_error"],
             "raw_log": normalize_relpath(log_path.relative_to(repo)),
             "log_truncated": truncated,
+            "execution_channel": execution.get("execution_channel"),
+            "effective_plan_id": (plan or {}).get("plan_id"),
+            "effective_plan_digest": (plan or {}).get("plan_digest"),
+            "project_policy_digest": (plan or {}).get("project_policy_digest"),
+            "command_definition_digest": observation["command_definition_digest"],
+            "input_fingerprint": execution.get("input_fingerprint"),
+            "output_fingerprint": execution.get("output_fingerprint"),
+            "actual_changed_paths": execution.get("actual_changed_paths", []),
+            "undeclared_paths": execution.get("undeclared_paths", []),
+            "gate_eligible": bool(eligibility["gate_eligible"]),
+            "eligibility_reason": eligibility["eligibility_reason"],
         }
         if batch_id is not None:
             evidence["verification_batch_id"] = batch_id
             evidence["verification_batch_index"] = batch_index
+        if execution_sequence is not None:
+            evidence["execution_sequence"] = execution_sequence
         metrics_with_duration = dict(metrics or {})
         metrics_with_duration["duration_ms"] = execution["duration_ms"]
         normalized_metrics = normalize_evidence_metrics(metrics_with_duration) or {}
@@ -3861,7 +4444,7 @@ def _record_verification_execution(
             verification_metrics.setdefault("cache_hit", False)
         evidence["metrics"] = normalized_metrics
         _write_evidence_unlocked(repo, state, evidence)
-        if evidence["status"] == "passed" and evidence["binds_current_source"]:
+        if evidence["gate_eligible"] and evidence["binds_current_source"]:
             state["last_verification"] = {
                 "evidence_id": evidence_id,
                 "source_fingerprint": source["fingerprint"],
@@ -3885,6 +4468,7 @@ def run_verification(
     covers: Sequence[str] = (),
     tasks: Sequence[str] = (),
     expectation: str = "zero",
+    release_stage: str | None = None,
     metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if kind == "review":
@@ -3896,9 +4480,35 @@ def run_verification(
         raise ValidationError("Unknown exit expectation.", {"expectation": expectation})
     if metrics is not None:
         metrics = normalize_evidence_metrics(metrics)
+    state = sync_state(repo, work_id)
     project = load_project(repo)
+    plan = _ensure_effective_plan_unlocked(repo, state, project=project)
     command, cwd, timeout = _verification_command(repo, project, command_id)
-    execution = _execute_verification_command(command, cwd, timeout)
+    decision = command_policy.evaluate(
+        {
+            "work_item": {"id": work_id, "risk": state["risk"]["level"]},
+            "phase": state.get("phase"),
+            "gate_status": (
+                "approved"
+                if state.get("gates", {}).get("build", {}).get("status") == "approved"
+                else "pending"
+            ),
+            "session_bound": True,
+            "command": command,
+            "argv": command["argv"],
+            "cwd": command.get("cwd", "."),
+            "writes": command.get("writes", "none"),
+            "outputs": command.get("outputs", []),
+            "affected_paths": command.get("affected_paths", []),
+            "release_stage": release_stage,
+            "dependency_closure": (plan or {}).get("dependency_closure", {}),
+            "current_policy_digest": command_policy.policy_digest(project),
+            "execution_channel": command_policy.EXECUTOR_CHANNEL,
+        }
+    )
+    if not decision.allowed:
+        raise ValidationError(decision.message, decision.as_dict())
+    execution = _execute_verification_command(repo, command, cwd, timeout)
     source = git_snapshot(repo)
     return _record_verification_execution(
         repo,
@@ -3906,6 +4516,7 @@ def run_verification(
         project=project,
         command_id=command_id,
         command=command,
+        plan=plan,
         execution=execution,
         source=source,
         kind=kind,
@@ -4109,6 +4720,7 @@ def run_verification_profile(
     expectation: str = "zero",
     max_parallel: int = 3,
     changed_paths: Sequence[str] | None = None,
+    release_stage: str | None = None,
     metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if kind == "review":
@@ -4122,10 +4734,86 @@ def run_verification_profile(
         raise ValidationError("Verification max parallel must be greater than zero.")
     if metrics is not None:
         metrics = normalize_evidence_metrics(metrics)
+    state = sync_state(repo, work_id)
     project = load_project(repo)
-    command_ids, prepared, selection = _verification_profile_commands(
-        repo, project, profile, changed_paths
+    requested_paths = (
+        _normalize_verification_paths(changed_paths)
+        if changed_paths is not None
+        else []
     )
+    frozen_plan = _ensure_effective_plan_unlocked(
+        repo,
+        state,
+        project=project,
+        affected_paths=requested_paths,
+        allow_selective_replan=True,
+    )
+    if frozen_plan is None:
+        plan = command_policy.build_effective_plan(
+            project,
+            {
+                "id": work_id,
+                "risk": state["risk"]["level"],
+                "phase": state.get("phase"),
+                "source_fingerprint": git_snapshot(repo)["fingerprint"],
+            },
+            profile=profile,
+            affected_paths=requested_paths,
+        )
+    else:
+        plan = frozen_plan
+        if plan.get("profile") != profile:
+            raise ValidationError(
+                "Verification profile does not match the frozen Effective Verification Plan.",
+                {"plan_profile": plan.get("profile"), "requested_profile": profile},
+            )
+    command_ids = list(plan.get("selected_commands", []))
+    prepared = {
+        command_id: _verification_command(repo, project, command_id)
+        for command_id in command_ids
+    }
+    current_policy_digest = command_policy.policy_digest(project)
+    for command_id in command_ids:
+        command = prepared[command_id][0]
+        decision = command_policy.evaluate(
+            {
+                "work_item": {"id": work_id, "risk": state["risk"]["level"]},
+                "phase": state.get("phase"),
+                "gate_status": (
+                    "approved"
+                    if state.get("gates", {}).get("build", {}).get("status") == "approved"
+                    else "pending"
+                ),
+                "session_bound": True,
+                "command": command,
+                "argv": command["argv"],
+                "cwd": command.get("cwd", "."),
+                "writes": command.get("writes", "none"),
+                "outputs": command.get("outputs", []),
+                "affected_paths": command.get("affected_paths", []),
+                "release_stage": release_stage,
+                "dependency_closure": plan.get("dependency_closure", {}),
+                "current_policy_digest": current_policy_digest,
+                "execution_channel": command_policy.EXECUTOR_CHANNEL,
+            }
+        )
+        if not decision.allowed:
+            raise ValidationError(decision.message, decision.as_dict())
+    required_ids = list(plan.get("required_commands", []))
+    closure_added = [command_id for command_id in command_ids if command_id not in required_ids]
+    selection = {
+        "mode": "affected-paths" if changed_paths is not None else "frozen-plan",
+        "requested_paths": list(requested_paths),
+        "selected": list(command_ids),
+        "skipped": [
+            {"command_id": item["id"], "reason": item["reason"]}
+            for item in [*plan.get("skipped", []), *plan.get("not_applicable", [])]
+        ],
+        "dependency_closure_added": closure_added,
+        "high_profile_full_set": profile == "high",
+        "effective_plan_id": plan.get("plan_id"),
+        "effective_plan_digest": plan.get("plan_digest"),
+    }
     selection_metrics = {
         "verification": {
             "selected": len(selection["selected"]),
@@ -4178,10 +4866,31 @@ def run_verification_profile(
                 "Verification profile cannot make progress.",
                 {"profile": profile, "pending": pending},
             )
+        minimum_stage = min(
+            int(plan.get("commands", {}).get(command_id, {}).get("stage", 0))
+            for command_id in ready
+        )
+        ready = [
+            command_id
+            for command_id in ready
+            if int(plan.get("commands", {}).get(command_id, {}).get("stage", 0))
+            == minimum_stage
+        ]
         selected: list[str] = []
         groups: set[str] = set()
+        writers = [
+            command_id
+            for command_id in ready
+            if prepared[command_id][0].get("writes", "none") != "none"
+        ]
+        if writers:
+            # A write stage is a serial promotion boundary.  It must complete
+            # before any read-only command can observe its candidate state.
+            ready = writers[:1]
         for command_id in ready:
-            group = prepared[command_id][0].get("exclusive_group", "")
+            group = plan.get("commands", {}).get(command_id, {}).get(
+                "exclusive_group"
+            ) or prepared[command_id][0].get("exclusive_group", "")
             if group and group in groups:
                 continue
             selected.append(command_id)
@@ -4191,18 +4900,28 @@ def run_verification_profile(
                 break
 
         executions: dict[str, dict[str, Any]] = {}
-        with ThreadPoolExecutor(max_workers=len(selected), thread_name_prefix="devweave-verify") as executor:
-            futures = {
-                command_id: executor.submit(
-                    _execute_verification_command,
-                    prepared[command_id][0],
-                    prepared[command_id][1],
-                    prepared[command_id][2],
-                )
-                for command_id in selected
-            }
-            for command_id, future in futures.items():
-                executions[command_id] = future.result()
+        if len(selected) == 1:
+            command_id = selected[0]
+            executions[command_id] = _execute_verification_command(
+                repo,
+                prepared[command_id][0],
+                prepared[command_id][1],
+                prepared[command_id][2],
+            )
+        else:
+            with ThreadPoolExecutor(max_workers=len(selected), thread_name_prefix="devweave-verify") as executor:
+                futures = {
+                    command_id: executor.submit(
+                        _execute_verification_command,
+                        repo,
+                        prepared[command_id][0],
+                        prepared[command_id][1],
+                        prepared[command_id][2],
+                    )
+                    for command_id in selected
+                }
+                for command_id, future in futures.items():
+                    executions[command_id] = future.result()
 
         source = git_snapshot(repo)
         for command_id in selected:
@@ -4213,6 +4932,7 @@ def run_verification_profile(
                 project=project,
                 command_id=command_id,
                 command=command,
+                plan=plan,
                 execution=executions[command_id],
                 source=source,
                 kind=kind,
@@ -4221,6 +4941,7 @@ def run_verification_profile(
                 expectation=expectation,
                 batch_id=batch_id,
                 batch_index=command_ids.index(command_id),
+                execution_sequence=command_ids.index(command_id),
                 metrics=metrics,
             )
             status = "passed" if evidence["status"] == "passed" else "failed"
@@ -4590,6 +5311,67 @@ def doctor(repo: Path) -> dict[str, Any]:
                 "commands",
                 len(command_ids) == len(set(command_ids)),
                 f"{len(command_ids)} configured command(s)",
+            )
+            add(
+                "command-policy-version",
+                project.get("command_policy_version") == command_policy.POLICY_VERSION,
+                f"version={project.get('command_policy_version')}; expected={command_policy.POLICY_VERSION}",
+            )
+            policy_digest_value = command_policy.policy_digest(project)
+            add("command-policy-digest", bool(policy_digest_value), policy_digest_value)
+            trusted = {
+                str(Path(item.get("path")).expanduser().resolve()).lower(): item.get("sha256")
+                for item in project.get("trusted_executables", [])
+                if isinstance(item, dict) and isinstance(item.get("path"), str)
+            }
+            trusted_errors: list[str] = []
+            for command in project.get("commands", []):
+                executable = Path(command["resolved_executable"]).expanduser()
+                if not executable.is_file():
+                    trusted_errors.append(f"{command['id']}: executable missing")
+                    continue
+                actual = _executable_hash(executable)
+                if actual.lower() != str(command.get("executable_sha256", "")).lower():
+                    trusted_errors.append(f"{command['id']}: executable hash mismatch")
+                if trusted.get(str(executable.resolve()).lower()) != actual.lower():
+                    trusted_errors.append(f"{command['id']}: executable is not trusted")
+                if command.get("writes", "none") == "none" and command.get("outputs"):
+                    trusted_errors.append(f"{command['id']}: read-only command declares outputs")
+            add(
+                "trusted-executables",
+                not trusted_errors,
+                "; ".join(trusted_errors) if trusted_errors else "all configured executables are present and hash-bound",
+            )
+            profile_errors: list[str] = []
+            for profile, values in project.get("verification_profiles", {}).items():
+                for command_id in values:
+                    if command_id not in command_ids:
+                        profile_errors.append(f"{profile}: undefined command {command_id}")
+            command_graph = {
+                item["id"]: list(item.get("depends_on", []))
+                for item in project.get("commands", [])
+            }
+            cycle = _dependency_cycle(command_graph)
+            if cycle:
+                profile_errors.append("dependency cycle: " + " -> ".join(cycle))
+            add(
+                "command-policy-metadata",
+                not profile_errors,
+                "; ".join(profile_errors) if profile_errors else "profiles, dependencies, writes, and outputs are valid",
+            )
+            active_plan_errors: list[str] = []
+            for state in list_work(repo, include_closed=False):
+                plan = state.get("verification_plan")
+                if not isinstance(plan, dict):
+                    continue
+                if plan.get("stale"):
+                    active_plan_errors.append(f"{state['id']}: stale plan")
+                elif plan.get("project_policy_digest") != policy_digest_value:
+                    active_plan_errors.append(f"{state['id']}: policy digest drift")
+            add(
+                "active-verification-plans",
+                not active_plan_errors,
+                "; ".join(active_plan_errors) if active_plan_errors else "active plans match the project policy",
             )
             root = project["knowledge"]["root"]
             try:

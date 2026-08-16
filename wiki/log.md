@@ -2,11 +2,11 @@
 title: Wiki Activity Log
 type: log
 sources: []
-last_updated: 2026-08-13
+last_updated: 2026-08-16
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260813-142228-feature-devweave-vs-code-extension
+verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
 ---
 
 # Activity Log
@@ -105,3 +105,9 @@ verified_by: 20260813-142228-feature-devweave-vs-code-extension
 - 記錄 command metadata、release-only dependency exclusion、high full-set policy、bounded evidence metrics 與 Codex usage unavailable 語意；build provenance 與 cache-only VS Code 1.131.0 smoke contract 維持 source-bound。
 - 將 0.2.3 package provenance 固定為 candidate → verify → atomic promotion；verification 或 promotion failure 保留 current artifact 並清理 candidate，Extension final run 更新為 88 tests。
 - 將 metrics contract 的 250,000-byte payload／10,000,000 numeric bounds 與 usage unavailable/null semantics 同步到 engine、Extension 與驗證投影。
+
+## [2026-08-16] promote | 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]] 與 [[knowledge-engine]]，同步 Verification Policy v2 的 shared evaluator、G2 frozen Effective Verification Plan、digest-bound evidence eligibility、controlled executor 與 G3 plan parity。
+- 新增 [[command-policy-engine]]，記錄 typed read-only grammar、trusted executable/cwd、writer barrier、temporary candidate、undeclared-write failure 與 policy mutation stale boundary。
+- 本批 Wiki 內容由四個 planned upsert 與 coupled index/log 更新組成；既有 log body 保持 append-only，完成後由 Router seal current source fingerprints。

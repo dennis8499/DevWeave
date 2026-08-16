@@ -131,6 +131,31 @@ py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . verify --w
 
 每個 verification evidence 都可帶 bounded `metrics`：duration、context pages/bytes/chars、tool counts、selection/cache 與 usage。engine 目前限制 metrics canonical payload 為 250,000 bytes、數值欄位為非負且最多 10,000,000；Codex host 未提供 exact token/cost 時，CLI 會保存 `usage.status=unavailable` 與 null 欄位，不以 context bytes 推算 Token，也不保存 prompt 或 secret。
 
+#### Verification Policy v2：命令與證據可信度
+
+`.devweave/project.json` 的 `command_policy_version: 2` 由
+`.agents/skills/devweave/scripts/command_policy.py` 統一評估。Guard、`verify`、Doctor、
+command mutation 與 G3 不得各自重建命令規則。Configured command 只能經過
+`devweave verify` 執行：固定 argv/cwd、`shell=False`、bounded timeout、trusted
+executable、repository snapshot 與 declared-output reconciliation；直接 Bash 即使
+argv 相同也會被拒絕。
+
+G2 會凍結 Work Item 的 `verification_plan`，保存 project policy digest、command
+definition digests、required/selected set、dependency closure、skip/not-applicable
+理由、stage、writes/outputs 與成功 exit policy。Profile runner 與 G3 只讀同一份 plan。
+`command set|remove` 在 G2 後會由 Router 讓 plan、相關 evidence 與 downstream gates
+deterministically stale。
+
+Evidence 的 `gate_eligible` 由 engine 計算，不能由 caller 指定。只有 current、zero
+exit、plan/command/source fingerprint 相符、受控 executor 執行且沒有 undeclared
+write 的證據可供 G3 使用；`expect=nonzero`、`expect=any`、reproduction、diagnostic、
+failed、timeout、execution error、stale 或 undeclared writes 永遠不能通過 G3。
+有寫入行為的 command 依 stage serial 執行；只有 `writes=none` 可以平行。
+
+Read-only Bash 採跨 POSIX/CMD/PowerShell 形狀一致的 argv allowlist；shell operator、
+command substitution、redirection、output-producing flag 與 unknown flag 一律
+fail closed。Release-only command 需明確傳入 `verify --release-context <stage>`。
+
 ## 三道人工 gate
 
 ### G1：Scope／需求核准

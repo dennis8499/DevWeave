@@ -2,11 +2,11 @@
 title: Knowledge Engine
 type: module
 sources: [.agents/skills/devweave/scripts, tests/devweave_test_support.py, tests/test_cli.py, tests/test_devweave_core.py, tests/test_repository_contract.py]
-last_updated: 2026-08-13
+last_updated: 2026-08-16
 tags: [module]
 status: active
-source_fingerprint: "sha256:c422adb540ff1cc910d9705fa7ba1e25697a74ade8232a011717756f3e27f260"
-verified_by: 20260813-142228-feature-devweave-vs-code-extension
+source_fingerprint: "sha256:76118c17cd763af07fa50378aca7123b6ba4cbde039270968318325a9f408f6d"
+verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
 ---
 
 # Knowledge Engine
@@ -107,3 +107,13 @@ Codex hook bootstrap 來源是根目錄 `.codex/hooks.json` 的 exact `PreToolUs
 Copy success 的 Webview result 與 native toast 是 consume 後的通知，不屬於 clipboard adapter failure；因此 notification 發生錯誤時不會把已成功 consumed 的 ticket 還原。Host error path 將原始錯誤轉成繁中 primary status，technical detail 只在可展開區域呈現。Configured full-suite raw logs 會保留 bounded fresh/evolved/conflict/rollback/multi-work 與 accessibility markers，供 G3 獨立核驗 walkthrough provenance。
 
 說明內容嵌入 Extension bundle 並在首次切換 help section 時 render；它不落地到 workspace、不發 network request。Extension runtime 維持 no process、no shell、no external network，除使用者確認的固定 bootstrap path 外不提供 workspace write seam。
+
+G3 驗證會把 `release-only-dependency:<command-id>` 視為 frozen plan 的合法 skip reason，與 Runner 的 dependency closure 結果一致；不會因 release context 缺席而重新要求被 skip 的 dependent command。
+
+## Verification Policy v2 integration（2026-08-16）
+
+`devweave_core.py` 將 Work Item lifecycle、frozen Effective Verification Plan、controlled executor observation 與 G3 reconciliation 接到 `command_policy.py` 的 shared evaluator。G2 approval 以 atomic state mutation 建立 plan；`command set/remove` 只經 typed mutation path，policy digest 改變時會 deterministic stale active plan、gate 與 evidence，而不直接改寫 ledger。
+
+`verify --command` 與 `verify --profile` 都回傳同一個 plan ID/digest、selection set 與 skip reason。profile 會建立 dependency closure、writer stage 與 shared-output exclusive group；release-only dependency 在沒有 release context 時保持 skipped。G3 只消費 frozen plan 中的 required commands 與 `gate_eligible=true` evidence，故 expectation match 不能升格成 gate proof。
+
+Executor 對每個 command 保存 pre/post filesystem 與 Git state fingerprint。`writes=none` 的任何 changed path、writer 的 undeclared output、scope 外變更、timeout、postcondition 或 promotion failure 都是 failed/ineligible evidence；writer candidate 必須先完成並凍結，之後才允許純驗證 commands 平行。Doctor 會檢查 v2 metadata、trusted executable/hash、dependency/cycle、outputs/writes 與 policy digest。

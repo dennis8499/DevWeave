@@ -67,4 +67,26 @@ Interactive decision contract:
 7. Never edit DevWeave JSON/JSONL ledgers directly. Record useful companion-skill outcomes in the current work artifact or through the DevWeave evidence CLI.
 8. If a companion skill reveals a needed requirement, design, scope, or task change, run `$devweave revise` from the earliest affected phase and wait for the invalidated gate to be reapproved.
 
+## Verification Policy v2 boundary
+
+The shared `command_policy.py` evaluator is the only source for read-only admission,
+configured-command admission, Effective Verification Plan selection and evidence
+eligibility. Guard, `verify`, Doctor, command mutation and G3 may not maintain local
+copies of those predicates.
+
+G2 freezes the Work Item's `verification_plan` and its project/command digests. A
+configured command must run through the DevWeave executor with exact argv/cwd,
+`shell=False`, bounded timeout, trusted executable, repository snapshots and declared
+output reconciliation. Direct Bash is denied, including when its argv matches a
+configured command. Read-only payloads are accepted only by the cross-shell argv
+allowlist; operators, substitutions, redirection, output flags and unknown flags
+fail closed.
+
+`gate_eligible` is engine-derived. Zero-only current evidence with matching plan,
+policy, command and source fingerprints and no undeclared writes may be eligible;
+non-zero/any expectations, reproduction/diagnostic, failures, timeout, execution
+errors, stale source and undeclared effects are never G3 evidence. Write stages are
+serial; only `writes=none` commands may run in parallel. `command set|remove` after
+G2 invalidates the plan, command evidence and downstream gates through the Router.
+
 Companion skill updates are executable policy changes. Do not update them automatically: open a new DevWeave feature work item, review the upstream instruction diff and `skills-lock.json`, rerun repository verification, and complete G3.

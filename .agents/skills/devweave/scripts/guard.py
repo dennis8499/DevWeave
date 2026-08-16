@@ -20,37 +20,15 @@ from devweave_core import (
     resolve_work,
     sync_state,
 )
+import command_policy
 
 
-FORBIDDEN_SHELL_OPERATORS = re.compile(r"(?:&&|\|\||[;|><]|\r|\n)")
 PATCH_PATH = re.compile(
     r"^\*\*\*\s+(?:(?:Add|Update|Delete)\s+File:|Move to:)\s+(.+?)\s*$",
     re.MULTILINE,
 )
 WORK_ARGUMENT = re.compile(
     r"(?:^|\s)--work(?:\s+|=)(?P<quote>[\"']?)(?P<work>[A-Za-z0-9._-]+)(?P=quote)(?:\s|$)"
-)
-READ_ONLY_PREFIXES = (
-    "git status",
-    "git diff",
-    "git log",
-    "git show",
-    "git ls-files",
-    "git rev-parse",
-    "git branch --show-current",
-    "rg ",
-    "rg --files",
-    "get-content ",
-    "get-childitem ",
-    "select-string ",
-    "test-path ",
-    "resolve-path ",
-    "get-command ",
-    "where.exe ",
-    "python --version",
-    "python3 --version",
-    "py -3 --version",
-    "git --version",
 )
 
 
@@ -84,7 +62,7 @@ def _command(payload: dict[str, Any]) -> str:
 
 
 def _is_devweave_cli(command: str) -> bool:
-    if FORBIDDEN_SHELL_OPERATORS.search(command):
+    if not command_policy.shell_syntax_safe(command):
         return False
     tokens = [token.strip("\"'") for token in _tokens(command)]
     if len(tokens) < 2:
@@ -120,26 +98,30 @@ def _tokens(command: str) -> list[str]:
         return []
 
 
-def _matches_configured_command(repo: Path, command: str) -> bool:
+def _matches_configured_command(repo: Path, command: str) -> dict[str, Any] | None:
     try:
         project = load_project(repo)
     except DevWeaveError:
-        return False
+        return None
     tokens = [token.strip("\"'") for token in _tokens(command)]
     if not tokens:
-        return False
+        return None
     for configured in project.get("commands", []):
         argv = configured.get("argv", [])
-        if tokens == argv:
-            return True
-    return False
+        if len(tokens) != len(argv):
+            continue
+        if all(
+            (left.replace("\\", "/").lower() == right.replace("\\", "/").lower())
+            if index == 0
+            else left == right
+            for index, (left, right) in enumerate(zip(tokens, argv))
+        ):
+            return configured
+    return None
 
 
 def _is_read_only(repo: Path, command: str) -> bool:
-    if FORBIDDEN_SHELL_OPERATORS.search(command):
-        return False
-    lowered = command.strip().lower()
-    return any(lowered == prefix.rstrip() or lowered.startswith(prefix) for prefix in READ_ONLY_PREFIXES)
+    return command_policy.evaluate_read_only(command).allowed
 
 
 def _patch_paths(command: str, repo: Path) -> list[str]:
@@ -226,8 +208,6 @@ def handle_hook(payload: dict[str, Any], repo: Path | None = None) -> dict[str, 
     cwd = payload.get("cwd") or os.getcwd()
     tool_name = str(payload.get("tool_name") or "")
     command = _command(payload)
-    if tool_name == "Bash" and _is_read_only(None, command):
-        return None
     try:
         repo = repo or find_repo_root(cwd)
     except DevWeaveError:
@@ -269,6 +249,30 @@ def handle_hook(payload: dict[str, Any], repo: Path | None = None) -> dict[str, 
             state = None
 
     if tool_name == "Bash":
+        configured = _matches_configured_command(repo, command)
+        if configured is not None:
+            tokens = [token.strip("\"'") for token in _tokens(command)]
+            decision = command_policy.evaluate(
+                {
+                    "work_item": state or {},
+                    "phase": state.get("phase", "requirements") if state else "requirements",
+                    "gate_status": "approved"
+                    if state and state["gates"]["build"].get("status") == "approved"
+                    else "pending",
+                    "session_bound": state is not None,
+                    "command": configured,
+                    "argv": tokens,
+                    "cwd": ".",
+                    "release_stage": None,
+                    "current_policy_digest": None,
+                    "execution_channel": "bash",
+                }
+            )
+            return deny(
+                "Configured verification command cannot be executed by direct Bash; "
+                "use devweave verify. "
+                + decision.reason_code
+            )
         if _is_read_only(repo, command):
             return None
         if state is None:
@@ -276,19 +280,15 @@ def handle_hook(payload: dict[str, Any], repo: Path | None = None) -> dict[str, 
                 "此 repo 已由 DevWeave 管理。請先用 $devweave 建立或選擇工作項，"
                 "再執行可能修改專案的命令。"
             )
-        if _matches_configured_command(repo, command):
-            return None
         if _mentions_knowledge_path(command, project["knowledge"]["root"]):
             return deny(
                 "Wiki 寫入必須在 verification/acceptance 階段透過已規劃的精確路徑；"
                 "shell 命令無法可靠驗證路徑，請使用 patch/edit/write 或 DevWeave knowledge CLI。"
             )
-        if state["gates"]["build"].get("status") != "approved":
-            return deny(
-                f"工作項 {state['id']} 尚未通過 G2 設計與開發核准；"
-                "目前只允許唯讀或已設定的驗證命令。"
-            )
-        return None
+        return deny(
+            f"工作項 {state['id']} 的 Bash 命令未經 Verification Policy 授權；"
+            "請使用 devweave verify 或明確的唯讀 argv。"
+        )
 
     if tool_name in ("apply_patch", "Edit", "Write"):
         if state is None:

@@ -63,3 +63,11 @@ Bootstrap provenance: `20260803-112312-feature-vs-code-devweave`（待 G3 核准
 Codebase LLM Wiki provenance: `20260803-161041-feature-codebase-llm-wiki`（待 G3 核准）。
 
 Independent Review provenance: `20260804-122803-feature-g3-review-agent`（待 G3 核准）。
+
+## Verification Policy v2 Quality Contract
+
+- Read-only policy 是 typed argv allowlist；shell operator、command substitution、redirection、unknown/output-producing flag、quoted/relative executable、wrapper、非 canonical cwd 與 PowerShell/CMD/POSIX 等價 injection 均 fail closed。Configured command 不能以相同 argv 直接 Bash 執行。
+- 每個 execution 前後比較 repository/filesystem/Git state；writes:none 的任何 effect、writer 的 undeclared output、scope 外變更、snapshot/postcondition/promotion failure、timeout 或 execution error 都形成 failed、`gate_eligible=false` evidence，且不得 promotion。
+- `expect=nonzero` 與 `expect=any` 可以保存 reproduction/diagnostic result，但永遠不滿足 required command、AC coverage、regression evidence 或 G3 acceptance。G3 只接受 frozen Effective Verification Plan 中 current、zero-only、engine-eligible evidence。
+- Command definition 的 argv、cwd、writes、outputs、depends_on、timeout 或 release policy 改變會改變 command/policy digest，使舊 plan、G2/G3 與 evidence stale。Runner 與 G3 必須回報相同 plan digest 與 selected/skipped/not-applicable 集合。
+- High-risk verification 的 controlled profile 應保留 release-only command 與依賴的明確 skip reason；本 Work Item 的 current profile 為 7 selected、2 release-only skipped。每筆 machine state 仍只能由 atomic typed mutation 寫入，不直接編輯 state/events/evidence ledger。

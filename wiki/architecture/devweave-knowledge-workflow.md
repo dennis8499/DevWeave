@@ -2,11 +2,11 @@
 title: DevWeave Knowledge Workflow
 type: architecture
 sources: [.agents/skills, .codex/hooks.json, AGENTS.md, README.md, docs/使用手冊.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-16
 tags: [architecture]
 status: active
-source_fingerprint: "sha256:c67339026554e1dfc11e4b2c19d188bfc82fadad14aa6a3bcfdf954a899785ef"
-verified_by: 20260813-142228-feature-devweave-vs-code-extension
+source_fingerprint: "sha256:ca96436e1eb19d64e39a489a78572bb8025cb362cda78898fffdfb13abba54a9"
+verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
 ---
 
 # DevWeave Knowledge Workflow
@@ -84,3 +84,13 @@ Control Center 的五個區域使用 tab/tabpanel `aria-controls`、`aria-labell
 - Extension intent parity、strict protocol、unknown state fail-closed、no-process/no-network、package 與 Extension Host activation 由 unit/security/typecheck/package/smoke 驗證。
 - Durable value 是語意判斷，machine 只能提供 coverage 與 affected-page obligation；最終由 Knowledge Review rationale 與 G3 人工核准承擔。Repository contract tests 可檢查政策存在，實際對話是否逐題等待仍需以運行時情境驗收。
 - Plan Mode native round-trip 與 ordinary/Skill tool visibility 必須以 host/manual evidence 驗證；目前 ordinary/Skill context 未暴露工具時，current result 是 unavailable compatibility，不可把 structured fallback 或 policy text 誤報成 native pass。
+
+G3 selection parity 的細節也屬於同一 frozen plan contract：`release-only` command 與 `release-only-dependency:<id>` 都是 plan-defined skip，不得被 G3 當成缺少 required command；Runner 與 G3 必須逐字重用 skip reason。
+
+## Verification Policy v2 與 G3 parity（2026-08-16）
+
+驗證入口不再各自推導 command 是否安全。唯一的 `command_policy.py` evaluator 同時服務 PreToolUse Guard、command/profile runner、Doctor、command set/remove 與 G3 validator；任何 unknown flag、shell operator、substitution、redirection、非 canonical executable/cwd、錯誤 phase/risk/session/release context 都 fail closed。configured command 的直接 Bash 呼叫只回報「請使用 `devweave verify`」，不啟動命令。
+
+G2 approval 在 Work Item state 內凍結 Effective Verification Plan，保存 plan ID/digest、project policy digest、command definition digests、required/selected/skipped/not-applicable 集合、dependency closure、stage、writes、outputs、expected exit policy 與 gate eligibility policy。Runner 的 selection response 與 G3 required set 都直接重用這份 snapshot；release-only command 沒有 explicit release context 時是 skipped，依賴它的 smoke command 也明確 skipped，不會被另一入口重新要求。
+
+Evidence 是 execution observation，不是 caller assertion。engine 會記錄 canonical argv/cwd、plan/command/source/input/output fingerprint、實際 exit code、changed/undeclared paths 與 execution channel；只有 controlled executor、zero-only formal success、current digest/source、無 timeout/error/undeclared effect 且 postcondition/promotion 成功時才 `gate_eligible=true`。policy mutation 會使 plan、G2/G3 與 command evidence stale；writes command 先在 candidate stage 完成，read-only stage 只能在 writer barrier 後平行。

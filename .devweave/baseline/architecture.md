@@ -67,3 +67,10 @@ Independent Review provenance: `20260804-122803-feature-g3-review-agent`（待 G
 - `writing-great-skills` 是 maintenance-only Skill：可協助維護 Skill instructions，但不屬於 companion allowlist、Extension bootstrap bundle 或 product SDLC routing。
 - 五個 companion 是保留 upstream `source`、`skillPath` 與 `computedHash` 的 local optimization overlay；`skills-lock.json` 是 provenance authority，最佳化文字不冒充 upstream release。
 - Skill completion 以可檢查的 phase boundary、public seam、decision return、evidence、metadata/invocation policy 與 explicit completion criterion 為治理契約；不新增 public CLI、JSON schema、router、state、ledger 或 Git 操作。
+
+## Verification Policy v2 Architecture
+
+- `command_policy.py` 是 Guard、`verify --command`、`verify --profile`、Doctor、command mutation 與 G3 的唯一 policy evaluator。其輸入綁定 Work Item、phase、gate、session、command definition、argv/cwd、writes/outputs、affected paths、release stage、dependency closure 與 current project policy digest；unknown/ambiguous shell input fail closed。
+- G2 approval 以同一 atomic state path 凍結唯一 Effective Verification Plan，保存 plan ID/digest、project policy digest、每個 command definition digest、required/selected/skipped/not-applicable、dependency closure、stage、write/exclusive policy、expected exit codes 與 gate eligibility policy。Runner 與 G3 不重建第二份 required set。
+- Configured verification command 只能經 DevWeave controlled executor：trusted executable/hash、固定 argv/cwd、`shell=False`、bounded timeout、sanitized environment、前後 snapshot、output reconciliation 與 evidence recording。`writes != none` 在 temporary candidate 內 serial 執行，candidate fingerprint 凍結後才允許 writes:none parallel stage；shared output boundary 自動 exclusive。
+- Evidence 是 engine-derived observation。只有 current plan/project/command/source fingerprints、controlled executor、zero-only formal success、無 timeout/error/undeclared effect 且 postcondition/promotion 成功時才可 `gate_eligible=true`；expectation/reproduction/diagnostic/failed evidence 不得作 G3 proof。Policy mutation 經 typed core path 使 active plan、gate 與受影響 evidence deterministic stale。

@@ -331,6 +331,14 @@ AC-001、AC-002 對應 TASK-001，證據為 {evidence}，且綁定目前 source 
             "timeout_seconds": timeout_seconds,
             "required_for": list(required_for),
         }
+        executable = Path(command["argv"][0]).resolve()
+        command["argv"][0] = str(executable)
+        command["resolved_executable"] = str(executable)
+        command["executable_sha256"] = (
+            core.sha256_bytes(executable.read_bytes())
+            if executable.is_file()
+            else "0" * 64
+        )
         if depends_on:
             command["depends_on"] = list(depends_on)
         if exclusive_group:
@@ -346,6 +354,20 @@ AC-001、AC-002 對應 TASK-001，證據為 {evidence}，且綁定目前 source 
         project["commands"] = [
             item for item in project.get("commands", []) if item.get("id") != command_id
         ] + [command]
+        trusted = [
+            item
+            for item in project.get("trusted_executables", [])
+            if item.get("path", "").lower() != str(executable).lower()
+        ]
+        trusted.append(
+            {
+                "id": executable.name,
+                "kind": "direct",
+                "path": str(executable),
+                "sha256": command["executable_sha256"],
+            }
+        )
+        project["trusted_executables"] = trusted
         for level in core.RISK_LEVELS:
             profile = project.setdefault("verification_profiles", {}).setdefault(level, [])
             if level in required_for and command_id not in profile:

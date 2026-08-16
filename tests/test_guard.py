@@ -158,11 +158,66 @@ class GuardTests(unittest.TestCase):
                 )
             )
             core.bind_session(harness.repo, "s-command", state["id"])
-            self.assertIsNone(
+            self.assertTrue(
+                denied(
                 guard.handle_hook(
                     bash_payload(harness.repo, "s-command", command_text), harness.repo
                 )
+                )
             )
+
+    def test_read_only_prefix_bypass_payloads_fail_closed_after_g2(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            session = "s-adversarial"
+            core.bind_session(harness.repo, session, state["id"])
+            payloads = (
+                "git status & echo SHOULD_NOT_RUN",
+                "git status $(echo SHOULD_NOT_RUN)",
+                "git status `echo SHOULD_NOT_RUN`",
+                "git diff --output=.devweave/cache/guard-probe.txt",
+                "git status --unknown-helper",
+                "Get-Content . & Write-Output SHOULD_NOT_RUN",
+                "Get-Content . $(Write-Output SHOULD_NOT_RUN)",
+                "Get-ChildItem . | Out-File .devweave/cache/probe.txt",
+            )
+            for command in payloads:
+                with self.subTest(command=command):
+                    self.assertTrue(
+                        denied(
+                            guard.handle_hook(
+                                bash_payload(harness.repo, session, command), harness.repo
+                            )
+                        )
+                    )
+
+    def test_configured_command_direct_bash_is_denied_after_g2(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            command = harness.configure_command(
+                "configured-writer",
+                required_for=(),
+                writes="generated",
+                outputs=("dist",),
+            )
+            session = "s-configured-direct"
+            core.bind_session(harness.repo, session, state["id"])
+            command_text = subprocess.list2cmdline(command["argv"])
+            result = guard.handle_hook(
+                bash_payload(harness.repo, session, command_text), harness.repo
+            )
+            self.assertTrue(denied(result))
+
+    def test_arbitrary_bash_is_denied_after_g2(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            session = "s-arbitrary"
+            core.bind_session(harness.repo, session, state["id"])
+            result = guard.handle_hook(
+                bash_payload(harness.repo, session, "python -c print('side effect')"),
+                harness.repo,
+            )
+            self.assertTrue(denied(result))
 
     def test_cli_bind_command_binds_hook_session(self) -> None:
         with RepositoryHarness() as harness:

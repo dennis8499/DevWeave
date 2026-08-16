@@ -131,3 +131,23 @@ Use the current phase reference:
 - [verification-phase.md](references/verification-phase.md)
 
 Artifact grammar, trace IDs, fingerprints, and state contracts are defined in [contracts.md](references/contracts.md). Templates in `assets/` are engine-owned inputs and should not be copied by hand.
+
+## Verification Policy v2
+
+The sole command-policy source is `scripts/command_policy.py`. Guard, verification,
+Doctor, command mutation and G3 must consume its evaluator and canonical digests.
+G2 freezes `state.verification_plan`; a profile runner must return that plan digest,
+and G3 must reuse the plan's selected/skipped/not-applicable sets.
+
+Configured commands are never direct Bash permissions. They run only through
+`devweave verify` with `shell=False`, fixed argv/cwd, bounded timeout, executable
+trust, repository-state snapshots, declared-output reconciliation and engine-owned
+evidence. Read-only Bash is an argv allowlist: shell operators, substitutions,
+redirection, output-producing flags and unknown flags fail closed, consistently for
+POSIX, CMD and PowerShell-shaped payloads.
+
+Evidence eligibility is engine-derived. Only current, zero-exit, plan/command/source
+bound, controlled-executor evidence with no undeclared writes is gate-eligible;
+`expect=nonzero`, `expect=any`, reproduction, diagnostic, failed, timed-out or stale
+evidence can never satisfy G3. Policy mutations after G2 are made through the Router
+and deterministically stale the plan, affected evidence and downstream gates.

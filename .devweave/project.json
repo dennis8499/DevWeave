@@ -1,4 +1,5 @@
 {
+  "command_policy_version": 2,
   "commands": [
     {
       "affected_paths": [
@@ -8,10 +9,12 @@
         "vscode-extension/scripts"
       ],
       "argv": [
-        "npm.cmd",
+        "C:/Program Files/nodejs/npm.cmd",
         "run",
         "package"
       ],
+      "resolved_executable": "C:/Program Files/nodejs/npm.cmd",
+      "executable_sha256": "21b46c69ad6e2f231f02a9e120f4ba6c8e75fef5a45637103002eab99f888ab8",
       "cwd": "vscode-extension",
       "id": "extension-package",
       "outputs": [
@@ -34,10 +37,12 @@
         "vscode-extension/test"
       ],
       "argv": [
-        "npm.cmd",
+        "C:/Program Files/nodejs/npm.cmd",
         "run",
         "test:smoke:current"
       ],
+      "resolved_executable": "C:/Program Files/nodejs/npm.cmd",
+      "executable_sha256": "21b46c69ad6e2f231f02a9e120f4ba6c8e75fef5a45637103002eab99f888ab8",
       "cwd": "vscode-extension",
       "depends_on": [
         "extension-package"
@@ -57,10 +62,12 @@
         "vscode-extension/test"
       ],
       "argv": [
-        "npm.cmd",
+        "C:/Program Files/nodejs/npm.cmd",
         "run",
         "test"
       ],
+      "resolved_executable": "C:/Program Files/nodejs/npm.cmd",
+      "executable_sha256": "21b46c69ad6e2f231f02a9e120f4ba6c8e75fef5a45637103002eab99f888ab8",
       "cwd": "vscode-extension",
       "id": "extension-tests",
       "required_for": [
@@ -78,10 +85,12 @@
         "vscode-extension/test"
       ],
       "argv": [
-        "npm.cmd",
+        "C:/Program Files/nodejs/npm.cmd",
         "run",
         "typecheck"
       ],
+      "resolved_executable": "C:/Program Files/nodejs/npm.cmd",
+      "executable_sha256": "21b46c69ad6e2f231f02a9e120f4ba6c8e75fef5a45637103002eab99f888ab8",
       "cwd": "vscode-extension",
       "id": "extension-typecheck",
       "required_for": [
@@ -98,7 +107,7 @@
         ".agents/skills/devweave/scripts"
       ],
       "argv": [
-        "python",
+        "C:/Python314/python.exe",
         "-B",
         "-m",
         "unittest",
@@ -109,6 +118,8 @@
         "test_cli.py",
         "-v"
       ],
+      "resolved_executable": "C:/Python314/python.exe",
+      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
       "cwd": ".",
       "id": "unit-tests-cli",
       "required_for": [
@@ -125,7 +136,7 @@
         ".agents/skills/devweave/scripts"
       ],
       "argv": [
-        "python",
+        "C:/Python314/python.exe",
         "-B",
         "-m",
         "unittest",
@@ -136,6 +147,8 @@
         "test_repository_contract.py",
         "-v"
       ],
+      "resolved_executable": "C:/Python314/python.exe",
+      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
       "cwd": ".",
       "id": "unit-tests-contract",
       "required_for": [
@@ -152,7 +165,7 @@
         ".agents/skills/devweave/scripts"
       ],
       "argv": [
-        "python",
+        "C:/Python314/python.exe",
         "-B",
         "-m",
         "unittest",
@@ -163,6 +176,8 @@
         "test_devweave_core.py",
         "-v"
       ],
+      "resolved_executable": "C:/Python314/python.exe",
+      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
       "cwd": ".",
       "id": "unit-tests-core",
       "required_for": [
@@ -179,7 +194,7 @@
         ".agents/skills/devweave/scripts"
       ],
       "argv": [
-        "python",
+        "C:/Python314/python.exe",
         "-B",
         "-m",
         "unittest",
@@ -190,6 +205,8 @@
         "test_guard.py",
         "-v"
       ],
+      "resolved_executable": "C:/Python314/python.exe",
+      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
       "cwd": ".",
       "id": "unit-tests-guard",
       "required_for": [
@@ -206,7 +223,7 @@
         ".agents/skills/devweave/scripts"
       ],
       "argv": [
-        "python",
+        "C:/Python314/python.exe",
         "-B",
         "-m",
         "unittest",
@@ -217,6 +234,8 @@
         "test_knowledge.py",
         "-v"
       ],
+      "resolved_executable": "C:/Python314/python.exe",
+      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
       "cwd": ".",
       "id": "unit-tests-knowledge",
       "required_for": [
@@ -226,6 +245,20 @@
       ],
       "timeout_seconds": 360,
       "writes": "none"
+    }
+  ],
+  "trusted_executables": [
+    {
+      "id": "python",
+      "kind": "direct",
+      "path": "C:/Python314/python.exe",
+      "sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38"
+    },
+    {
+      "id": "npm-cmd",
+      "kind": "registered-wrapper",
+      "path": "C:/Program Files/nodejs/npm.cmd",
+      "sha256": "21b46c69ad6e2f231f02a9e120f4ba6c8e75fef5a45637103002eab99f888ab8"
     }
   ],
   "evidence": {

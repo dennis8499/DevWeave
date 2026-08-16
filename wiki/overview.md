@@ -2,11 +2,11 @@
 title: DevWeave Codebase Overview
 type: overview
 sources: [.agents/skills, .codex/hooks.json, AGENTS.md, README.md, docs/使用手冊.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-16
 tags: [overview]
 status: active
-source_fingerprint: "sha256:c67339026554e1dfc11e4b2c19d188bfc82fadad14aa6a3bcfdf954a899785ef"
-verified_by: 20260813-142228-feature-devweave-vs-code-extension
+source_fingerprint: "sha256:ca96436e1eb19d64e39a489a78572bb8025cb362cda78898fffdfb13abba54a9"
+verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
 ---
 
 # DevWeave Codebase Overview
@@ -79,3 +79,11 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 需要使用者選擇的五個 companion 都遵循同一份 `native-question-contract.md`：Plan Mode/native `request_user_input`、一題／二至三選項／推薦第一項／host `Other`、等待與 result safety；普通 pre-G2 context 不能自行建立第二套問答 UI，新的 implementation decision 必須 `revise`。
 
 品質檢查包含 UTF-8 quick validation、repository contract 的 exact six-governed-Skill set、frontmatter/metadata/link/invocation policy、maintenance-only/bootstrap exclusion、隔離 forward-test，以及 Python/Extension full verification。Hook hardening 的 repository contract 覆蓋三種 Windows launcher、UTF-8 deny JSON、malformed input 與 read-only silence；本 work item 的 Python final run 為 111 tests（1 skipped），另維持 88 項 Extension tests、58 個 bootstrap files 與 119 個 VSIX entries。validator 尚未支援的 `disable-model-invocation` 欄位由 repository contract 補驗，並保留 `grill-me` 的必要 policy。
+
+## Verification Policy v2（2026-08-16）
+
+Verification Policy v2 將 `command_policy.py` 定為 Guard、`verify --command`、`verify --profile`、Doctor、command mutation 與 G3 的共同 evaluator。它以 canonical argv、cwd、trusted executable/hash、phase/risk/session、release context、writes、outputs、dependency closure 與 project policy digest 做 fail-closed admission；configured command 只能經 `devweave_executor` 的 `shell=False` 固定 argv 與 bounded timeout 執行。
+
+G2 會把 project policy 與 command definition 凍結成 state 內唯一的 Effective Verification Plan。Runner 與 G3 只讀這份 plan；本 Work Item 的 plan digest 為 `sha256:147af180d37ae67586d55739749ccd1c985c1a03535302133bda0adff78c940b`。每筆 evidence 另綁 command digest、source/input/output fingerprint、實際 exit code 與 observed effects；`gate_eligible` 僅由 engine 推導，`expect=nonzero|any`、reproduction、diagnostic、failed、timeout、digest/source stale 與 undeclared writes 永遠不能進 G3。
+
+寫入 command 在 temporary candidate 中先完成，依 dependency/stage serial 執行；candidate fingerprint 凍結後才允許 `writes=none` checks 平行。前後 snapshot 會拒絕未宣告路徑、scope 外變更與 writes:none effect，只有 declared outputs 通過 postcondition 才 atomic promotion。project command policy mutation 會透過 typed core path 使 active plan、gate 與受影響 evidence deterministic stale。

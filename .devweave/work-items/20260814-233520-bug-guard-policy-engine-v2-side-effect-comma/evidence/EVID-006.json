@@ -1,0 +1,23 @@
+{
+  "binds_current_source": false,
+  "command_id": null,
+  "covers": [
+    "AC-012",
+    "AC-017"
+  ],
+  "created_at": "2026-08-16T07:19:37+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "913c2a24d877e582305bceeb830107555b4168c1",
+  "id": "EVID-006",
+  "kind": "reproduction",
+  "log_truncated": false,
+  "observed_result": "failure",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "b751275325b33314b8bc7e6f7d17722c1c8857fe5ae5adc08769e9ed7ee31bf5",
+  "stale": false,
+  "status": "passed",
+  "summary": "BUG-04 temporary expectation harness: exit 7 with expect nonzero and exit 0 with expect any both produced status=passed and entered the raw G3 current-evidence set; gate_eligible was absent.",
+  "tasks": []
+}

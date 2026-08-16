@@ -1,0 +1,25 @@
+{
+  "binds_current_source": false,
+  "command_id": null,
+  "covers": [
+    "AC-009",
+    "AC-010",
+    "AC-024",
+    "AC-027"
+  ],
+  "created_at": "2026-08-16T07:19:21+00:00",
+  "exit_code": null,
+  "expectation": null,
+  "git_head": "913c2a24d877e582305bceeb830107555b4168c1",
+  "id": "EVID-003",
+  "kind": "reproduction",
+  "log_truncated": false,
+  "observed_result": "failure",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "b751275325b33314b8bc7e6f7d17722c1c8857fe5ae5adc08769e9ed7ee31bf5",
+  "stale": false,
+  "status": "passed",
+  "summary": "BUG-01 temporary Guard payload matrix: shell operator, command substitution, backtick, Git output flag, unknown Git flag, CMD environment expansion, and PowerShell expression payloads returned allow; only the pre-existing double-operator and basic redirection cases denied.",
+  "tasks": []
+}

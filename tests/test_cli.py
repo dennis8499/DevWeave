@@ -287,6 +287,41 @@ class CliContractTests(unittest.TestCase):
                 [item["id"] for item in core.load_project(harness.repo)["commands"]],
             )
 
+    def test_command_policy_mutation_invalidates_post_g2_plan(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            harness.implement(state["id"], "policy mutation")
+            harness.configure_command()
+            evidence = core.run_verification(
+                harness.repo,
+                state["id"],
+                command_id="fixture-tests",
+                kind="regression",
+                covers=["AC-001", "AC-002"],
+                tasks=["TASK-001"],
+            )
+            self.assertTrue(evidence["gate_eligible"])
+            result, payload = invoke(
+                harness.repo,
+                "command",
+                "set",
+                "--id",
+                "fixture-tests",
+                "--timeout",
+                "31",
+                "--required-for",
+                "standard",
+                "--",
+                sys.executable,
+                "-c",
+                "print('fixture verification passed')",
+            )
+            self.assertEqual(0, result.returncode, payload)
+            self.assertIn(state["id"], payload["invalidated_work_items"])
+            updated = core.load_state(harness.repo, state["id"])
+            self.assertTrue(updated["verification_plan"]["stale"])
+            self.assertTrue(updated["evidence"][evidence["id"]]["stale"])
+
     def test_selective_profile_reports_skips_and_dependency_closure(self) -> None:
         with RepositoryHarness() as harness:
             state = harness.start()

@@ -199,3 +199,44 @@ Resolve an explicitly named item first, then an item unambiguously established b
 ## Language and ownership
 
 Keep skill instructions, Python, JSON keys, IDs, and internal contracts in English. Write chat summaries and human-facing Markdown in Traditional Chinese unless the user requests another language. Inspect Git state but leave branches, worktrees, commits, pushes, PRs, deployment, and remote trackers to an explicitly authorized workflow.
+
+## Verification Policy v2 contract
+
+`.devweave/project.json` uses `command_policy_version: 2`. Its configured commands are
+canonical argv records with a repository-relative `cwd`, bounded timeout, `writes`,
+`outputs`, `affected_paths`, `depends_on`, release stage, resolved executable and
+SHA-256 trust binding. `doctor` validates the executable registry, command metadata,
+profiles, dependency graph and active-plan policy digest.
+
+Guard, `verify --command`, `verify --profile`, G3 validation, Doctor and command
+mutation validation share the evaluator in `scripts/command_policy.py`. A configured
+command is admitted only through the DevWeave executor (`shell=false`, exact argv and
+cwd, bounded timeout, repository-state reconciliation and evidence recording). Direct
+Bash invocation is denied even when its text resembles a configured command. An
+unregistered Bash payload is allowed only when the cross-shell read-only argv
+allowlist parses it safely; operators, substitutions, redirections, output flags and
+unknown flags fail closed.
+
+G2 stores one frozen `verification_plan` in the Work Item. It contains the project
+policy digest, command definition digests, required and selected sets, dependency
+closure, skip/not-applicable reasons, execution stages, write/output boundaries and
+expected success exits. The profile runner and G3 read this plan; they do not
+reconstruct separate required sets. A typed `command set` or `command remove` after
+G2 invalidates the plan, affected command evidence and downstream gates. A detected
+raw policy digest drift is also stale once plan-bound command evidence exists.
+
+Verification evidence records the plan digest, project policy digest, command
+definition digest, exact argv/cwd, input/source/output fingerprints, actual changed
+paths, exit code, execution channel and engine-derived `gate_eligible`. Only a zero
+exit that matches the plan, current source/policy/definition, controlled executor and
+declared output boundary is gate-eligible. `expect=nonzero`, `expect=any`,
+reproduction, diagnostic, timeout, execution error, stale source, digest mismatch and
+undeclared writes are never gate-eligible. G3 required commands, AC coverage and
+required evidence kinds use only `gate_eligible: true` entries.
+
+Write commands execute in a temporary repository candidate and promote only declared
+outputs after reconciliation. Write stages are serial and dependency ordered; only
+`writes=none` commands may run concurrently. Shared output boundaries become an
+exclusive plan group. A command that changes an undeclared path fails its evidence.
+Use `verify --release-context <stage>` when a release-only command is intentionally
+selected.

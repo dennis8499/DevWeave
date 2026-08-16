@@ -409,6 +409,7 @@ class RepositoryContractTests(unittest.TestCase):
                     imported.add(node.module.split(".", 1)[0])
             non_standard = imported - set(sys.stdlib_module_names) - {
                 "devweave_core",
+                "command_policy",
                 "knowledge_core",
             }
             self.assertEqual(set(), non_standard, f"{path.name}: {sorted(non_standard)}")
@@ -521,7 +522,7 @@ class RepositoryContractTests(unittest.TestCase):
             shutil.copyfile(REPOSITORY_ROOT / ".codex" / "hooks.json", target)
             guard_target = harness.repo / ".agents" / "skills" / "devweave" / "scripts" / "guard.py"
             guard_target.parent.mkdir(parents=True)
-            for script_name in ("guard.py", "devweave_core.py", "knowledge_core.py"):
+            for script_name in ("guard.py", "devweave_core.py", "command_policy.py", "knowledge_core.py"):
                 shutil.copyfile(
                     REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "scripts" / script_name,
                     guard_target.parent / script_name,

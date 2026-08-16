@@ -68,3 +68,23 @@ Present the behavior delivered, verification commands, manual evidence, baseline
 When acceptance is rejected, record revise from requirements, design, or implementation according to the reason and continue from that phase.
 
 Complete when G3 is current, close succeeds, and the work item remains in place with status closed.
+
+## Verification Policy v2 operating rules
+
+Before executing a configured command, confirm that the Work Item has a current
+G2-backed `verification_plan`. Run `verify --command` or `verify --profile` only
+through the Router; do not paste a configured argv into Bash. The profile result's
+`selection.effective_plan_digest` must match the Work Item plan and the recorded
+evidence digests.
+
+The engine derives `gate_eligible`; callers cannot set it. A matching non-zero or
+`any` expectation may be useful diagnostic evidence, but it cannot satisfy a required
+command, AC coverage, regression evidence or G3. A changed command definition,
+project policy, source fingerprint or declared-output reconciliation makes old command
+evidence stale or ineligible.
+
+Write commands run in serial dependency stages and are reconciled in a candidate
+repository before declared outputs are promoted. Only `writes=none` commands can be
+parallelized. Any undeclared path change fails the execution evidence. Release-only
+commands require an explicit `--release-context`; selective profile skips and
+not-applicable reasons are the same frozen-plan data consumed by G3.

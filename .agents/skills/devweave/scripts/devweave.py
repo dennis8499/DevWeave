@@ -3,9 +3,12 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Sequence
+
+import command_policy
 
 from devweave_core import (
     DevWeaveError,
@@ -27,6 +30,7 @@ from devweave_core import (
     doctor,
     find_repo_root,
     init_project,
+    invalidate_active_verification_plans,
     instructions,
     list_work,
     load_project,
@@ -46,6 +50,7 @@ from devweave_core import (
     set_knowledge_review,
     set_risk,
     set_scope,
+    sha256_bytes,
     sync_state,
     update_task,
     validate_work,
@@ -383,6 +388,7 @@ def command_verify(args: argparse.Namespace, repo: Path) -> tuple[dict[str, Any]
             covers=args.covers,
             tasks=args.task,
             expectation=args.expect,
+            release_stage=args.release_stage,
             max_parallel=args.max_parallel,
             changed_paths=args.path if args.path else None,
             metrics=parse_metrics_json(args.metrics),
@@ -396,6 +402,7 @@ def command_verify(args: argparse.Namespace, repo: Path) -> tuple[dict[str, Any]
         covers=args.covers,
         tasks=args.task,
         expectation=args.expect,
+        release_stage=args.release_stage,
         metrics=parse_metrics_json(args.metrics),
     )
     payload = {"ok": evidence["status"] == "passed", "work": state["id"], "evidence": evidence}
@@ -450,7 +457,13 @@ def command_command(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
         project = load_project(repo)
         commands = project.setdefault("commands", [])
         if args.command_action == "list":
-            return {"ok": True, "commands": commands, "profiles": project["verification_profiles"]}
+            return {
+                "ok": True,
+                "commands": commands,
+                "profiles": project["verification_profiles"],
+                "policy_digest": command_policy.policy_digest(project),
+            }
+        previous_policy_digest = command_policy.policy_digest(project)
         if args.command_action == "remove":
             before = len(commands)
             dependents = [
@@ -467,8 +480,24 @@ def command_command(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
             for profile in project.get("verification_profiles", {}).values():
                 while args.id in profile:
                     profile.remove(args.id)
+            removed = before - len(project["commands"])
+            if not removed:
+                return {"ok": True, "removed": 0, "id": args.id, "policy_digest": previous_policy_digest}
             atomic_write_json(project_path(repo), project)
-            return {"ok": True, "removed": before - len(project["commands"]), "id": args.id}
+            current_project = load_project(repo)
+            current_policy_digest = command_policy.policy_digest(current_project)
+            invalidated = invalidate_active_verification_plans(
+                repo,
+                previous_policy_digest=previous_policy_digest,
+                current_policy_digest=current_policy_digest,
+            )
+            return {
+                "ok": True,
+                "removed": removed,
+                "id": args.id,
+                "policy_digest": current_policy_digest,
+                "invalidated_work_items": invalidated,
+            }
         argv = list(args.argv)
         if argv and argv[0] == "--":
             argv = argv[1:]
@@ -505,6 +534,19 @@ def command_command(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
             "timeout_seconds": args.timeout,
             "required_for": sorted(set(args.required_for)),
         }
+        resolved_executable = Path(argv[0]).expanduser()
+        if not resolved_executable.is_absolute():
+            located = shutil.which(str(resolved_executable))
+            resolved_executable = Path(located) if located else (repo / resolved_executable).resolve()
+        else:
+            resolved_executable = resolved_executable.resolve()
+        entry["argv"][0] = str(resolved_executable)
+        entry["resolved_executable"] = str(resolved_executable)
+        entry["executable_sha256"] = (
+            sha256_bytes(resolved_executable.read_bytes())
+            if resolved_executable.is_file()
+            else "0" * 64
+        )
         entry.update(metadata)
         if args.depends_on:
             entry["depends_on"] = sorted(set(args.depends_on))
@@ -523,6 +565,20 @@ def command_command(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
                 "Command dependencies must reference existing commands and cannot be self-referential.",
                 {"id": args.id, "depends_on": invalid_dependencies},
             )
+        trusted = [
+            item
+            for item in project.get("trusted_executables", [])
+            if item.get("path", "").lower() != str(resolved_executable).lower()
+        ]
+        trusted.append(
+            {
+                "id": resolved_executable.name,
+                "kind": "registered-wrapper" if resolved_executable.suffix.lower() in (".cmd", ".bat") else "direct",
+                "path": str(resolved_executable),
+                "sha256": entry["executable_sha256"],
+            }
+        )
+        project["trusted_executables"] = trusted
         profiles = project.setdefault(
             "verification_profiles", {level: [] for level in RISK_LEVELS}
         )
@@ -534,7 +590,25 @@ def command_command(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
             if level not in entry["required_for"] and args.id in profile:
                 profile.remove(args.id)
         atomic_write_json(project_path(repo), project)
-        return {"ok": True, "command": entry, "profiles": profiles}
+        current_project = load_project(repo)
+        current_policy_digest = command_policy.policy_digest(current_project)
+        invalidated = []
+        if current_policy_digest != previous_policy_digest:
+            invalidated = invalidate_active_verification_plans(
+                repo,
+                previous_policy_digest=previous_policy_digest,
+                current_policy_digest=current_policy_digest,
+            )
+        current_entry = next(
+            item for item in current_project["commands"] if item.get("id") == args.id
+        )
+        return {
+            "ok": True,
+            "command": current_entry,
+            "profiles": current_project["verification_profiles"],
+            "policy_digest": current_policy_digest,
+            "invalidated_work_items": invalidated,
+        }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -723,6 +797,11 @@ def build_parser() -> argparse.ArgumentParser:
     verify_parser.add_argument("--covers", action="append", default=[])
     verify_parser.add_argument("--task", action="append", default=[])
     verify_parser.add_argument("--expect", choices=("zero", "nonzero", "any"), default="zero")
+    verify_parser.add_argument(
+        "--release-context",
+        dest="release_stage",
+        help="Explicit release stage required by release-only verification commands.",
+    )
     verify_parser.add_argument("--max-parallel", type=int, default=3)
     verify_parser.add_argument(
         "--metrics-json",
