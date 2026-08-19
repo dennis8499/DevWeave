@@ -1,0 +1,60 @@
+{
+  "actual_changed_paths": [],
+  "argv": [
+    "C:/Python314/python.exe",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-p",
+    "test_cli.py",
+    "-v"
+  ],
+  "binds_current_source": true,
+  "command_definition_digest": "sha256:937b31373e1e06fedb9491abdc9169b7668fe771f1e7bc5749b42cc1ec0bada9",
+  "command_id": "unit-tests-cli",
+  "covers": [
+    "AC-003"
+  ],
+  "created_at": "2026-08-19T08:11:41+00:00",
+  "cwd": ".",
+  "duration_ms": 38339,
+  "effective_plan_digest": "sha256:eb3236f2ed8e4ed93f8fa3e2d0e6b9d68ca9be2f279545a599c2a686e804e62c",
+  "effective_plan_id": "plan-46151a623f3adccd",
+  "eligibility_reason": "zero_exit_and_current_observed_effects",
+  "execution_channel": "devweave_executor",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-19T08:11:40+00:00",
+  "gate_eligible": true,
+  "git_head": "c895cd2a32c454621176e071ecc693f742e29039",
+  "id": "EVID-021",
+  "input_fingerprint": "9f9f19926d499458e6b87b8d71ae074ea7b817c77c4cb8e05e406ecbf4cf804d",
+  "kind": "regression",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 38339,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 1,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "output_fingerprint": "9f9f19926d499458e6b87b8d71ae074ea7b817c77c4cb8e05e406ecbf4cf804d",
+  "project_policy_digest": "sha256:386702adf1c510b07cd9a99cf79c22d34fcf0d189a1969dcef7f025ddfa1e945",
+  "raw_log": ".devweave/cache/logs/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/EVID-021.log",
+  "schema_version": 1,
+  "source_fingerprint": "10f10fd85c0e1521b069d8573f14f1c62f45d010a11581eb0d5f5c8dc84592f4",
+  "stale": false,
+  "started_at": "2026-08-19T08:11:02+00:00",
+  "status": "passed",
+  "summary": "test_ambiguous_selection_uses_exit_code_three (test_cli.CliContractTests.test_ambiguous_selection_uses_exit_code_three) ... ok\r\ntest_bind_without_hook_confirmation_is_not_reported_as_bound (test_cli.CliContractTests.test_bind_without_hook_confirmation_is_not_reported_as_bound) ... ok\r\ntest_command_policy_mutation_invalidates_post_g2_plan (test_cli.CliContractTests.test_command_policy_mutation_invalidates_post_g2_plan) ... ok\r\ntest_command_set_preserves_argv_array (test_cli.CliContractTests.test_command_set_preserves_argv_array) ... ok\r\ntest_command_set_records_and_validates_optional_metadata (test_cli.CliContractTests.test_command_set_records_and_validates_optional_metadata) ... ok\r\ntest_command_set_rejects_invalid_timeout (test_cli.CliContractTests.test_command_set_rejects_invalid_timeout) ... ok\r\ntest_command_set_rejects_unknown_dependency_without_writing_invalid_project (test_cli.CliContractTests.test_command_set_rejects_unknown_dependency_without_writing_invalid_project) ... ok\r\ntest_high_profile_ignores_path_filter_and_legacy_commands_are_explicitly_skipped (test_cli.CliContractTests.test_high_profile_ignores_path_filter_and_legacy_commands_are_explicitly_skipped) ... ok\r\ntest_json_first_status_and_validation_exit_codes (test_cli.CliContractTests.test_json_first_status_and_validation_exit_codes) ... ok\r\ntest_knowledge_bootstrap_cli_creates_then_resumes_one_work_item (test_cli.CliContractTests.test_knowledge_bootstrap_cli_creates_then_resumes_one_work_item) ... ok\r\ntest_knowledge_machine_cli_reports_and_replaces_g1_context (test_cli.CliContractTests.test_knowledge_machine_cli_reports_and_replaces_g1_context) ... ok\r\ntest_knowledge_no_update_review_cli_records_rationale_without_plan (test_cli.CliContractTests.test_knowledge_no_update_review_cli_records_rationale_without_plan) ... ok\r\ntest_knowledge_plan_and_seal_cli_use_coupled_targets (test_cli.CliContractTests.test_knowledge_plan_and_seal_cli_use_coupled_targets) ... ok\r\ntest_knowledge_review_and_scaffold_cli_are_phase_and_plan_bound (test_cli.CliContractTests.test_knowledge_review_and_scaffold_cli_are_phase_and_plan_bound) ... ok\r\ntest_machine_only_review_record_cli_writes_review_evidence (test_cli.CliContractTests.test_machine_only_review_record_cli_writes_review_evidence) ... ok\r\ntest_non_high_profile_does_not_resurrect_release_only_dependency (test_cli.CliContractTests.test_non_high_profile_does_not_resurrect_release_only_dependency) ... ok\r\ntest_selective_profile_reports_skips_and_dependency_closure (test_cli.CliContractTests.test_selective_profile_reports_skips_and_dependency_closure) ... ok\r\ntest_usage_errors_are_json_with_exit_code_two (test_cli.CliContractTests.test_usage_errors_are_json_with_exit_code_two) ... ok\r\ntest_verify_failure_uses_exit_code_four (test_cli.CliContractTests.test_verify_failure_uses_exit_code_four) ... ok\r\ntest_verify_profile_batches_independent_commands_and_respects_dependencies (test_cli.CliContractTests.test_verify_profile_batches_independent_commands_and_respects_dependencies) ... ok\r\ntest_verify_records_selection_and_unavailable_usage_metrics (test_cli.CliContractTests.test_verify_records_selection_and_unavailable_usage_metrics) ... ok\r\ntest_verify_rejects_malformed_metrics_json_as_validation_error (test_cli.CliContractTests.test_verify_rejects_malformed_metrics_json_as_validation_error) ... ok\r\ntest_work_id_cannot_escape_work_item_directory (test_cli.CliContractTests.test_work_id_cannot_escape_work_item_directory) ... ok\r\n\r\n----------------------------------------------------------------------\r\nRan 23 tests in 38.146s\r\n\r\nOK",
+  "tasks": [],
+  "timed_out": false,
+  "undeclared_paths": []
+}

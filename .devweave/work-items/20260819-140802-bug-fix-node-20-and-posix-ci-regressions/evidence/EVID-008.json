@@ -1,0 +1,62 @@
+{
+  "actual_changed_paths": [],
+  "argv": [
+    "C:/Python314/python.exe",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-p",
+    "test_guard.py",
+    "-v"
+  ],
+  "binds_current_source": true,
+  "command_definition_digest": "sha256:a38fd273abc335d3a8edea2b7ad574f4025b74962f38d45053947aa3385264cb",
+  "command_id": "unit-tests-guard",
+  "covers": [
+    "AC-004"
+  ],
+  "created_at": "2026-08-19T07:56:28+00:00",
+  "cwd": ".",
+  "duration_ms": 19147,
+  "effective_plan_digest": "sha256:eb3236f2ed8e4ed93f8fa3e2d0e6b9d68ca9be2f279545a599c2a686e804e62c",
+  "effective_plan_id": "plan-46151a623f3adccd",
+  "eligibility_reason": "zero_exit_and_current_observed_effects",
+  "execution_channel": "devweave_executor",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-19T07:56:27+00:00",
+  "gate_eligible": true,
+  "git_head": "c895cd2a32c454621176e071ecc693f742e29039",
+  "id": "EVID-008",
+  "input_fingerprint": "5882609ac6600c78879458cb5e0804a2cd9bdadbd55b9a470b11b9b0ecd7d4ca",
+  "kind": "regression",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 19147,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 1,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "output_fingerprint": "5882609ac6600c78879458cb5e0804a2cd9bdadbd55b9a470b11b9b0ecd7d4ca",
+  "project_policy_digest": "sha256:386702adf1c510b07cd9a99cf79c22d34fcf0d189a1969dcef7f025ddfa1e945",
+  "raw_log": ".devweave/cache/logs/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/EVID-008.log",
+  "schema_version": 1,
+  "source_fingerprint": "2e55d3aec900a3593e7d1f0dc0a2df287049dd655ebc7c7ad9011d4fc122a470",
+  "stale": false,
+  "started_at": "2026-08-19T07:56:08+00:00",
+  "status": "passed",
+  "summary": "test_arbitrary_bash_is_denied_after_g2 (test_guard.GuardTests.test_arbitrary_bash_is_denied_after_g2) ... ok\r\ntest_baseline_write_is_limited_to_verification (test_guard.GuardTests.test_baseline_write_is_limited_to_verification) ... ok\r\ntest_bound_session_can_edit_artifacts_but_not_product_before_g2 (test_guard.GuardTests.test_bound_session_can_edit_artifacts_but_not_product_before_g2) ... ok\r\ntest_cli_bind_command_binds_hook_session (test_guard.GuardTests.test_cli_bind_command_binds_hook_session) ... ok\r\ntest_configured_command_direct_bash_is_denied_after_g2 (test_guard.GuardTests.test_configured_command_direct_bash_is_denied_after_g2) ... ok\r\ntest_devweave_name_inside_arbitrary_command_is_not_a_guard_bypass (test_guard.GuardTests.test_devweave_name_inside_arbitrary_command_is_not_a_guard_bypass) ... ok\r\ntest_g2_allows_product_write_and_stale_design_reblocks_it (test_guard.GuardTests.test_g2_allows_product_write_and_stale_design_reblocks_it) ... ok\r\ntest_g2_still_blocks_known_out_of_scope_patch (test_guard.GuardTests.test_g2_still_blocks_known_out_of_scope_patch) ... ok\r\ntest_managed_repository_blocks_unbound_writes (test_guard.GuardTests.test_managed_repository_blocks_unbound_writes) ... ok\r\ntest_patch_move_destination_is_also_scope_checked (test_guard.GuardTests.test_patch_move_destination_is_also_scope_checked) ... ok\r\ntest_read_only_bash_in_unmanaged_repository_does_not_activate (test_guard.GuardTests.test_read_only_bash_in_unmanaged_repository_does_not_activate) ... ok\r\ntest_read_only_is_unbound_but_configured_command_requires_binding (test_guard.GuardTests.test_read_only_is_unbound_but_configured_command_requires_binding) ... ok\r\ntest_read_only_prefix_bypass_payloads_fail_closed_after_g2 (test_guard.GuardTests.test_read_only_prefix_bypass_payloads_fail_closed_after_g2) ... ok\r\ntest_uninitialized_repository_does_not_activate (test_guard.GuardTests.test_uninitialized_repository_does_not_activate) ... ok\r\ntest_wiki_write_requires_verification_and_exact_knowledge_plan (test_guard.GuardTests.test_wiki_write_requires_verification_and_exact_knowledge_plan) ... ok\r\n\r\n----------------------------------------------------------------------\r\nRan 15 tests in 18.952s\r\n\r\nOK",
+  "tasks": [
+    "TASK-002"
+  ],
+  "timed_out": false,
+  "undeclared_paths": []
+}

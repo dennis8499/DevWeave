@@ -2,7 +2,7 @@
 
 DevWeave Control Center 是以新手為先的 VS Code Extension。它把 DevWeave repository 的檔案狀態整理成五個區域：`總覽`、`工作項目`、`知識`、`驗證與稽核`、`說明`，讓你先知道目前狀態與下一步，再按需要查看治理細節。
 
-本頁對應 DevWeave 0.2.3 Windows 公開版；本次提供 0.2.3 VSIX，並保留 0.2.2 與 0.2.1 artifact。本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 111 項（1 項因 symlink 權限 skipped）與 Extension unit tests 88 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。交付方式是 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。
+本頁對應 DevWeave 0.2.3 Windows 公開版；本次提供 0.2.3 VSIX，並保留 0.2.2 與 0.2.1 artifact。本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 111 項（1 項因 symlink 權限 skipped）與 Extension unit tests 89 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻。交付方式是 repository 與 VSIX，不包含 Marketplace 上架，也不承諾 macOS/Linux 支援。
 
 若發生發布事故，立即停止散布並停用或解除安裝 0.2.3；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。保留 workspace snapshot 與 logs，0.2.2 與 0.2.1 artifact 可作為回溯參考，修復後產生新版本。
 

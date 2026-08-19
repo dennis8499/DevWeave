@@ -29,6 +29,9 @@ EXPECTED_REPOSITORY_SKILLS = COMPANION_SKILLS | {"devweave"}
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 WINDOWS_HOOK_RUNNERS = ("cmd", "powershell", "pwsh")
 NON_WINDOWS_DOCTOR_SKIP = "Windows-only prerequisite probe skipped on this non-Windows host."
+NON_WINDOWS_HOOK_LAUNCHER_SKIP = (
+    "Windows-only hook launcher contract requires cmd.exe, Windows PowerShell, and PowerShell 7."
+)
 
 
 def workflow_job_block(source: str, job_id: str) -> str:
@@ -537,6 +540,7 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(0)", command["commandWindows"])
         self.assertNotIn("$repo", command["commandWindows"])
 
+    @unittest.skipUnless(sys.platform == "win32", NON_WINDOWS_HOOK_LAUNCHER_SKIP)
     def test_hook_launcher_matrix_preserves_utf8_deny_json(self) -> None:
         hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
         hook = json.loads(hook_path.read_text(encoding="utf-8"))
@@ -568,6 +572,7 @@ class RepositoryContractTests(unittest.TestCase):
                 self.assertEqual("deny", specific["permissionDecision"])
                 self.assertIn("active work item", specific["permissionDecisionReason"])
 
+    @unittest.skipUnless(sys.platform == "win32", NON_WINDOWS_HOOK_LAUNCHER_SKIP)
     def test_hook_launcher_matrix_returns_valid_deny_json_for_malformed_utf8_json(self) -> None:
         hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
         hook = json.loads(hook_path.read_text(encoding="utf-8"))
@@ -585,6 +590,7 @@ class RepositoryContractTests(unittest.TestCase):
                 self.assertEqual("deny", specific["permissionDecision"])
                 self.assertIn("無法解析 hook input", specific["permissionDecisionReason"])
 
+    @unittest.skipUnless(sys.platform == "win32", NON_WINDOWS_HOOK_LAUNCHER_SKIP)
     def test_hook_launcher_matrix_keeps_read_only_bash_silent(self) -> None:
         hook_path = REPOSITORY_ROOT / ".codex" / "hooks.json"
         hook = json.loads(hook_path.read_text(encoding="utf-8"))
@@ -723,7 +729,7 @@ class RepositoryContractTests(unittest.TestCase):
             "目前 Codex host",
             "技術門檻",
             "Python full suite 111 項",
-            "Extension unit tests 88 項",
+            "Extension unit tests 89 項",
             "symlink 權限",
             "停止散布",
             "不會自動刪除 `.devweave`、Wiki 或 workspace 資料",

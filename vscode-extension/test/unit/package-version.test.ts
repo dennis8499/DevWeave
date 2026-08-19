@@ -7,7 +7,7 @@ import test from "node:test";
 const extensionRoot = resolve(process.cwd());
 
 test("release package is wired through the candidate-first orchestrator", () => {
-  const packageJson = JSON.parse(readFileSync(resolve(extensionRoot, "package.json"), "utf8")) as { version?: string; scripts?: { package?: string } };
+  const packageJson = JSON.parse(readFileSync(resolve(extensionRoot, "package.json"), "utf8")) as { version?: string; scripts?: { package?: string; test?: string } };
   const packageLock = JSON.parse(readFileSync(resolve(extensionRoot, "package-lock.json"), "utf8")) as { version?: string; packages?: { ""?: { version?: string } } };
   const esbuild = readFileSync(resolve(extensionRoot, "esbuild.mjs"), "utf8");
   const builder = readFileSync(resolve(extensionRoot, "scripts/package-vsix.mjs"), "utf8");
@@ -18,12 +18,15 @@ test("release package is wired through the candidate-first orchestrator", () => 
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages?.[""]?.version, packageJson.version);
   assert.equal(packageJson.scripts?.package, "node esbuild.mjs --production && node scripts/release-orchestrator.mjs");
+  assert.equal(packageJson.scripts?.test, "node scripts/run-unit-tests.mjs");
   assert.match(esbuild, /const version = packageJson\.version/);
   assert.match(esbuild, /bundleVersion: version/);
   assert.match(builder, /--output/);
   assert.match(builder, /Usage: node scripts\/package-vsix\.mjs --output/);
   assert.match(builder, /flag: "wx"/);
   assert.match(builder, /must name a unique candidate artifact/);
+  assert.match(builder, /scripts\/run-unit-tests\.mjs/);
+  assert.match(builder, /test\/unit\/unit-test-runner\.test\.ts/);
   assert.match(verifier, /package version must be 0\.2\.3/);
   assert.match(verifier, /--artifact/);
   assert.match(verifier, /Usage: node scripts\/verify-package\.mjs --artifact/);

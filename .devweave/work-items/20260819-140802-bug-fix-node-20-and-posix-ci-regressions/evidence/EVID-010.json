@@ -1,0 +1,55 @@
+{
+  "actual_changed_paths": [],
+  "argv": [
+    "C:/Program Files/nodejs/npm.cmd",
+    "run",
+    "test"
+  ],
+  "binds_current_source": true,
+  "command_definition_digest": "sha256:16ee6eab666621f8dccaa1c54ea2e3443056752da369a55ef4020d6a5956e899",
+  "command_id": "extension-tests",
+  "covers": [
+    "AC-006"
+  ],
+  "created_at": "2026-08-19T07:59:44+00:00",
+  "cwd": "vscode-extension",
+  "duration_ms": 1109,
+  "effective_plan_digest": "sha256:eb3236f2ed8e4ed93f8fa3e2d0e6b9d68ca9be2f279545a599c2a686e804e62c",
+  "effective_plan_id": "plan-46151a623f3adccd",
+  "eligibility_reason": "zero_exit_and_current_observed_effects",
+  "execution_channel": "devweave_executor",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-19T07:59:43+00:00",
+  "gate_eligible": true,
+  "git_head": "c895cd2a32c454621176e071ecc693f742e29039",
+  "id": "EVID-010",
+  "input_fingerprint": "243865c12e657d22791fdcf30c2ab760e10333b908da2698deaacf9a3863e00b",
+  "kind": "regression",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 1109,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 1,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "output_fingerprint": "243865c12e657d22791fdcf30c2ab760e10333b908da2698deaacf9a3863e00b",
+  "project_policy_digest": "sha256:386702adf1c510b07cd9a99cf79c22d34fcf0d189a1969dcef7f025ddfa1e945",
+  "raw_log": ".devweave/cache/logs/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/EVID-010.log",
+  "schema_version": 1,
+  "source_fingerprint": "10f10fd85c0e1521b069d8573f14f1c62f45d010a11581eb0d5f5c8dc84592f4",
+  "stale": false,
+  "started_at": "2026-08-19T07:59:42+00:00",
+  "status": "passed",
+  "summary": "plicitly non-authoritative and hands off next to Codex (0.6495ms)\n✔ snapshot guidance handles an empty active-work state without selecting closed history (0.4763ms)\n✔ snapshot guidance marks G1 and G2 work with a required Plan Mode stage (0.4531ms)\n✔ snapshot guidance does not block post-G2 work with an initial Plan Mode prompt (0.9832ms)\n✔ snapshot guidance makes initialization and bootstrap write boundary explicit (0.6302ms)\n✔ review readiness explains gate, blocker, stale evidence, task and Wiki checks (1.4164ms)\n✔ review readiness can be ready for a pending gate without pretending the gate is approved (3.9255ms)\n✔ high-risk acceptance readiness projects independent review states (0.8775ms)\n✔ closed work is explicitly not reviewable (0.565ms)\n✔ diagnostics and audit events become readable while preserving technical raw data (0.4442ms)\n✔ display mode protocol accepts only the typed preference message (0.7238ms)\n✔ readiness and bootstrap statuses are presented in Traditional Chinese (0.2643ms)\n✔ PreviewGate stages and consumes only a matching ticket once (1.4605ms)\n✔ PreviewGate rejects mismatched panel, intent, or revision without consuming (0.1899ms)\n✔ PreviewGate compares typed intent fields without delimiter collisions (0.1047ms)\n✔ PreviewGate invalidation makes a ticket stale and prevents restore (0.1123ms)\n✔ PreviewGate restores only the consumed current ticket for clipboard retry (0.123ms)\n✔ host preview messages carry intent and the snapshot revision (0.8794ms)\n✔ RefreshCoordinator never overlaps reads and publishes the newest pending snapshot (5.1385ms)\n✔ RefreshCoordinator reports a read failure and accepts a later retry (0.8423ms)\n✔ RefreshCoordinator forwards incremental paths and escalates a pending full refresh (0.5645ms)\n✔ verification failure preserves current artifact and cleans candidate (19.9166ms)\n✔ verified candidate is atomically promoted and then cleaned (9.1653ms)\n✔ promotion failure preserves current artifact and cleans candidate (5.4262ms)\n✔ Extension runtime has no process, shell, or external-network path and confines writes to bootstrap (5.0115ms)\n✔ package and Webview keep the approved dependency and CSP boundary (1.6917ms)\n✔ workflow mutations remain preview-first and bootstrap uses explicit confirmation (0.9436ms)\n✔ Wiki bootstrap has three prompt-only entrances with one public intent (2.3254ms)\n✔ P2 preferences and Wiki browsing stay Extension-local and discoverable (2.202ms)\n[walkthrough] multi-active implicit-selection=blocked explicit-selection=active-2\n✔ selection never promotes closed history to the implicit current work (0.5722ms)\n✔ multiple active works require an explicit choice (0.4135ms)\n✔ work grouping exposes active work and closed history as separate collections (0.9641ms)\n✔ snapshot reader parallelizes independent text reads while keeping diagnostics sorted (36.3323ms)\n✔ snapshot reader reuses unchanged Wiki pages for an incremental refresh (62.6656ms)\n✔ snapshot reader exposes bounded Wiki provenance and keeps engine observation unavailable (31.9007ms)\n✔ unit-test runner discovers a deterministic suite and fails closed for every abnormal child outcome (23.144ms)\n[accessibility] tabs=5 panels=5 hidden-inactive=4 keyboard=arrows/Home/End focus-restore=section-key forced-colors=checked\n✔ Wiki result mount writes rendered markup into the dedicated result host (0.675ms)\n✔ Webview contract keeps preview metadata, stale reset, and accessible five-tab navigation (2.0686ms)\n✔ WikiSearchModel keeps draft input separate until Enter commits it (0.8964ms)\n✔ WikiSearchModel matches title, path, and body case-insensitively with contains semantics (0.1387ms)\n✔ WikiSearchModel applies exact type filtering and show-all state (0.1633ms)\n✔ RenderScheduler coalesces local renders into one frame (0.1236ms)\nℹ tests 89\nℹ suites 0\nℹ pass 89\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 649.8141",
+  "tasks": [
+    "TASK-004"
+  ],
+  "timed_out": false,
+  "undeclared_paths": []
+}

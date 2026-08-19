@@ -1,0 +1,56 @@
+{
+  "actual_changed_paths": [],
+  "argv": [
+    "C:/Program Files/nodejs/npm.cmd",
+    "run",
+    "test"
+  ],
+  "binds_current_source": true,
+  "command_definition_digest": "sha256:16ee6eab666621f8dccaa1c54ea2e3443056752da369a55ef4020d6a5956e899",
+  "command_id": "extension-tests",
+  "covers": [
+    "AC-001",
+    "AC-002"
+  ],
+  "created_at": "2026-08-19T07:39:43+00:00",
+  "cwd": "vscode-extension",
+  "duration_ms": 1130,
+  "effective_plan_digest": null,
+  "effective_plan_id": null,
+  "eligibility_reason": "command_not_in_effective_plan",
+  "execution_channel": "devweave_executor",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-19T07:39:43+00:00",
+  "gate_eligible": false,
+  "git_head": "c895cd2a32c454621176e071ecc693f742e29039",
+  "id": "EVID-004",
+  "input_fingerprint": "4b65cdacd90d70ed03b971bd38429acaa219d9ab24a7dad63be63cf41c281db6",
+  "kind": "regression",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 1130,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 1,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "output_fingerprint": "4b65cdacd90d70ed03b971bd38429acaa219d9ab24a7dad63be63cf41c281db6",
+  "project_policy_digest": null,
+  "raw_log": ".devweave/cache/logs/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/EVID-004.log",
+  "schema_version": 1,
+  "source_fingerprint": "5db5949c5820b95c56335ac2784d18c703fd830ec9fa34dd7d0d20e7d2d99e37",
+  "stale": false,
+  "started_at": "2026-08-19T07:39:42+00:00",
+  "status": "passed",
+  "summary": "icitly non-authoritative and hands off next to Codex (0.3779ms)\n✔ snapshot guidance handles an empty active-work state without selecting closed history (0.1773ms)\n✔ snapshot guidance marks G1 and G2 work with a required Plan Mode stage (0.1281ms)\n✔ snapshot guidance does not block post-G2 work with an initial Plan Mode prompt (0.1731ms)\n✔ snapshot guidance makes initialization and bootstrap write boundary explicit (0.1087ms)\n✔ review readiness explains gate, blocker, stale evidence, task and Wiki checks (0.5415ms)\n✔ review readiness can be ready for a pending gate without pretending the gate is approved (0.1479ms)\n✔ high-risk acceptance readiness projects independent review states (0.5173ms)\n✔ closed work is explicitly not reviewable (0.162ms)\n✔ diagnostics and audit events become readable while preserving technical raw data (0.766ms)\n✔ display mode protocol accepts only the typed preference message (0.4448ms)\n✔ readiness and bootstrap statuses are presented in Traditional Chinese (0.2531ms)\n✔ PreviewGate stages and consumes only a matching ticket once (0.7604ms)\n✔ PreviewGate rejects mismatched panel, intent, or revision without consuming (0.1309ms)\n✔ PreviewGate compares typed intent fields without delimiter collisions (0.0892ms)\n✔ PreviewGate invalidation makes a ticket stale and prevents restore (0.1053ms)\n✔ PreviewGate restores only the consumed current ticket for clipboard retry (0.1118ms)\n✔ host preview messages carry intent and the snapshot revision (0.8823ms)\n✔ RefreshCoordinator never overlaps reads and publishes the newest pending snapshot (8.2917ms)\n✔ RefreshCoordinator reports a read failure and accepts a later retry (1.0793ms)\n✔ RefreshCoordinator forwards incremental paths and escalates a pending full refresh (0.9028ms)\n✔ verification failure preserves current artifact and cleans candidate (16.1396ms)\n✔ verified candidate is atomically promoted and then cleaned (8.3671ms)\n✔ promotion failure preserves current artifact and cleans candidate (9.9291ms)\n✔ Extension runtime has no process, shell, or external-network path and confines writes to bootstrap (5.1212ms)\n✔ package and Webview keep the approved dependency and CSP boundary (1.9637ms)\n✔ workflow mutations remain preview-first and bootstrap uses explicit confirmation (1.9274ms)\n✔ Wiki bootstrap has three prompt-only entrances with one public intent (1.5192ms)\n✔ P2 preferences and Wiki browsing stay Extension-local and discoverable (0.6156ms)\n[walkthrough] multi-active implicit-selection=blocked explicit-selection=active-2\n✔ selection never promotes closed history to the implicit current work (1.1097ms)\n✔ multiple active works require an explicit choice (1.2871ms)\n✔ work grouping exposes active work and closed history as separate collections (0.5731ms)\n✔ snapshot reader parallelizes independent text reads while keeping diagnostics sorted (36.5874ms)\n✔ snapshot reader reuses unchanged Wiki pages for an incremental refresh (63.6144ms)\n✔ snapshot reader exposes bounded Wiki provenance and keeps engine observation unavailable (31.4518ms)\n✔ unit-test runner discovers a deterministic suite and fails closed for every abnormal child outcome (15.0517ms)\n[accessibility] tabs=5 panels=5 hidden-inactive=4 keyboard=arrows/Home/End focus-restore=section-key forced-colors=checked\n✔ Wiki result mount writes rendered markup into the dedicated result host (0.6949ms)\n✔ Webview contract keeps preview metadata, stale reset, and accessible five-tab navigation (1.6639ms)\n✔ WikiSearchModel keeps draft input separate until Enter commits it (0.8691ms)\n✔ WikiSearchModel matches title, path, and body case-insensitively with contains semantics (0.1333ms)\n✔ WikiSearchModel applies exact type filtering and show-all state (0.1738ms)\n✔ RenderScheduler coalesces local renders into one frame (0.125ms)\nℹ tests 89\nℹ suites 0\nℹ pass 89\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 659.4759",
+  "tasks": [
+    "TASK-001"
+  ],
+  "timed_out": false,
+  "undeclared_paths": []
+}

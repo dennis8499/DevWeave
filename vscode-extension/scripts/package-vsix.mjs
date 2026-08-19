@@ -49,7 +49,12 @@ function parseOutputPath(args) {
 
 async function collectFiles(directory) {
   const entries = [];
-  const excludedFiles = new Set(["scripts/release-orchestrator.mjs", "test/unit/release-transaction.test.ts"]);
+  const excludedFiles = new Set([
+    "scripts/release-orchestrator.mjs",
+    "scripts/run-unit-tests.mjs",
+    "test/unit/release-transaction.test.ts",
+    "test/unit/unit-test-runner.test.ts",
+  ]);
   for (const entry of (await readdir(directory, { withFileTypes: true })).sort((left, right) => left.name.localeCompare(right.name))) {
     if (["node_modules", ".vscode-test", ".git"].includes(entry.name)) continue;
     const absolute = join(directory, entry.name);

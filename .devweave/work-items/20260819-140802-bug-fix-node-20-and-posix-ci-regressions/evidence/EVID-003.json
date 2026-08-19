@@ -1,0 +1,55 @@
+{
+  "actual_changed_paths": [],
+  "argv": [
+    "C:/Program Files/nodejs/npm.cmd",
+    "run",
+    "test"
+  ],
+  "binds_current_source": false,
+  "command_definition_digest": "sha256:16ee6eab666621f8dccaa1c54ea2e3443056752da369a55ef4020d6a5956e899",
+  "command_id": "extension-tests",
+  "covers": [
+    "AC-002"
+  ],
+  "created_at": "2026-08-19T07:38:51+00:00",
+  "cwd": "vscode-extension",
+  "duration_ms": 1074,
+  "effective_plan_digest": "sha256:e3d80358bba45c0b18cc2f3dcf88448f54b3d04d305a870c70f6d4086dcefc5e",
+  "effective_plan_id": "plan-71611abffb0204de",
+  "eligibility_reason": "expectation_not_zero_only",
+  "execution_channel": "devweave_executor",
+  "execution_error": null,
+  "exit_code": 1,
+  "expectation": "nonzero",
+  "finished_at": "2026-08-19T07:38:51+00:00",
+  "gate_eligible": false,
+  "git_head": "c895cd2a32c454621176e071ecc693f742e29039",
+  "id": "EVID-003",
+  "input_fingerprint": "c9f3a5661c6710536c2b716f052d0d9012ced804876799bbb3eed1e262f62105",
+  "kind": "reproduction",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 1074,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 1,
+      "skipped": 0
+    }
+  },
+  "observed_result": "failure",
+  "output_fingerprint": "c9f3a5661c6710536c2b716f052d0d9012ced804876799bbb3eed1e262f62105",
+  "project_policy_digest": "sha256:386702adf1c510b07cd9a99cf79c22d34fcf0d189a1969dcef7f025ddfa1e945",
+  "raw_log": ".devweave/cache/logs/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/EVID-003.log",
+  "schema_version": 1,
+  "source_fingerprint": "f6d9f66470e222011faa0c7f67e14b4b9a665f82a28b76fa01f4f535ea8ae8cf",
+  "stale": false,
+  "started_at": "2026-08-19T07:38:50+00:00",
+  "status": "passed",
+  "summary": "rves current artifact and cleans candidate (30.8476ms)\n✔ verified candidate is atomically promoted and then cleaned (14.1251ms)\n✔ promotion failure preserves current artifact and cleans candidate (12.1626ms)\n✔ Extension runtime has no process, shell, or external-network path and confines writes to bootstrap (2.9872ms)\n✔ package and Webview keep the approved dependency and CSP boundary (0.9547ms)\n✔ workflow mutations remain preview-first and bootstrap uses explicit confirmation (1.3678ms)\n✔ Wiki bootstrap has three prompt-only entrances with one public intent (2.1709ms)\n✔ P2 preferences and Wiki browsing stay Extension-local and discoverable (0.6552ms)\n[walkthrough] multi-active implicit-selection=blocked explicit-selection=active-2\n✔ selection never promotes closed history to the implicit current work (0.5467ms)\n✔ multiple active works require an explicit choice (0.4408ms)\n✔ work grouping exposes active work and closed history as separate collections (0.5418ms)\n✔ snapshot reader parallelizes independent text reads while keeping diagnostics sorted (29.8795ms)\n✔ snapshot reader reuses unchanged Wiki pages for an incremental refresh (61.1285ms)\n✔ snapshot reader exposes bounded Wiki provenance and keeps engine observation unavailable (32.3355ms)\n✖ unit-test runner discovers a deterministic suite and fails closed for every abnormal child outcome (9.8526ms)\n[accessibility] tabs=5 panels=5 hidden-inactive=4 keyboard=arrows/Home/End focus-restore=section-key forced-colors=checked\n✔ Wiki result mount writes rendered markup into the dedicated result host (0.4984ms)\n✔ Webview contract keeps preview metadata, stale reset, and accessible five-tab navigation (1.8853ms)\n✔ WikiSearchModel keeps draft input separate until Enter commits it (1.0016ms)\n✔ WikiSearchModel matches title, path, and body case-insensitively with contains semantics (0.1387ms)\n✔ WikiSearchModel applies exact type filtering and show-all state (0.1714ms)\n✔ RenderScheduler coalesces local renders into one frame (0.1241ms)\nℹ tests 89\nℹ suites 0\nℹ pass 88\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 640.896\n\n✖ failing tests:\n\ntest at test\\unit\\unit-test-runner.test.ts:2:1306\n✖ unit-test runner discovers a deterministic suite and fails closed for every abnormal child outcome (9.8526ms)\n  Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\Users\\小豬的電腦\\Desktop\\Project\\SDLC\\DevWeave\\vscode-extension\\scripts\\run-unit-tests.mjs' imported from C:\\Users\\小豬的電腦\\Desktop\\Project\\SDLC\\DevWeave\\vscode-extension\\test\\unit\\unit-test-runner.test.ts\n      at finalizeResolution (node:internal/modules/esm/resolve:271:11)\n      at moduleResolve (node:internal/modules/esm/resolve:865:10)\n      at defaultResolve (node:internal/modules/esm/resolve:992:11)\n      at #cachedDefaultResolve (node:internal/modules/esm/loader:691:20)\n      at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:708:38)\n      at nextStep (node:internal/modules/customization_hooks:189:26)\n      at resolveBaseSync (file:///C:/Users/%E5%B0%8F%E8%B1%AC%E7%9A%84%E9%9B%BB%E8%85%A6/Desktop/Project/SDLC/DevWeave/vscode-extension/node_modules/tsx/dist/register-B_kKY3fL.mjs:2:9102)\n      at resolveDirectorySync (file:///C:/Users/%E5%B0%8F%E8%B1%AC%E7%9A%84%E9%9B%BB%E8%85%A6/Desktop/Project/SDLC/DevWeave/vscode-extension/node_modules/tsx/dist/register-B_kKY3fL.mjs:2:10315)\n      at resolveTsPathsSync (file:///C:/Users/%E5%B0%8F%E8%B1%AC%E7%9A%84%E9%9B%BB%E8%85%A6/Desktop/Project/SDLC/DevWeave/vscode-extension/node_modules/tsx/dist/register-B_kKY3fL.mjs:2:11547)\n      at resolve (file:///C:/Users/%E5%B0%8F%E8%B1%AC%E7%9A%84%E9%9B%BB%E8%85%A6/Desktop/Project/SDLC/DevWeave/vscode-extension/node_modules/tsx/dist/register-B_kKY3fL.mjs:2:13365) {\n    code: 'ERR_MODULE_NOT_FOUND',\n    url: 'file:///C:/Users/%E5%B0%8F%E8%B1%AC%E7%9A%84%E9%9B%BB%E8%85%A6/Desktop/Project/SDLC/DevWeave/vscode-extension/scripts/run-unit-tests.mjs'\n  }",
+  "tasks": [
+    "TASK-001"
+  ],
+  "timed_out": false,
+  "undeclared_paths": []
+}

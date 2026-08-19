@@ -1,0 +1,27 @@
+{
+  "binds_current_source": false,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-003",
+    "AC-004",
+    "AC-005"
+  ],
+  "created_at": "2026-08-19T06:14:23+00:00",
+  "eligibility_reason": "manual_evidence_not_gate_eligible",
+  "exit_code": null,
+  "expectation": null,
+  "gate_eligible": false,
+  "git_head": "c895cd2a32c454621176e071ecc693f742e29039",
+  "id": "EVID-002",
+  "kind": "reproduction",
+  "log_truncated": false,
+  "observed_result": "failure",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "ea9cdc1bf1dbeb41669fc824b67edbe4264a403a755dd2197609029a3cbcf1ca",
+  "stale": false,
+  "status": "passed",
+  "summary": "成功取得並核對 GitHub Actions run 32218573938 logs：Node 20 Ubuntu/Windows 將 test/unit/**/*.test.ts 當字面路徑；Python 3.11-3.14 Ubuntu/macOS 八格固定觀察到 executable canonicalization、Z:\\\\ POSIX fixture 與三項 commandWindows launcher failures。此 evidence 的蒐證成功，observed product/test result 為 failure。",
+  "tasks": []
+}

@@ -39,14 +39,10 @@ def bash_payload(repo, session: str, command: str) -> dict:
 
 
 class GuardTests(unittest.TestCase):
-    def test_read_only_bash_short_circuits_before_repository_loading(self) -> None:
-        payload = {
-            "cwd": "Z:\\missing\\repository",
-            "session_id": "",
-            "tool_name": "Bash",
-            "tool_input": {"command": "git status --short"},
-        }
-        self.assertIsNone(guard.handle_hook(payload))
+    def test_read_only_bash_in_unmanaged_repository_does_not_activate(self) -> None:
+        with RepositoryHarness() as harness:
+            payload = bash_payload(harness.repo, "", "git status --short")
+            self.assertIsNone(guard.handle_hook(payload))
 
     def test_uninitialized_repository_does_not_activate(self) -> None:
         with RepositoryHarness() as harness:

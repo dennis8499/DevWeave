@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import subprocess
 import sys
 import unittest
@@ -485,7 +486,15 @@ class CliContractTests(unittest.TestCase):
                 "print('ok')",
             )
             self.assertEqual(0, result.returncode, result.stderr)
-            self.assertEqual([sys.executable, "-c", "print('ok')"], payload["command"]["argv"])
+            expected_executable = str(Path(sys.executable).resolve())
+            self.assertEqual(
+                [expected_executable, "-c", "print('ok')"],
+                payload["command"]["argv"],
+            )
+            self.assertEqual(
+                expected_executable,
+                payload["command"]["resolved_executable"],
+            )
             self.assertIn("unit", payload["profiles"]["standard"])
 
     def test_command_set_rejects_invalid_timeout(self) -> None:

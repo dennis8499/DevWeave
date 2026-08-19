@@ -1,0 +1,62 @@
+{
+  "actual_changed_paths": [],
+  "argv": [
+    "C:/Python314/python.exe",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-p",
+    "test_repository_contract.py",
+    "-v"
+  ],
+  "binds_current_source": true,
+  "command_definition_digest": "sha256:3c8ed4f0f52aedede99934273a9c1c6dedfefb08e0a5bff79f3a35a49a6435ec",
+  "command_id": "unit-tests-contract",
+  "covers": [
+    "AC-005"
+  ],
+  "created_at": "2026-08-19T07:57:54+00:00",
+  "cwd": ".",
+  "duration_ms": 10881,
+  "effective_plan_digest": "sha256:eb3236f2ed8e4ed93f8fa3e2d0e6b9d68ca9be2f279545a599c2a686e804e62c",
+  "effective_plan_id": "plan-46151a623f3adccd",
+  "eligibility_reason": "zero_exit_and_current_observed_effects",
+  "execution_channel": "devweave_executor",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-19T07:57:53+00:00",
+  "gate_eligible": true,
+  "git_head": "c895cd2a32c454621176e071ecc693f742e29039",
+  "id": "EVID-009",
+  "input_fingerprint": "bbe5f38231a82f5f074ad4fd64782a4d25f94800388977133b2d3fb9ea68f401",
+  "kind": "regression",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 10881,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 1,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "output_fingerprint": "bbe5f38231a82f5f074ad4fd64782a4d25f94800388977133b2d3fb9ea68f401",
+  "project_policy_digest": "sha256:386702adf1c510b07cd9a99cf79c22d34fcf0d189a1969dcef7f025ddfa1e945",
+  "raw_log": ".devweave/cache/logs/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/EVID-009.log",
+  "schema_version": 1,
+  "source_fingerprint": "9eadc82b9d87173c3fc389869f86b46f067e0fd3369c16562faa9b1ba5237bd5",
+  "stale": false,
+  "started_at": "2026-08-19T07:57:42+00:00",
+  "status": "passed",
+  "summary": "test_codebase_wiki_and_current_release_contracts_are_documented (test_repository_contract.RepositoryContractTests.test_codebase_wiki_and_current_release_contracts_are_documented) ... ok\r\ntest_companion_skill_precedence_policy_covers_side_effect_boundaries (test_repository_contract.RepositoryContractTests.test_companion_skill_precedence_policy_covers_side_effect_boundaries) ... ok\r\ntest_companion_skill_provenance_and_relative_links_are_complete (test_repository_contract.RepositoryContractTests.test_companion_skill_provenance_and_relative_links_are_complete) ... ok\r\ntest_devweave_is_the_only_router_with_expected_companions (test_repository_contract.RepositoryContractTests.test_devweave_is_the_only_router_with_expected_companions) ... ok\r\ntest_doctor_passes_for_an_initialized_fixture_with_hook (test_repository_contract.RepositoryContractTests.test_doctor_passes_for_an_initialized_fixture_with_hook) ... ok\r\ntest_high_risk_review_stays_on_the_single_router_and_read_only_extension (test_repository_contract.RepositoryContractTests.test_high_risk_review_stays_on_the_single_router_and_read_only_extension) ... ok\r\ntest_hook_contract_is_json_and_resolves_from_git_root (test_repository_contract.RepositoryContractTests.test_hook_contract_is_json_and_resolves_from_git_root) ... ok\r\ntest_hook_launcher_matrix_keeps_read_only_bash_silent (test_repository_contract.RepositoryContractTests.test_hook_launcher_matrix_keeps_read_only_bash_silent) ... ok\r\ntest_hook_launcher_matrix_preserves_utf8_deny_json (test_repository_contract.RepositoryContractTests.test_hook_launcher_matrix_preserves_utf8_deny_json) ... ok\r\ntest_hook_launcher_matrix_returns_valid_deny_json_for_malformed_utf8_json (test_repository_contract.RepositoryContractTests.test_hook_launcher_matrix_returns_valid_deny_json_for_malformed_utf8_json) ... ok\r\ntest_initial_plan_mode_preflight_and_control_center_handoff_are_documented (test_repository_contract.RepositoryContractTests.test_initial_plan_mode_preflight_and_control_center_handoff_are_documented) ... ok\r\ntest_interactive_decision_policy_is_explicit (test_repository_contract.RepositoryContractTests.test_interactive_decision_policy_is_explicit) ... ok\r\ntest_maintenance_only_skill_is_excluded_from_governed_sets_and_bundle (test_repository_contract.RepositoryContractTests.test_maintenance_only_skill_is_excluded_from_governed_sets_and_bundle) ... ok\r\ntest_native_question_contract_is_shared_without_host_or_engine_adapters (test_repository_contract.RepositoryContractTests.test_native_question_contract_is_shared_without_host_or_engine_adapters) ... ok\r\ntest_public_ci_badge_and_local_equivalent_commands_are_documented (test_repository_contract.RepositoryContractTests.test_public_ci_badge_and_local_equivalent_commands_are_documented) ... ok\r\ntest_public_ci_workflow_is_cross_platform_and_least_privilege (test_repository_contract.RepositoryContractTests.test_public_ci_workflow_is_cross_platform_and_least_privilege) ... ok\r\ntest_runtime_has_no_openspec_or_third_party_imports (test_repository_contract.RepositoryContractTests.test_runtime_has_no_openspec_or_third_party_imports) ... ok\r\ntest_skill_frontmatter_metadata_and_invocation_policy_are_explicit (test_repository_contract.RepositoryContractTests.test_skill_frontmatter_metadata_and_invocation_policy_are_explicit) ... ok\r\n\r\n----------------------------------------------------------------------\r\nRan 18 tests in 10.685s\r\n\r\nOK",
+  "tasks": [
+    "TASK-003"
+  ],
+  "timed_out": false,
+  "undeclared_paths": []
+}

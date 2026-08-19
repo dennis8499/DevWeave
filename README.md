@@ -53,7 +53,7 @@ hook、project state、Wiki 與 baseline 一起運作。
 
 本次提供 0.2.3 VSIX，交付檔為 `vscode-extension/devweave-control-center-0.2.3.vsix`，並保留既有 0.2.2 與 0.2.1 artifact。VSIX 可在 VS Code 的 Extensions 視窗使用「Install from VSIX…」安裝；安裝後開啟 DevWeave repository，即可從 Activity Bar 進入 Control Center。完整流程請看[繁體中文使用手冊](docs/使用手冊.md)與 [Control Center README](vscode-extension/README.md)。
 
-本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 111 項（1 項因 symlink 權限 skipped）與 Extension unit tests 88 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻，不是本次已認證組合的宣告。這個 release 不包含 Marketplace 上架，也不對 macOS/Linux 做支援承諾。
+本次認證環境是 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次實際基準為 Python full suite 111 項（1 項因 symlink 權限 skipped）與 Extension unit tests 89 項。VS Code 1.90+ 與 Python 3.11+ 只是技術門檻，不是本次已認證組合的宣告。這個 release 不包含 Marketplace 上架，也不對 macOS/Linux 做支援承諾。
 
 發布流程先建立同目錄唯一 candidate，再以 provenance verifier 驗證，成功後才以 atomic rename promotion current VSIX；verify、promotion 或 cleanup 失敗都保留 current 與 retained artifact bytes，candidate 只做 best-effort cleanup。若發生發布事故，立即停止散布並停用或解除安裝 0.2.3；這些操作不會自動刪除 `.devweave`、Wiki 或 workspace 資料。應保留 workspace snapshot 與 logs，以新版本修復，並保留已發布的 0.2.2 與 0.2.1 artifact。
 

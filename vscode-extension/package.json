@@ -101,7 +101,7 @@
     "build": "node esbuild.mjs",
     "package": "node esbuild.mjs --production && node scripts/release-orchestrator.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test \"test/unit/**/*.test.ts\"",
+    "test": "node scripts/run-unit-tests.mjs",
     "test:smoke": "npm run build && tsx test/smoke.test.ts",
     "test:smoke:current": "tsx test/smoke.test.ts"
   },
