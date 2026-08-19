@@ -1,0 +1,62 @@
+{
+  "actual_changed_paths": [],
+  "argv": [
+    "C:/Python314/python.exe",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-p",
+    "test_repository_contract.py",
+    "-v"
+  ],
+  "binds_current_source": false,
+  "command_definition_digest": "sha256:3c8ed4f0f52aedede99934273a9c1c6dedfefb08e0a5bff79f3a35a49a6435ec",
+  "command_id": "unit-tests-contract",
+  "covers": [
+    "AC-005"
+  ],
+  "created_at": "2026-08-19T04:19:59+00:00",
+  "cwd": ".",
+  "duration_ms": 11340,
+  "effective_plan_digest": "sha256:be3121730798a8880b20a66919986b395d9a480f2e99cd8c418682908667d4bd",
+  "effective_plan_id": "plan-5aa78f592d49ebf6",
+  "eligibility_reason": "expectation_not_zero_only",
+  "execution_channel": "devweave_executor",
+  "execution_error": null,
+  "exit_code": 1,
+  "expectation": "nonzero",
+  "finished_at": "2026-08-19T04:19:59+00:00",
+  "gate_eligible": false,
+  "git_head": "3662d8622b46a1cab6931da988db3c4280def783",
+  "id": "EVID-001",
+  "input_fingerprint": "5d842eb779f4283b91fd8ff372807182100041b12983a11a46bcb984d3717c61",
+  "kind": "reproduction",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 11340,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 1,
+      "skipped": 0
+    }
+  },
+  "observed_result": "failure",
+  "output_fingerprint": "5d842eb779f4283b91fd8ff372807182100041b12983a11a46bcb984d3717c61",
+  "project_policy_digest": "sha256:386702adf1c510b07cd9a99cf79c22d34fcf0d189a1969dcef7f025ddfa1e945",
+  "raw_log": ".devweave/cache/logs/20260819-115533-feature-deterministic-ci-baseline/EVID-001.log",
+  "schema_version": 1,
+  "source_fingerprint": "880c806773e934fc62da9745f1bf02abf9f55d2950fcb3eff20b8c2fa495572f",
+  "stale": false,
+  "started_at": "2026-08-19T04:19:48+00:00",
+  "status": "passed",
+  "summary": "wiki_and_current_release_contracts_are_documented (test_repository_contract.RepositoryContractTests.test_codebase_wiki_and_current_release_contracts_are_documented) ... ok\r\ntest_companion_skill_precedence_policy_covers_side_effect_boundaries (test_repository_contract.RepositoryContractTests.test_companion_skill_precedence_policy_covers_side_effect_boundaries) ... ok\r\ntest_companion_skill_provenance_and_relative_links_are_complete (test_repository_contract.RepositoryContractTests.test_companion_skill_provenance_and_relative_links_are_complete) ... ok\r\ntest_devweave_is_the_only_router_with_expected_companions (test_repository_contract.RepositoryContractTests.test_devweave_is_the_only_router_with_expected_companions) ... ok\r\ntest_doctor_passes_for_an_initialized_fixture_with_hook (test_repository_contract.RepositoryContractTests.test_doctor_passes_for_an_initialized_fixture_with_hook) ... ok\r\ntest_high_risk_review_stays_on_the_single_router_and_read_only_extension (test_repository_contract.RepositoryContractTests.test_high_risk_review_stays_on_the_single_router_and_read_only_extension) ... ok\r\ntest_hook_contract_is_json_and_resolves_from_git_root (test_repository_contract.RepositoryContractTests.test_hook_contract_is_json_and_resolves_from_git_root) ... ok\r\ntest_hook_launcher_matrix_keeps_read_only_bash_silent (test_repository_contract.RepositoryContractTests.test_hook_launcher_matrix_keeps_read_only_bash_silent) ... ok\r\ntest_hook_launcher_matrix_preserves_utf8_deny_json (test_repository_contract.RepositoryContractTests.test_hook_launcher_matrix_preserves_utf8_deny_json) ... ok\r\ntest_hook_launcher_matrix_returns_valid_deny_json_for_malformed_utf8_json (test_repository_contract.RepositoryContractTests.test_hook_launcher_matrix_returns_valid_deny_json_for_malformed_utf8_json) ... ok\r\ntest_initial_plan_mode_preflight_and_control_center_handoff_are_documented (test_repository_contract.RepositoryContractTests.test_initial_plan_mode_preflight_and_control_center_handoff_are_documented) ... ok\r\ntest_interactive_decision_policy_is_explicit (test_repository_contract.RepositoryContractTests.test_interactive_decision_policy_is_explicit) ... ok\r\ntest_maintenance_only_skill_is_excluded_from_governed_sets_and_bundle (test_repository_contract.RepositoryContractTests.test_maintenance_only_skill_is_excluded_from_governed_sets_and_bundle) ... ok\r\ntest_native_question_contract_is_shared_without_host_or_engine_adapters (test_repository_contract.RepositoryContractTests.test_native_question_contract_is_shared_without_host_or_engine_adapters) ... ok\r\ntest_public_ci_workflow_is_cross_platform_and_least_privilege (test_repository_contract.RepositoryContractTests.test_public_ci_workflow_is_cross_platform_and_least_privilege) ... FAIL\r\ntest_runtime_has_no_openspec_or_third_party_imports (test_repository_contract.RepositoryContractTests.test_runtime_has_no_openspec_or_third_party_imports) ... ok\r\ntest_skill_frontmatter_metadata_and_invocation_policy_are_explicit (test_repository_contract.RepositoryContractTests.test_skill_frontmatter_metadata_and_invocation_policy_are_explicit) ... ok\r\n\r\n======================================================================\r\nFAIL: test_public_ci_workflow_is_cross_platform_and_least_privilege (test_repository_contract.RepositoryContractTests.test_public_ci_workflow_is_cross_platform_and_least_privilege)\r\n----------------------------------------------------------------------\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\�p�ު��q��\\Desktop\\Project\\SDLC\\DevWeave\\tests\\test_repository_contract.py\", line 80, in test_public_ci_workflow_is_cross_platform_and_least_privilege\r\n    self.assertTrue(workflow_path.is_file(), workflow_path)\r\n    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\nAssertionError: False is not true : C:\\Users\\�p�ު��q��\\Desktop\\Project\\SDLC\\DevWeave\\.github\\workflows\\ci.yml\r\n\r\n----------------------------------------------------------------------\r\nRan 17 tests in 10.873s\r\n\r\nFAILED (failures=1)",
+  "tasks": [
+    "TASK-001"
+  ],
+  "timed_out": false,
+  "undeclared_paths": []
+}

@@ -2,11 +2,11 @@
 title: Knowledge Engine
 type: module
 sources: [.agents/skills/devweave/scripts, tests/devweave_test_support.py, tests/test_cli.py, tests/test_devweave_core.py, tests/test_repository_contract.py]
-last_updated: 2026-08-16
+last_updated: 2026-08-19
 tags: [module]
 status: active
-source_fingerprint: "sha256:76118c17cd763af07fa50378aca7123b6ba4cbde039270968318325a9f408f6d"
-verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
+source_fingerprint: "sha256:c99cd77d24214898e7eba4a3278d9ad347f2bcdb28c882486f712f949eef3648"
+verified_by: 20260819-115533-feature-deterministic-ci-baseline
 ---
 
 # Knowledge Engine
@@ -34,6 +34,14 @@ Knowledge Engine 是 DevWeave 既有 Python engine 內的深模組組合。`know
 Verification evidence remains the single durable metrics surface. The engine records execution duration and bounded verification selection; callers may add bounded context/tool counters and explicit usage. The complete metrics payload is limited to 250,000 bytes and numeric counters to 10,000,000. Usage is status-aware: unavailable host usage is stored as unavailable with null token/cost fields, never inferred from bytes or prompt text. Legacy evidence without `metrics` remains readable.
 
 CLI machine output explicitly reconfigures standard streams to UTF-8 when the host supports it, preserving non-ASCII executable paths and argv values in JSON evidence and command responses; embedded streams that cannot be reconfigured keep their existing transport without changing the schema.
+
+### Public CI repository contract（2026-08-19）
+
+Public CI 沒有新增 Knowledge Engine command、state、schema 或 execution backend。`tests/test_repository_contract.py` 直接把 `.github/workflows/ci.yml` 與 README 當作公開 repository interface：以 job-local stdlib assertions 驗證 trigger、Python/Node matrix、hygiene、完整 Action SHA、read-only permission、credential boundary、命令順序與文件等價命令。這個 seam 保持 engine dependency-free，也避免遠端 GitHub check 成為唯一 regression oracle。
+
+同一 Doctor fixture 現在區分 capability observation：Windows 必須實際通過 `py -3`、CMD、Windows PowerShell、PowerShell 7、hook schema 與 launcher probe；非 Windows 只接受精確的 Windows-only prerequisite skip detail。Doctor runtime 行為沒有變更，測試只是固定「supported／observed」與「explicitly skipped」的既有語意。
+
+P0-00 的 frozen standard plan digest 為 `sha256:be3121730798a8880b20a66919986b395d9a480f2e99cd8c418682908667d4bd`：7 個 selected commands 產生 `EVID-005` 至 `EVID-011` current passing evidence，release-only package 與其 smoke dependent 以 plan-defined reasons 跳過。這些本機 evidence 驗證 repository contract、engine、Guard、Knowledge 與 Extension tests/typecheck；GitHub 三 OS matrix 仍需人類 push／PR 後取得 hosted observation。
 
 0.2.3 current-version-only release 不新增 Python public command、CLI schema 或 engine lifecycle。Repository contract 以既有 test surface 機械檢查 README、使用手冊、Extension README 與內嵌 Help 的單一 0.2.3 交付、限定認證環境、Python release baseline、88 項 Extension tests 與 data-preserving incident response；package verifier 只接受明確的 candidate artifact，完成 source-derived 58 個 bootstrap files、119 個 VSIX entries、artifact hash 與 hook equality 後才由 release orchestrator promotion，失敗時保留 current 並清理 candidate；並保留 0.2.2 與 0.2.1 artifact。Extension 的 PreviewGate、`actionPreview` protocol、legacy `copyNextAction` 與 Wiki DOM mount 都是 projection/client-side seams。Python engine 仍是 work state、multi-work `next/status --all`、bootstrap cancel/failure 與 gate/evidence 的權威來源。
 

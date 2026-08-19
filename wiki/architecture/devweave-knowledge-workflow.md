@@ -2,11 +2,11 @@
 title: DevWeave Knowledge Workflow
 type: architecture
 sources: [.agents/skills, .codex/hooks.json, AGENTS.md, README.md, docs/使用手冊.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-19
 tags: [architecture]
 status: active
-source_fingerprint: "sha256:ca96436e1eb19d64e39a489a78572bb8025cb362cda78898fffdfb13abba54a9"
-verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
+source_fingerprint: "sha256:92dd23be0f80fea628190a00281cc29e7ce681f18006ab1b2b59c50b912e1b67"
+verified_by: 20260819-115533-feature-deterministic-ci-baseline
 ---
 
 # DevWeave Knowledge Workflow
@@ -44,6 +44,14 @@ The same evidence pipeline records bounded `duration_ms`, context page/byte/char
 11. G3 重新比對完整 Wiki diff、affected pages、plan、coupling、log、seal、baseline、current evidence 與 Independent Review。`passed` 正常通過；unavailable/advisory 形成 warning；critical security/data-loss/irreversible/scope finding 只有 exact named `review-critical` acceptance waiver 可解除。它只驗證實作是否符合已批准內容，不默默補入新需求或設計。人工核准後才可 close。
 12. 0.2.3 Windows release verification 必須固定記錄 `py -3 -X utf8 -B ... doctor`、Extension tests/typecheck/package/smoke、Python release baseline、symlink 權限結果、disposable walkthrough 與 `git diff --check`；VSIX verifier 只驗證 current 0.2.3，包含 58 個 bootstrap files、119 個 VSIX entries、source length/hash、artifact SHA-256 與 root/embedded hook equality，並保留 0.2.2 artifact。本 work item 的 Extension final run 為 88 tests、Python final run 為 111 tests（1 skipped）。Release 必須先建立 candidate、完成 verifier，再以 atomic promotion 取代 current；verification 或 promotion 失敗不得破壞 current。High-risk review 仍只由 router 啟動 exactly one isolated read-only reviewer；failed evidence、未說明的 skip、stale evidence 或非 current `passed` review 都不符合 G3 release bar。
 13. Windows Codex 的 PreToolUse launcher 是 bootstrap control contract：exact matcher `^(Bash|apply_patch|Edit|Write)$` 同時提供 POSIX `command` 與 Windows `commandWindows`。Windows path 使用 `powershell.exe -NoLogo -NoProfile -NonInteractive -Command`，先設定 `[Console]::InputEncoding`/`[Console]::OutputEncoding` 為 .NET UTF-8，再以 `py -3 -X utf8 -B` 和 `Join-Path (git rev-parse --show-toplevel)` 從 Git root 執行 `guard.py`；它不依賴 shell-scoped `$OutputEncoding`，可由 `cmd.exe`、Windows PowerShell 5.1、PowerShell 7 與 VS Code terminal 啟動。guard 以 UTF-8 bytes 解析/輸出，程序 exit 與 guard 的 `permissionDecision` JSON 是分離的結果，Extension 不會靜默覆寫既有 exact hook。launcher failure 與正常 process exit 0 的 policy deny 必須分開診斷。
+
+## Public CI module and contract seam
+
+`.github/workflows/ci.yml` 是 repository 唯一 Public CI Module。它的外部 interface 只有 `pull_request`／`master` push 與 Python、Node、hygiene check conclusions；內部以 12 個 Python cells、4 個 Node cells、1 個 hygiene job 隱藏 runner/runtime 展開。GitHub Actions 是唯一真實 provider，因此沒有建立第二個 CI adapter、scheduler 或 workflow lifecycle。
+
+Repository-local seam 位於 `tests/test_repository_contract.py`。測試不呼叫 GitHub API、不加入 YAML parser，而是以 UTF-8 text 與 canonical job indentation 分離三個 job blocks，再對核准 matrix、commands、完整 Action SHA、`contents: read`、`persist-credentials: false` 與無 secret／error suppression 契約做 deterministic assertions。這讓 workflow 被刪除、縮減或放寬權限時，在 hosted run 前先產生本機 red signal；完整 YAML semantic 與真實 runner 結果仍由 GitHub 外部 oracle 負責。
+
+CI 不進入 DevWeave machine lifecycle：它不 approve Gate、不寫 state/events/evidence、不更新 Wiki、不 commit/push/開 PR。Node build output 只存在 runner workspace；smoke/package/release 保留在 frozen release-only verification policy。Public CI pass 只代表 development contract，不改寫特定 Windows release certification。
 
 ## VS Code Control Center integration
 

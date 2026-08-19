@@ -2,11 +2,11 @@
 title: Wiki Activity Log
 type: log
 sources: []
-last_updated: 2026-08-16
+last_updated: 2026-08-19
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
+verified_by: 20260819-115533-feature-deterministic-ci-baseline
 ---
 
 # Activity Log
@@ -111,3 +111,10 @@ verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
 - Refresh [[overview]]、[[devweave-knowledge-workflow]] 與 [[knowledge-engine]]，同步 Verification Policy v2 的 shared evaluator、G2 frozen Effective Verification Plan、digest-bound evidence eligibility、controlled executor 與 G3 plan parity。
 - 新增 [[command-policy-engine]]，記錄 typed read-only grammar、trusted executable/cwd、writer barrier、temporary candidate、undeclared-write failure 與 policy mutation stale boundary。
 - 本批 Wiki 內容由四個 planned upsert 與 coupled index/log 更新組成；既有 log body 保持 append-only，完成後由 Router seal current source fingerprints。
+
+## [2026-08-19] promote | 20260819-115533-feature-deterministic-ci-baseline
+
+- 新增 [[public-ci]]，記錄 PR／`master` 的 Python 3.11–3.14 三 OS matrix、Node 20/22 兩 OS matrix、hygiene check、least-privilege checkout 與完整 Action SHA。
+- Refresh [[overview]] 與 [[devweave-knowledge-workflow]]，加入單一 Public CI Module、stdlib job-local contract seam、development baseline／release certification 分離及 hosted-run 外部 oracle。
+- Refresh [[knowledge-engine]]，固定 Doctor 的 Windows 真實 probe／非 Windows explicit skip、frozen standard plan 7 selected／2 release-only skipped 與 current evidence 邊界。
+- 本批為四個 planned content upserts 加 coupled index/log；沒有 Codex API、smoke/package/release、部署、Git remote mutation 或 waiver。

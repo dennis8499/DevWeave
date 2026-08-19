@@ -1,5 +1,7 @@
 # DevWeave
 
+[![CI](https://github.com/dennis8499/DevWeave/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/dennis8499/DevWeave/actions/workflows/ci.yml)
+
 DevWeave 是一套以 repository 為中心、由 Codex 操作的語言中立 SDLC workflow。它把需求探索、
 系統設計、任務、驗證證據與三道人工作業 gate 放在同一個可追溯的 work item 中，讓每次變更
 都有清楚的範圍、決策、驗證結果與驗收紀錄。
@@ -300,19 +302,40 @@ docs/使用手冊.md                詳細繁體中文操作手冊
 
 ## 驗證與測試
 
-完整測試只使用 Python standard library：
+公開 CI 會在所有 pull request 與 `master` push 執行下列開發矩陣：Python 3.11、3.12、3.13、3.14 分別在 Ubuntu、Windows、macOS 執行完整 standard-library suite；Node 20、22 分別在 Ubuntu、Windows 執行 lockfile install、typecheck、unit test 與 build；另有獨立的 whitespace check。
+
+**CI 開發矩陣不等於正式 release certification。** CI pass 表示上述開發合約在 GitHub-hosted runner 通過；特定 VS Code、Windows build、Extension Host smoke、VSIX package 與發布交易仍以 release 文件及 accepted quality baseline 的認證範圍為準。
+
+### PowerShell 本機等價命令
 
 ```powershell
 py -3 -X utf8 -B -m unittest discover -s tests -v
-```
-
-其他常用檢查：
-
-```powershell
 py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . doctor
 py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . project
 py -3 -X utf8 -B .agents\skills\devweave\scripts\devweave.py --repo . command list
 git diff --check
+```
+
+### POSIX 本機等價命令
+
+```bash
+python3 -X utf8 -B -m unittest discover -s tests -v
+python3 -X utf8 -B .agents/skills/devweave/scripts/devweave.py --repo . doctor
+python3 -X utf8 -B .agents/skills/devweave/scripts/devweave.py --repo . project
+python3 -X utf8 -B .agents/skills/devweave/scripts/devweave.py --repo . command list
+git diff --check
+```
+
+### VS Code Extension 本機等價命令
+
+以下命令在 PowerShell 與 POSIX shell 相同：
+
+```text
+cd vscode-extension
+npm ci
+npm run typecheck
+npm test
+npm run build
 ```
 
 維護者若需要驗證 skill package，可使用 skill-creator 提供的 `quick_validate.py`；安裝或

@@ -2,11 +2,11 @@
 title: DevWeave Codebase Overview
 type: overview
 sources: [.agents/skills, .codex/hooks.json, AGENTS.md, README.md, docs/使用手冊.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-19
 tags: [overview]
 status: active
-source_fingerprint: "sha256:ca96436e1eb19d64e39a489a78572bb8025cb362cda78898fffdfb13abba54a9"
-verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
+source_fingerprint: "sha256:92dd23be0f80fea628190a00281cc29e7ce681f18006ab1b2b59c50b912e1b67"
+verified_by: 20260819-115533-feature-deterministic-ci-baseline
 ---
 
 # DevWeave Codebase Overview
@@ -22,6 +22,12 @@ DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router�
 5. G3 驗證 current evidence、scope、baseline 與 Knowledge Review，確認實作符合已批准內容。新式 Work Item 必須選擇 `promote` 或 `no-update`；promote 最多變更五個內容頁並同步 index/log/seal。
 6. High-risk Work Item 在 final artifacts 穩定後由唯一 DevWeave router 啟動一個 isolated、read-only Independent Review Agent。Python engine 只接收 machine-only `review record`，保存 source-bound `kind: review` evidence、redacted report hash 與 provenance；standard/low risk 不啟動此 reviewer。
 7. 本次 0.2.3 Windows 公開版提供 `devweave-control-center-0.2.3.vsix`，並保留 `devweave-control-center-0.2.2.vsix` 與 `devweave-control-center-0.2.1.vsix`；認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host，Python full suite 為 111 項（1 項因 symlink 權限 skipped），Extension tests 為 88 項。Current release 先產生同目錄、含 `.candidate-` 的 VSIX，對 candidate 完成 source-derived manifest/entry/hash verification 後才以 atomic rename promotion；驗證或 promotion 失敗會保留 current artifact 並清理 candidate，並保留 0.2.2/0.2.1。Control Center 的公開操作採 preview → 使用者確認複製 → Codex Chat handoff → Refresh；事故時停止散布並停用或解除安裝 0.2.3，保留 repository 資料與既有 artifact，以新版本修復，不提供舊版 binary rollback。
+
+### 2026-08-19 public deterministic CI baseline
+
+Root `.github/workflows/ci.yml` 在所有 pull request 與 `master` push 提供公開 checks。Python matrix 是 Ubuntu／Windows／macOS × 3.11／3.12／3.13／3.14；Node matrix 是 Ubuntu／Windows × 20／22，依序執行 lockfile install、typecheck、88 項 Extension unit tests 與 build；hygiene job 執行 `git diff --check`。兩個 matrix 都 `fail-fast: false`，讓每個 OS/runtime 結果保持可觀察。
+
+CI top-level permission 只有 `contents: read`，checkout 不持久化 credentials；checkout、setup-python、setup-node 都綁完整 commit SHA，workflow 不接收 secrets 或 Codex API key。Repository contract 以 stdlib job-local assertions 固定 trigger、matrix、SHA、權限、命令與 README badge；Doctor contract 在 Windows 真實 probe，在非 Windows 要求具名 skip reason。CI 是 development baseline，不取代特定 Windows release certification、Extension Host smoke、VSIX package 或發布交易。第一次 hosted run 仍需人類 push／PR 後確認。
 
 ### 2026-08-13 verification efficiency hardening
 
@@ -63,6 +69,7 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 - [[devweave-knowledge-workflow]]：Bootstrap、Query、Review、Promotion 的完整生命週期與真實來源優先序。
 - [[knowledge-engine]]：knowledge machine commands、狀態投影、template scaffold、coverage 與 seal 邊界。
 - [[vscode-extension]]：Control Center 的 Wiki 搜尋、refresh/snapshot、bootstrap repair、embedded help 與安全邊界。
+- [[public-ci]]：PR／`master` 的 Python、Node、hygiene matrices、least-privilege checkout、immutable Action pins、repository contract 與 hosted-run 外部邊界。
 
 ## 真實來源與限制
 

@@ -28,6 +28,17 @@ MAINTENANCE_ONLY_SKILLS = {"writing-great-skills"}
 EXPECTED_REPOSITORY_SKILLS = COMPANION_SKILLS | {"devweave"}
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 WINDOWS_HOOK_RUNNERS = ("cmd", "powershell", "pwsh")
+NON_WINDOWS_DOCTOR_SKIP = "Windows-only prerequisite probe skipped on this non-Windows host."
+
+
+def workflow_job_block(source: str, job_id: str) -> str:
+    match = re.search(
+        rf"(?ms)^  {re.escape(job_id)}:\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)",
+        source,
+    )
+    if match is None:
+        raise AssertionError(f"workflow job is missing: {job_id}")
+    return match.group("body")
 
 
 def run_windows_hook(
@@ -64,6 +75,91 @@ def run_windows_hook(
 
 
 class RepositoryContractTests(unittest.TestCase):
+    def test_public_ci_workflow_is_cross_platform_and_least_privilege(self) -> None:
+        workflow_path = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
+        self.assertTrue(workflow_path.is_file(), workflow_path)
+        workflow = workflow_path.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "on:\n  pull_request:\n  push:\n    branches:\n      - master\n",
+            workflow,
+        )
+        self.assertEqual(1, workflow.count("permissions:"))
+        self.assertIn("permissions:\n  contents: read\n", workflow)
+        self.assertNotIn("continue-on-error", workflow)
+        self.assertNotIn("${{ secrets.", workflow)
+
+        checkout = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1"
+        setup_python = "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0"
+        setup_node = "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0"
+        self.assertEqual(3, workflow.count(checkout))
+        self.assertEqual(3, workflow.count("persist-credentials: false"))
+        self.assertEqual(1, workflow.count(setup_python))
+        self.assertEqual(1, workflow.count(setup_node))
+        self.assertNotRegex(workflow, r"actions/(?:checkout|setup-python|setup-node)@v\d")
+
+        python_job = workflow_job_block(workflow, "python")
+        self.assertIn("name: Python ${{ matrix.python-version }} / ${{ matrix.os }}", python_job)
+        self.assertIn("runs-on: ${{ matrix.os }}", python_job)
+        self.assertIn("fail-fast: false", python_job)
+        self.assertIn(
+            "os: [ubuntu-latest, windows-latest, macos-latest]",
+            python_job,
+        )
+        self.assertIn(
+            'python-version: ["3.11", "3.12", "3.13", "3.14"]',
+            python_job,
+        )
+        self.assertIn(setup_python, python_job)
+        self.assertIn("python-version: ${{ matrix.python-version }}", python_job)
+        self.assertIn("python -B -m unittest discover -s tests -v", python_job)
+
+        node_job = workflow_job_block(workflow, "node")
+        self.assertIn("name: Node ${{ matrix.node-version }} / ${{ matrix.os }}", node_job)
+        self.assertIn("runs-on: ${{ matrix.os }}", node_job)
+        self.assertIn("fail-fast: false", node_job)
+        self.assertIn("os: [ubuntu-latest, windows-latest]", node_job)
+        self.assertIn('node-version: ["20", "22"]', node_job)
+        self.assertIn(setup_node, node_job)
+        self.assertIn("node-version: ${{ matrix.node-version }}", node_job)
+        self.assertIn("working-directory: vscode-extension", node_job)
+        node_commands = (
+            "npm ci",
+            "npm run typecheck",
+            "npm test",
+            "npm run build",
+        )
+        positions = [node_job.index(command) for command in node_commands]
+        self.assertEqual(sorted(positions), positions)
+
+        hygiene_job = workflow_job_block(workflow, "hygiene")
+        self.assertIn("name: Repository hygiene", hygiene_job)
+        self.assertIn("runs-on: ubuntu-latest", hygiene_job)
+        self.assertIn("git diff --check", hygiene_job)
+
+    def test_public_ci_badge_and_local_equivalent_commands_are_documented(self) -> None:
+        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+        badge = (
+            "[![CI](https://github.com/dennis8499/DevWeave/actions/workflows/"
+            "ci.yml/badge.svg?branch=master)](https://github.com/dennis8499/"
+            "DevWeave/actions/workflows/ci.yml)"
+        )
+        self.assertIn(badge, readme)
+        self.assertIn("### PowerShell 本機等價命令", readme)
+        self.assertIn("### POSIX 本機等價命令", readme)
+        self.assertIn("### VS Code Extension 本機等價命令", readme)
+        for command in (
+            "py -3 -X utf8 -B -m unittest discover -s tests -v",
+            "python3 -X utf8 -B -m unittest discover -s tests -v",
+            "git diff --check",
+            "npm ci",
+            "npm run typecheck",
+            "npm test",
+            "npm run build",
+        ):
+            self.assertIn(command, readme)
+        self.assertIn("CI 開發矩陣不等於正式 release certification", readme)
+
     def test_devweave_is_the_only_router_with_expected_companions(self) -> None:
         discovered = {
             path.parent.name
@@ -529,9 +625,21 @@ class RepositoryContractTests(unittest.TestCase):
                 )
             report = core.doctor(harness.repo)
             checks = {item["name"]: item for item in report["checks"]}
-            for name in ("py-3", "cmd", "powershell", "pwsh", "hook-schema", "launcher-probe"):
+            windows_checks = (
+                "py-3",
+                "cmd",
+                "powershell",
+                "pwsh",
+                "hook-schema",
+                "launcher-probe",
+            )
+            for name in windows_checks:
                 self.assertIn(name, checks)
                 self.assertTrue(checks[name]["ok"], checks[name])
+                if sys.platform == "win32":
+                    self.assertNotEqual(NON_WINDOWS_DOCTOR_SKIP, checks[name]["detail"])
+                else:
+                    self.assertEqual(NON_WINDOWS_DOCTOR_SKIP, checks[name]["detail"])
             self.assertTrue(report["ok"], report["checks"])
 
     def test_codebase_wiki_and_current_release_contracts_are_documented(self) -> None:

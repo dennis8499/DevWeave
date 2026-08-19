@@ -2,11 +2,11 @@
 title: Wiki Index
 type: index
 sources: []
-last_updated: 2026-08-16
+last_updated: 2026-08-19
 tags: [index]
 status: active
 source_fingerprint: none
-verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
+verified_by: 20260819-115533-feature-deterministic-ci-baseline
 ---
 
 # Codebase Wiki — 索引
@@ -17,7 +17,7 @@ verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
 
 | 頁面 | 摘要 |
 | --- | --- |
-| [[overview]] | DevWeave Plan Mode preflight、Plan-first workflow、Wiki/Gate lifecycle、high-risk G3 reviewer、0.2.3 Windows release，以及 Verification Policy v2、frozen plan、controlled executor 與 gate-eligible evidence 概觀 |
+| [[overview]] | DevWeave Plan Mode preflight、Plan-first workflow、Wiki/Gate lifecycle、Public CI development baseline、high-risk G3 reviewer、0.2.3 Windows release，以及 Verification Policy v2、frozen plan、controlled executor 與 gate-eligible evidence 概觀 |
 
 ## Architecture
 
@@ -26,6 +26,7 @@ verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
 ## Modules
 
 - [[knowledge-engine]] | Wiki model、reserved-starter init、coverage/review/scaffold/seal、machine lifecycle、shared policy plan/evidence integration、selective verification、bounded metrics 與 UTF-8 Windows launcher/doctor boundary
+- [[public-ci]] | PR／master Python、Node、hygiene matrices、least-privilege checkout、immutable Action pins、repository contract 與 hosted-run 外部邊界
 - [[command-policy-engine]] | Verification Policy v2 evaluator、typed read-only grammar、trusted executable/cwd、frozen plan digest、eligibility、writer barrier 與 undeclared-write reconciliation
 - [[vscode-extension]] | 0.2.3 Windows Control Center 五區、PreviewGate、refresh/snapshot、Wiki provenance、summary/detail boundary、evidence metrics、58/119 package provenance、pinned smoke、Independent Review readiness 與安全邊界
 
