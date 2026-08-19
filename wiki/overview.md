@@ -5,8 +5,8 @@ sources: [.agents/skills, .codex/hooks.json, AGENTS.md, README.md, docs/使用�
 last_updated: 2026-08-19
 tags: [overview]
 status: active
-source_fingerprint: "sha256:92dd23be0f80fea628190a00281cc29e7ce681f18006ab1b2b59c50b912e1b67"
-verified_by: 20260819-115533-feature-deterministic-ci-baseline
+source_fingerprint: "sha256:ee0f5dc08ab7e9986325a4013d43c4fa0d98b97348e217b3a22b5e01389270a2"
+verified_by: 20260819-140802-bug-fix-node-20-and-posix-ci-regressions
 ---
 
 # DevWeave Codebase Overview
@@ -21,13 +21,15 @@ DevWeave 是 repository-managed SDLC workflow。它以單一 `$devweave` router�
 4. G2 使用 `codebase-design` 在 Plan Mode 逐題確認重要設計取捨，採用同一套 native-first/fallback 問答規則；回答回流 `design.md`/`plan.md`，完成 `validate` 後展示方案、介面、失敗處理、回復方式與 task plan，等待明確 G2 approval。G2 前的普通/Skill context 若看不到工具，必須先回到 Plan Mode；G2 後普通模式只執行 approved tasks，新的 material decision 必須用 `revise` 回到最早受影響 phase。Wiki 在 verification 前保持唯讀。
 5. G3 驗證 current evidence、scope、baseline 與 Knowledge Review，確認實作符合已批准內容。新式 Work Item 必須選擇 `promote` 或 `no-update`；promote 最多變更五個內容頁並同步 index/log/seal。
 6. High-risk Work Item 在 final artifacts 穩定後由唯一 DevWeave router 啟動一個 isolated、read-only Independent Review Agent。Python engine 只接收 machine-only `review record`，保存 source-bound `kind: review` evidence、redacted report hash 與 provenance；standard/low risk 不啟動此 reviewer。
-7. 本次 0.2.3 Windows 公開版提供 `devweave-control-center-0.2.3.vsix`，並保留 `devweave-control-center-0.2.2.vsix` 與 `devweave-control-center-0.2.1.vsix`；認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host，Python full suite 為 111 項（1 項因 symlink 權限 skipped），Extension tests 為 88 項。Current release 先產生同目錄、含 `.candidate-` 的 VSIX，對 candidate 完成 source-derived manifest/entry/hash verification 後才以 atomic rename promotion；驗證或 promotion 失敗會保留 current artifact 並清理 candidate，並保留 0.2.2/0.2.1。Control Center 的公開操作採 preview → 使用者確認複製 → Codex Chat handoff → Refresh；事故時停止散布並停用或解除安裝 0.2.3，保留 repository 資料與既有 artifact，以新版本修復，不提供舊版 binary rollback。
+7. 本次 0.2.3 Windows 公開版提供 `devweave-control-center-0.2.3.vsix`，並保留 `devweave-control-center-0.2.2.vsix` 與 `devweave-control-center-0.2.1.vsix`；認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host，Python full suite 為 111 項（1 項因 symlink 權限 skipped），Extension tests 為 89 項。Current release 先產生同目錄、含 `.candidate-` 的 VSIX，對 candidate 完成 source-derived manifest/entry/hash verification 後才以 atomic rename promotion；驗證或 promotion 失敗會保留 current artifact 並清理 candidate，並保留 0.2.2/0.2.1。Control Center 的公開操作採 preview → 使用者確認複製 → Codex Chat handoff → Refresh；事故時停止散布並停用或解除安裝 0.2.3，保留 repository 資料與既有 artifact，以新版本修復，不提供舊版 binary rollback。
 
 ### 2026-08-19 public deterministic CI baseline
 
-Root `.github/workflows/ci.yml` 在所有 pull request 與 `master` push 提供公開 checks。Python matrix 是 Ubuntu／Windows／macOS × 3.11／3.12／3.13／3.14；Node matrix 是 Ubuntu／Windows × 20／22，依序執行 lockfile install、typecheck、88 項 Extension unit tests 與 build；hygiene job 執行 `git diff --check`。兩個 matrix 都 `fail-fast: false`，讓每個 OS/runtime 結果保持可觀察。
+Root `.github/workflows/ci.yml` 在所有 pull request 與 `master` push 提供公開 checks。Python matrix 是 Ubuntu／Windows／macOS × 3.11／3.12／3.13／3.14；Node matrix 是 Ubuntu／Windows × 20／22，依序執行 lockfile install、typecheck、89 項 Extension unit tests 與 build；hygiene job 執行 `git diff --check`。兩個 matrix 都 `fail-fast: false`，讓每個 OS/runtime 結果保持可觀察。
 
-CI top-level permission 只有 `contents: read`，checkout 不持久化 credentials；checkout、setup-python、setup-node 都綁完整 commit SHA，workflow 不接收 secrets 或 Codex API key。Repository contract 以 stdlib job-local assertions 固定 trigger、matrix、SHA、權限、命令與 README badge；Doctor contract 在 Windows 真實 probe，在非 Windows 要求具名 skip reason。CI 是 development baseline，不取代特定 Windows release certification、Extension Host smoke、VSIX package 或發布交易。第一次 hosted run 仍需人類 push／PR 後確認。
+CI top-level permission 只有 `contents: read`，checkout 不持久化 credentials；checkout、setup-python、setup-node 都綁完整 commit SHA，workflow 不接收 secrets 或 Codex API key。Repository contract 以 stdlib job-local assertions 固定 trigger、matrix、SHA、權限、命令與 README badge；Doctor contract 在 Windows 真實 probe，在非 Windows 要求具名 skip reason。CI 是 development baseline，不取代特定 Windows release certification、Extension Host smoke、VSIX package 或發布交易。PR #1 的 GitHub Actions run `32231940371` 已在 commit `036ca6b2cbaabe117a82420948e5b7c3bdbd2a83` 實際完成 17/17：12 個 Python cells、4 個 Node cells 與 repository hygiene 全綠。
+
+Extension unit-test entrypoint 現由 `node scripts/run-unit-tests.mjs` 遞迴探索 `.test.ts`、依 repository-relative POSIX path 排序，再以 `process.execPath`、resolved `tsx/cli`、明確 argv 與 `shell: false` 執行；空集合、spawn error、signal 或缺少 numeric status 都 fail closed。Python contract fixtures 使用 current interpreter 的 canonical resolved path 與平台原生 temporary repository；三個真實 Windows hook launcher tests 只在 `win32` 執行，非 Windows 以同一具名 prerequisite reason 明確 skip，不再把缺少 Windows shell 誤報成產品失敗。
 
 ### 2026-08-13 verification efficiency hardening
 
@@ -69,7 +71,7 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 - [[devweave-knowledge-workflow]]：Bootstrap、Query、Review、Promotion 的完整生命週期與真實來源優先序。
 - [[knowledge-engine]]：knowledge machine commands、狀態投影、template scaffold、coverage 與 seal 邊界。
 - [[vscode-extension]]：Control Center 的 Wiki 搜尋、refresh/snapshot、bootstrap repair、embedded help 與安全邊界。
-- [[public-ci]]：PR／`master` 的 Python、Node、hygiene matrices、least-privilege checkout、immutable Action pins、repository contract 與 hosted-run 外部邊界。
+- [[public-ci]]：PR／`master` 的 Python、Node、hygiene matrices、deterministic Node runner、平台真實性、least-privilege checkout、immutable Action pins、repository contract 與 hosted 17/17 結果。
 
 ## 真實來源與限制
 
@@ -85,7 +87,7 @@ Companion Skills 是階段內的方法，不建立第二套 lifecycle：`grill-m
 
 需要使用者選擇的五個 companion 都遵循同一份 `native-question-contract.md`：Plan Mode/native `request_user_input`、一題／二至三選項／推薦第一項／host `Other`、等待與 result safety；普通 pre-G2 context 不能自行建立第二套問答 UI，新的 implementation decision 必須 `revise`。
 
-品質檢查包含 UTF-8 quick validation、repository contract 的 exact six-governed-Skill set、frontmatter/metadata/link/invocation policy、maintenance-only/bootstrap exclusion、隔離 forward-test，以及 Python/Extension full verification。Hook hardening 的 repository contract 覆蓋三種 Windows launcher、UTF-8 deny JSON、malformed input 與 read-only silence；本 work item 的 Python final run 為 111 tests（1 skipped），另維持 88 項 Extension tests、58 個 bootstrap files 與 119 個 VSIX entries。validator 尚未支援的 `disable-model-invocation` 欄位由 repository contract 補驗，並保留 `grill-me` 的必要 policy。
+品質檢查包含 UTF-8 quick validation、repository contract 的 exact six-governed-Skill set、frontmatter/metadata/link/invocation policy、maintenance-only/bootstrap exclusion、隔離 forward-test，以及 Python/Extension full verification。Hook hardening 的 repository contract 覆蓋三種 Windows launcher、UTF-8 deny JSON、malformed input 與 read-only silence；本 work item 的 Python final run 為 111 tests（1 skipped），另維持 89 項 Extension tests、58 個 bootstrap files 與 119 個 VSIX entries。validator 尚未支援的 `disable-model-invocation` 欄位由 repository contract 補驗，並保留 `grill-me` 的必要 policy。
 
 ## Verification Policy v2（2026-08-16）
 

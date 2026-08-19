@@ -1,12 +1,12 @@
 ---
 title: Knowledge Engine
 type: module
-sources: [.agents/skills/devweave/scripts, tests/devweave_test_support.py, tests/test_cli.py, tests/test_devweave_core.py, tests/test_repository_contract.py]
+sources: [.agents/skills/devweave/scripts, tests/test_cli.py, tests/test_devweave_core.py, tests/test_guard.py, tests/test_repository_contract.py]
 last_updated: 2026-08-19
 tags: [module]
 status: active
-source_fingerprint: "sha256:c99cd77d24214898e7eba4a3278d9ad347f2bcdb28c882486f712f949eef3648"
-verified_by: 20260819-115533-feature-deterministic-ci-baseline
+source_fingerprint: "sha256:5ba646c79007e694aca0e42a3824004f3a0b5f311c38c2ba3952d685815c32be"
+verified_by: 20260819-140802-bug-fix-node-20-and-posix-ci-regressions
 ---
 
 # Knowledge Engine
@@ -41,9 +41,11 @@ Public CI 沒有新增 Knowledge Engine command、state、schema 或 execution b
 
 同一 Doctor fixture 現在區分 capability observation：Windows 必須實際通過 `py -3`、CMD、Windows PowerShell、PowerShell 7、hook schema 與 launcher probe；非 Windows 只接受精確的 Windows-only prerequisite skip detail。Doctor runtime 行為沒有變更，測試只是固定「supported／observed」與「explicitly skipped」的既有語意。
 
-P0-00 的 frozen standard plan digest 為 `sha256:be3121730798a8880b20a66919986b395d9a480f2e99cd8c418682908667d4bd`：7 個 selected commands 產生 `EVID-005` 至 `EVID-011` current passing evidence，release-only package 與其 smoke dependent 以 plan-defined reasons 跳過。這些本機 evidence 驗證 repository contract、engine、Guard、Knowledge 與 Extension tests/typecheck；GitHub 三 OS matrix 仍需人類 push／PR 後取得 hosted observation。
+P0-00 初始 baseline 的 frozen plan digest 是 `sha256:be3121730798a8880b20a66919986b395d9a480f2e99cd8c418682908667d4bd`。本次 CI hardening 的 current plan digest 為 `sha256:eb3236f2ed8e4ed93f8fa3e2d0e6b9d68ca9be2f279545a599c2a686e804e62c`：循序 standard batch `VB-1786ea0ecaff` 的 `EVID-050` 至 `EVID-056` 共 7 個 selected commands 全部 passing、zero-only、gate-eligible，且逐筆追溯 AC-006／TASK-004；package 與 smoke dependent 仍以 plan-defined release-only reasons 跳過。`EVID-057` 至 `EVID-060` 再精確覆蓋 AC-001～AC-005 與 TASK-001～TASK-003。手動補充的 `EVID-024` 記錄 PR #1 run `32231940371` 的 hosted 17/17，但不冒充 machine gate evidence。
 
-0.2.3 current-version-only release 不新增 Python public command、CLI schema 或 engine lifecycle。Repository contract 以既有 test surface 機械檢查 README、使用手冊、Extension README 與內嵌 Help 的單一 0.2.3 交付、限定認證環境、Python release baseline、88 項 Extension tests 與 data-preserving incident response；package verifier 只接受明確的 candidate artifact，完成 source-derived 58 個 bootstrap files、119 個 VSIX entries、artifact hash 與 hook equality 後才由 release orchestrator promotion，失敗時保留 current 並清理 candidate；並保留 0.2.2 與 0.2.1 artifact。Extension 的 PreviewGate、`actionPreview` protocol、legacy `copyNextAction` 與 Wiki DOM mount 都是 projection/client-side seams。Python engine 仍是 work state、multi-work `next/status --all`、bootstrap cancel/failure 與 gate/evidence 的權威來源。
+0.2.3 current-version-only release 不新增 Python public command、CLI schema 或 engine lifecycle。Repository contract 以既有 test surface 機械檢查 README、使用手冊、Extension README 與內嵌 Help 的單一 0.2.3 交付、限定認證環境、Python release baseline、89 項 Extension tests 與 data-preserving incident response；package verifier 只接受明確的 candidate artifact，完成 source-derived 58 個 bootstrap files、119 個 VSIX entries、artifact hash 與 hook equality 後才由 release orchestrator promotion，失敗時保留 current 並清理 candidate；並保留 0.2.2 與 0.2.1 artifact。Extension 的 PreviewGate、`actionPreview` protocol、legacy `copyNextAction` 與 Wiki DOM mount 都是 projection/client-side seams。Python engine 仍是 work state、multi-work `next/status --all`、bootstrap cancel/failure 與 gate/evidence 的權威來源。
+
+本次平台修正只強化既有測試 oracle：CLI command-set contract 以 `Path(sys.executable).resolve()` 同時核對 `argv[0]` 與 `resolved_executable`；Guard 的 unmanaged-repository fixture 使用 `RepositoryHarness` 的真實 temporary repository，不再建立 Windows drive-letter 假設。三個 process-level Windows hook launcher tests 使用 `skipUnless(sys.platform == "win32", <exact prerequisite reason>)`，讓 POSIX runner 清楚標示未具 Windows shell capability，而不是把 `cmd.exe` 缺席當成功或產品故障。
 
 Release verification 將這個 boundary 綁到 current source fingerprint：Extension bounded walkthrough 需覆蓋 fresh/evolved/conflict/rollback 與 multi-work selection，Python targeted fixtures 需確認 conflict 保留 user bytes；high-risk review 仍只能由 router 透過 machine-only `review record` 記錄，不能由 engine 或 Extension 自行啟動。
 

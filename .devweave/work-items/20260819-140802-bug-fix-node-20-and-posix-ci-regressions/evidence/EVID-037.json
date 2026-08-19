@@ -1,0 +1,73 @@
+{
+  "actual_changed_paths": [
+    ".devweave/work-items/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/events.jsonl",
+    ".devweave/work-items/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/evidence/EVID-034.json",
+    ".devweave/work-items/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/evidence/EVID-035.json",
+    ".devweave/work-items/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/evidence/EVID-036.json",
+    ".devweave/work-items/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/state.json"
+  ],
+  "argv": [
+    "C:/Python314/python.exe",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-p",
+    "test_knowledge.py",
+    "-v"
+  ],
+  "binds_current_source": true,
+  "command_definition_digest": "sha256:ebfa3e45b1fb0108e4210ddb102955819391c51106f51f740483320d2119235a",
+  "command_id": "unit-tests-knowledge",
+  "covers": [],
+  "created_at": "2026-08-19T08:32:55+00:00",
+  "cwd": ".",
+  "duration_ms": 39231,
+  "effective_plan_digest": "sha256:eb3236f2ed8e4ed93f8fa3e2d0e6b9d68ca9be2f279545a599c2a686e804e62c",
+  "effective_plan_id": "plan-46151a623f3adccd",
+  "eligibility_reason": "undeclared_writes",
+  "execution_channel": "devweave_executor",
+  "execution_error": null,
+  "execution_sequence": 6,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-19T08:32:55+00:00",
+  "gate_eligible": false,
+  "git_head": "036ca6b2cbaabe117a82420948e5b7c3bdbd2a83",
+  "id": "EVID-037",
+  "input_fingerprint": "40fc19e36ec04eae823244d78f034b6af4559ab0afaf72a4aaf46f91dc22d518",
+  "kind": "regression",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 39231,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 7,
+      "skipped": 2
+    }
+  },
+  "observed_result": "success",
+  "output_fingerprint": "e61321459feeafe29bd0fc235f431d37539af18f8ecdeb0b7c8feb7f54446ebe",
+  "project_policy_digest": "sha256:386702adf1c510b07cd9a99cf79c22d34fcf0d189a1969dcef7f025ddfa1e945",
+  "raw_log": ".devweave/cache/logs/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/EVID-037.log",
+  "schema_version": 1,
+  "source_fingerprint": "3dae54d518eb27185075ab8c940eb320496d7ac3ddb1f1b8611c13fb1cf583f8",
+  "stale": false,
+  "started_at": "2026-08-19T08:32:16+00:00",
+  "status": "failed",
+  "summary": "[walkthrough] python-conflict-fail-closed user-bytes-preserved=true partial-state=none\r\n[walkthrough] python-evolved-adoption custom-index-preserved=true\r\n\ntest_all_canonical_templates_declare_placeholder_scaffold_tokens (test_knowledge.KnowledgeCoreTests.test_all_canonical_templates_declare_placeholder_scaffold_tokens) ... ok\r\ntest_bootstrap_assessment_requires_sourced_overview_architecture_and_module (test_knowledge.KnowledgeCoreTests.test_bootstrap_assessment_requires_sourced_overview_architecture_and_module) ... ok\r\ntest_bootstrap_conflict_is_reported_without_touching_user_content (test_knowledge.KnowledgeCoreTests.test_bootstrap_conflict_is_reported_without_touching_user_content) ... ok\r\ntest_bootstrap_is_idempotent_and_adopts_without_overwrite (test_knowledge.KnowledgeCoreTests.test_bootstrap_is_idempotent_and_adopts_without_overwrite) ... ok\r\ntest_context_records_and_coverage_are_deterministic_and_source_bound (test_knowledge.KnowledgeCoreTests.test_context_records_and_coverage_are_deterministic_and_source_bound) ... ok\r\ntest_frontmatter_parser_and_lint_cover_links_uniqueness_and_index (test_knowledge.KnowledgeCoreTests.test_frontmatter_parser_and_lint_cover_links_uniqueness_and_index) ... ok\r\ntest_frontmatter_renderer_quotes_control_characters (test_knowledge.KnowledgeCoreTests.test_frontmatter_renderer_quotes_control_characters) ... ok\r\ntest_project_upgrade_is_read_only_until_init_and_legacy_state_loads (test_knowledge.KnowledgeCoreTests.test_project_upgrade_is_read_only_until_init_and_legacy_state_loads) ... ok\r\ntest_scaffold_supports_all_nine_types_and_conditional_fields (test_knowledge.KnowledgeCoreTests.test_scaffold_supports_all_nine_types_and_conditional_fields) ... ok\r\ntest_scaffold_uses_canonical_template_and_never_overwrites (test_knowledge.KnowledgeCoreTests.test_scaffold_uses_canonical_template_and_never_overwrites) ... ok\r\ntest_seal_rejects_placeholder_and_template_tokens_before_writing (test_knowledge.KnowledgeCoreTests.test_seal_rejects_placeholder_and_template_tokens_before_writing) ... ok\r\ntest_source_fingerprint_tracks_dirty_directory_rename_delete_and_ignores_ignored (test_knowledge.KnowledgeCoreTests.test_source_fingerprint_tracks_dirty_directory_rename_delete_and_ignores_ignored) ... ok\r\ntest_declared_delete_and_append_only_log_rules (test_knowledge.KnowledgeLifecycleTests.test_declared_delete_and_append_only_log_rules) ... ok\r\ntest_only_affected_page_blocks_and_unrelated_stale_page_warns (test_knowledge.KnowledgeLifecycleTests.test_only_affected_page_blocks_and_unrelated_stale_page_warns) ... ok\r\ntest_plan_requires_real_changes_and_seal_rejects_unplanned_pages (test_knowledge.KnowledgeLifecycleTests.test_plan_requires_real_changes_and_seal_rejects_unplanned_pages) ... ok\r\ntest_refresh_promotion_passes_g3_and_wiki_only_change_stales_only_g3 (test_knowledge.KnowledgeLifecycleTests.test_refresh_promotion_passes_g3_and_wiki_only_change_stales_only_g3) ... ok\r\n\r\n----------------------------------------------------------------------\r\nRan 16 tests in 38.867s\r\n\r\nOK",
+  "tasks": [],
+  "timed_out": false,
+  "undeclared_paths": [
+    ".devweave/work-items/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/events.jsonl",
+    ".devweave/work-items/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/evidence/EVID-034.json",
+    ".devweave/work-items/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/evidence/EVID-035.json",
+    ".devweave/work-items/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/evidence/EVID-036.json",
+    ".devweave/work-items/20260819-140802-bug-fix-node-20-and-posix-ci-regressions/state.json"
+  ],
+  "verification_batch_id": "VB-1d79bdcea32f",
+  "verification_batch_index": 6
+}

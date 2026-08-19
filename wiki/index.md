@@ -6,7 +6,7 @@ last_updated: 2026-08-19
 tags: [index]
 status: active
 source_fingerprint: none
-verified_by: 20260819-115533-feature-deterministic-ci-baseline
+verified_by: 20260819-140802-bug-fix-node-20-and-posix-ci-regressions
 ---
 
 # Codebase Wiki — 索引
@@ -17,7 +17,7 @@ verified_by: 20260819-115533-feature-deterministic-ci-baseline
 
 | 頁面 | 摘要 |
 | --- | --- |
-| [[overview]] | DevWeave Plan Mode preflight、Plan-first workflow、Wiki/Gate lifecycle、Public CI development baseline、high-risk G3 reviewer、0.2.3 Windows release，以及 Verification Policy v2、frozen plan、controlled executor 與 gate-eligible evidence 概觀 |
+| [[overview]] | DevWeave Plan Mode preflight、Plan-first workflow、Wiki/Gate lifecycle、Public CI 17/17 development baseline、cross-platform runner、high-risk G3 reviewer、0.2.3 Windows release，以及 Verification Policy v2、frozen plan、controlled executor 與 gate-eligible evidence 概觀 |
 
 ## Architecture
 
@@ -26,9 +26,9 @@ verified_by: 20260819-115533-feature-deterministic-ci-baseline
 ## Modules
 
 - [[knowledge-engine]] | Wiki model、reserved-starter init、coverage/review/scaffold/seal、machine lifecycle、shared policy plan/evidence integration、selective verification、bounded metrics 與 UTF-8 Windows launcher/doctor boundary
-- [[public-ci]] | PR／master Python、Node、hygiene matrices、least-privilege checkout、immutable Action pins、repository contract 與 hosted-run 外部邊界
+- [[public-ci]] | PR／master Python、Node、hygiene matrices、Node 20／POSIX hardening、deterministic test runner、platform-truth skips、least-privilege checkout 與 hosted 17/17 result
 - [[command-policy-engine]] | Verification Policy v2 evaluator、typed read-only grammar、trusted executable/cwd、frozen plan digest、eligibility、writer barrier 與 undeclared-write reconciliation
-- [[vscode-extension]] | 0.2.3 Windows Control Center 五區、PreviewGate、refresh/snapshot、Wiki provenance、summary/detail boundary、evidence metrics、58/119 package provenance、pinned smoke、Independent Review readiness 與安全邊界
+- [[vscode-extension]] | 0.2.3 Windows Control Center 五區、PreviewGate、refresh/snapshot、Wiki provenance、89-test deterministic runner、summary/detail boundary、evidence metrics、58/119 package provenance、pinned smoke、Independent Review readiness 與安全邊界
 
 ## Entities
 

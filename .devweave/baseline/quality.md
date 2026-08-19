@@ -5,6 +5,7 @@
 ## Quality Attributes
 
 - Public deterministic CI：所有 pull request 與 `master` push 執行 Python Ubuntu/Windows/macOS × 3.11–3.14、Node Ubuntu/Windows × 20/22 與獨立 `git diff --check`；兩個 matrix `fail-fast: false`，不得用 `continue-on-error` 隱藏失敗。Workflow top-level 只有 `contents: read`，checkout 不持久化 credentials，官方 Actions 以核准完整 SHA 固定，job 不接收 secrets 或 Codex API key。
+- Cross-platform test entrypoint：Extension unit runner 必須自行探索並 deterministic sort `.test.ts`，以 current Node executable、resolved `tsx/cli`、explicit argv 與 `shell: false` 執行；空集合、spawn error、signal、缺少 numeric status 或 child nonzero 必須 fail closed。Python contract 必須使用 canonical current interpreter 與平台原生 fixture；Windows-only process tests 在非 Windows 只能以精確 prerequisite reason skip。
 - Determinism：stdlib-only frontmatter、canonical JSON、sorted paths、streaming SHA-256、exclusive canonical scaffold 與 atomic per-file writes。
 - Safety：所有 knowledge paths 固定在 root `wiki/`；source 禁止進入 Wiki、`.devweave`、`.git` 或 repo 外；中間 symlink escape fail closed。
 - Compatibility：schema version 1 additive migration、既有 Wiki 不覆寫、custom-only Wiki 可補齊 reserved starters、缺少 review marker 的 legacy active work 不追溯阻擋、既有 verbs 與 JSON envelope 不變。
@@ -29,9 +30,11 @@
 
 ## Verification Commands
 
-- P0-00 frozen standard profile：effective plan `sha256:be3121730798a8880b20a66919986b395d9a480f2e99cd8c418682908667d4bd` 選取 7 個 commands，`EVID-005`～`EVID-011` 全部 current、zero-only、gate-eligible；Extension 88 tests／typecheck、Python CLI 23、repository contract 18、core 45（1 項既有 Windows symlink privilege skip）、Guard 15、Knowledge 16 全部通過。`extension-package` 以 `release-only`、`extension-smoke` 以 `release-only-dependency:extension-package` 合法跳過，無 waiver。
+- P0-00 frozen standard profile：effective plan `sha256:be3121730798a8880b20a66919986b395d9a480f2e99cd8c418682908667d4bd` 選取 7 個 commands，`EVID-005`～`EVID-011` 在該基線驗收時全部 current、zero-only、gate-eligible；Extension 88 tests／typecheck、Python CLI 23、repository contract 18、core 45（1 項既有 Windows symlink privilege skip）、Guard 15、Knowledge 16 全部通過。`extension-package` 以 `release-only`、`extension-smoke` 以 `release-only-dependency:extension-package` 合法跳過，無 waiver。
+- Current P0-00 hardening profile：effective plan `sha256:eb3236f2ed8e4ed93f8fa3e2d0e6b9d68ca9be2f279545a599c2a686e804e62c` 選取 7 個 commands；trace-complete 循序 batch `VB-1786ea0ecaff` 的 `EVID-050`～`EVID-056` 全部 current、zero-only、gate-eligible。Extension 89 tests／typecheck、Python CLI 23、repository contract 18、core 45（1 項既有 Windows symlink privilege skip）、Guard 15、Knowledge 16 全部通過。`extension-package` 以 `release-only`、`extension-smoke` 以 `release-only-dependency:extension-package` 合法跳過，無 waiver。
 - Public CI TDD contract：`EVID-001` 先以缺少 workflow 的單一失敗固定紅燈；`EVID-002` 在新增 workflow 後通過；`EVID-003` 以缺少 README badge／本機等價命令的單一失敗固定第二個紅燈；`EVID-004` 完成文件後以 18 項 repository contract 全綠。後續 current frozen-profile evidence 取代已 stale 的中途 source snapshot。
-- 人工作業分支 pre-G1 baseline：Doctor 所有 probe 通過；完整 Python suite 129 項通過、1 項既有 Windows symlink privilege skip；Extension `npm ci`、typecheck、88 tests 與 build 通過。Current source 以 frozen standard profile 為 G3 權威；GitHub-hosted 三 OS／兩 OS 結果須由人類 push 或 PR 後取得，不以本機結果冒充 hosted observation。
+- 人工作業分支 pre-G1 baseline：Doctor 所有 probe 通過；完整 Python suite 129 項通過、1 項既有 Windows symlink privilege skip；Extension `npm ci`、typecheck、88 tests 與 build 通過。這是修正前的歷史觀察，不取代 current hardening profile。
+- Hosted observation：PR #1 GitHub Actions run `32231940371` 在 head `036ca6b2cbaabe117a82420948e5b7c3bdbd2a83` 完成 17/17；12 個 Python、4 個 Node（含 Node 20 Ubuntu/Windows）與 repository hygiene 全部 passing。此結果由 non-gate-eligible `EVID-024` 保存，G3 權威仍是同一 source fingerprint 的 controlled evidence。
 - `python -B -m unittest discover -s tests -v`：111 項通過，另有一項因 Windows symlink privilege 不可用而 skipped；涵蓋 Wiki reserved preflight、bootstrap G1→G3、review/no-update、context currentness、coverage、九種 scaffold、seal、CLI/guard、legacy 與 repository contract coverage。該 skip 是環境權限限制，不能解讀為產品失敗。
 - Repository contract tests：目前契約測試全部通過，包含 single-router Codebase Wiki 閉環、Windows hook launcher matrix、current-only release contract、maintenance-only exclusion、metadata 與 invocation policy 契約。
 - `npx skills@latest list -a codex`：只列出唯一 local `devweave` router 與五個 `mattpocock/skills` companions。
@@ -40,7 +43,7 @@
 - `git diff --check`：無 whitespace error；Windows checkout 僅回報既有 LF/CRLF conversion warnings。
 - `python -B -m unittest discover -s tests -p test_cli.py -v`：22 項通過，涵蓋 malformed metrics、metadata fail-closed、affected-path selection、dependency closure、release-only skip 與 high full-set policy。
 - `python -B -m unittest discover -s tests -p test_devweave_core.py -v`：45 項通過，另有一項因 Windows symlink privilege 不可用而 skipped；涵蓋 bounded metrics、evidence compatibility、state/gate/review 與 repository-safe validation。
-- `vscode-extension/npm.cmd run test`：88 項通過，涵蓋 PlanModeGuidance mapping、overview/preview/copy handoff、PreviewGate 的結構化 typed-intent 比較與控制字元拒絕、actionPreview protocol、Wiki DOM mount、ARIA/keyboard、legacy/multi-work、shared semantic validator、BootstrapInstaller、candidate release transaction、bounded metrics projection、prompt 與 security regression。
+- `vscode-extension/npm.cmd run test`：89 項通過，新增 deterministic unit-test runner seam，並涵蓋 PlanModeGuidance mapping、overview/preview/copy handoff、PreviewGate 的結構化 typed-intent 比較與控制字元拒絕、actionPreview protocol、Wiki DOM mount、ARIA/keyboard、legacy/multi-work、shared semantic validator、BootstrapInstaller、candidate release transaction、bounded metrics projection、prompt 與 security regression。
 - `vscode-extension/npm.cmd run typecheck`：通過；`npm.cmd run package` 先建立並驗證 candidate，再 promotion 0.2.3 current artifact。manifest 具 58 個 bootstrap files、119 個 VSIX entries，root/embedded hook、source hash/length、package／bundle version、required entries、compatibility declarations 與 candidate/current artifact SHA-256 全數匹配，0.2.2 與 0.2.1 retained artifacts 保留；verify/promotion failure transaction tests 會確認 current bytes 不變。
 - `vscode-extension/npm.cmd run test:smoke`：Windows VS Code Extension Host activation、Activity Bar view 與公開 commands 通過。
 - Metrics limits：canonical metrics payload 上限 250,000 bytes；數值欄位必須是有限、非負且不超過 10,000,000。未提供 exact host usage 時只保存 `usage.status=unavailable` 與 null token/cost，禁止以 bytes 推算 Token 或保存 prompt/secrets。
@@ -49,7 +52,7 @@
 
 ## Operational Constraints
 
-- Public CI 只使用公開 repository 的 GitHub-hosted standard runners 與官方 Actions；不要求付費第三方服務、私有 runner、部署權限或 secrets。免費額度、佇列與 hosted service availability 屬 GitHub 外部邊界；此 workflow 是 development baseline，不等於正式 release certification。
+- Public CI 只使用公開 repository 的 GitHub-hosted standard runners 與官方 Actions；不要求付費第三方服務、私有 runner、部署權限或 secrets。免費額度、佇列與 hosted service availability 屬 GitHub 外部邊界；run `32231940371` 只認證 commit `036ca6b2cbaabe117a82420948e5b7c3bdbd2a83` 的 development baseline，不等於正式 release certification。
 - Python 3.11+、Git repository、UTF-8、無第三方 runtime dependencies。
 - Source pages 預期維持 1–5 個核心 sources；health payload 限制 page/finding summaries 數量。
 - Repository 必須信任 hook；外部 editor 或停用 hook 的修改只能在 G3 reconciliation 被偵測。

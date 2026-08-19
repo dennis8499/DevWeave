@@ -6,7 +6,7 @@ last_updated: 2026-08-19
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260819-115533-feature-deterministic-ci-baseline
+verified_by: 20260819-140802-bug-fix-node-20-and-posix-ci-regressions
 ---
 
 # Activity Log
@@ -118,3 +118,9 @@ verified_by: 20260819-115533-feature-deterministic-ci-baseline
 - Refresh [[overview]] 與 [[devweave-knowledge-workflow]]，加入單一 Public CI Module、stdlib job-local contract seam、development baseline／release certification 分離及 hosted-run 外部 oracle。
 - Refresh [[knowledge-engine]]，固定 Doctor 的 Windows 真實 probe／非 Windows explicit skip、frozen standard plan 7 selected／2 release-only skipped 與 current evidence 邊界。
 - 本批為四個 planned content upserts 加 coupled index/log；沒有 Codex API、smoke/package/release、部署、Git remote mutation 或 waiver。
+
+## [2026-08-19] promote | 20260819-140802-bug-fix-node-20-and-posix-ci-regressions
+
+- Refresh [[overview]]、[[devweave-knowledge-workflow]]、[[knowledge-engine]]、[[public-ci]] 與 [[vscode-extension]]，記錄 deterministic explicit-file Node runner、canonical Python executable、platform-native Guard fixture 與非 Windows launcher prerequisite skip。
+- Extension current test surface 更新為 89；PR #1 GitHub Actions run `32231940371` 在 commit `036ca6b2cbaabe117a82420948e5b7c3bdbd2a83` 完成 12 Python、4 Node 與 1 hygiene checks，共 17/17 通過。
+- 本批為五個 planned content upserts 加 coupled index/log；current trace-complete standard batch `VB-1786ea0ecaff` 為 7/7，package/smoke 依 release-only policy 跳過，無 waiver。

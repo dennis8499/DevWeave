@@ -2,18 +2,18 @@
 title: DevWeave VS Code Extension
 type: module
 sources: [.codex/hooks.json, vscode-extension]
-last_updated: 2026-08-13
+last_updated: 2026-08-19
 tags: [module, vscode, control-center]
 status: active
-source_fingerprint: "sha256:b372563f7cd467ebfbc2b09f8412d37738c07e352307da3c9d6a01610f6aa36f"
-verified_by: 20260813-142228-feature-devweave-vs-code-extension
+source_fingerprint: "sha256:313712450a978b6f3eb10c34394be85e9e2e58216d319f741458ab5970449e5a"
+verified_by: 20260819-140802-bug-fix-node-20-and-posix-ci-regressions
 ---
 
 # DevWeave VS Code Extension
 
 ## Responsibility
 
-`devweave-control-center` 是 DevWeave 0.2.3 Windows 公開版的唯讀 Control Center，本次提供 `devweave-control-center-0.2.3.vsix` 並保留 `devweave-control-center-0.2.2.vsix` 與 `devweave-control-center-0.2.1.vsix`。認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次 Python full suite 為 111 項（1 項因 symlink 權限 skipped），Extension unit tests 為 88 項。VS Code 1.90+／Python 3.11+ 是技術門檻，不代表其他組合已完成本次認證。Extension host 將 project、Work Item、Wiki、evidence、diagnostics 與 bootstrap completeness 投影給 Webview；workflow decision 仍以 prompt handoff 回到 Codex Chat，Extension 不執行 DevWeave engine、CLI、shell、Git 或 network。
+`devweave-control-center` 是 DevWeave 0.2.3 Windows 公開版的唯讀 Control Center，本次提供 `devweave-control-center-0.2.3.vsix` 並保留 `devweave-control-center-0.2.2.vsix` 與 `devweave-control-center-0.2.1.vsix`。認證環境限定為 Windows x64 build 10.0.26200／25H2、VS Code 1.131.0、Python 3.14.6、Git 2.51.0.windows.1 與目前 Codex host；本次 Python full suite 為 111 項（1 項因 symlink 權限 skipped），Extension unit tests 為 89 項。VS Code 1.90+／Python 3.11+ 是技術門檻，不代表其他組合已完成本次認證。Extension host 將 project、Work Item、Wiki、evidence、diagnostics 與 bootstrap completeness 投影給 Webview；workflow decision 仍以 prompt handoff 回到 Codex Chat，Extension 不執行 DevWeave engine、CLI、shell、Git 或 network。
 
 ## Webview interaction
 
@@ -54,6 +54,8 @@ Runtime 維持 CSP、no process、no shell、no external network 與 preview-fir
 
 ## Verification seams
 
-`WikiSearchModel`、`RenderScheduler`、`RefreshCoordinator`、`PreviewGate`、Wiki result mount adapter、instrumented snapshot reader、`dashboard-sections.ts`、copy transaction boundary、`bootstrap-compat.ts` 與 `BootstrapInstaller.inspect()` 是不依賴 VS Code UI 的測試 seams。package verifier 只讀取 current 0.2.3 candidate VSIX，檢查 manifest 每個 entry 的 destination、byte length、SHA-256、policy/kind、package／bundle version、58 個 bootstrap files、119 個 VSIX entries、required entries、root/embedded hook equality 與 current artifact SHA-256；88 項 Extension tests、typecheck 與 smoke test 再確認 host 可載入 bundle，既有 0.2.2 與 0.2.1 artifact 保留。Configured full-suite raw logs 另保留 Windows walkthrough、accessibility marker 與 111-test/1-symlink-skip result。
+`WikiSearchModel`、`RenderScheduler`、`RefreshCoordinator`、`PreviewGate`、Wiki result mount adapter、instrumented snapshot reader、`dashboard-sections.ts`、copy transaction boundary、`bootstrap-compat.ts` 與 `BootstrapInstaller.inspect()` 是不依賴 VS Code UI 的測試 seams。package verifier 只讀取 current 0.2.3 candidate VSIX，檢查 manifest 每個 entry 的 destination、byte length、SHA-256、policy/kind、package／bundle version、58 個 bootstrap files、119 個 VSIX entries、required entries、root/embedded hook equality 與 current artifact SHA-256；89 項 Extension tests、typecheck 與 smoke test 再確認 host 可載入 bundle，既有 0.2.2 與 0.2.1 artifact 保留。Configured full-suite raw logs 另保留 Windows walkthrough、accessibility marker 與 111-test/1-symlink-skip result。
+
+Extension unit tests 的 public npm entrypoint 使用專用 `scripts/run-unit-tests.mjs`。它以 sorted recursive discovery 建立完整 `.test.ts` argv，直接呼叫 current Node executable 與 resolved `tsx/cli`，並固定 `shell: false`；因此 Node 20、Node 22、Windows 與 POSIX 使用同一執行語意。第 89 項 unit test 以 injected spawn seam 驗證 deterministic order 與所有 abnormal child outcomes 都 fail closed。Runner 只屬 development/test surface，`package-vsix.mjs` 明確排除 runner 與其測試，不增加 production VSIX entries。
 
 Evidence metrics projection 顯示 duration、selected/skipped/closure/cache 與 usage availability；metrics payload 上限為 250,000 bytes、numeric counter 上限為 10,000,000；未知 token/cost 顯示 unavailable，不由 Extension 估算。Build seam 先清理 dist，再用 package version、source Git HEAD、manifest hash、bootstrap count 與 VSIX entry count 做 provenance verification；pinned smoke 只接受 cache-only VS Code 1.131.0，缺少 runtime 時 fail with guidance，不下載或 fallback。

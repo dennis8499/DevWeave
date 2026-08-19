@@ -1,0 +1,34 @@
+{
+  "binds_current_source": false,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006"
+  ],
+  "created_at": "2026-08-19T08:28:12+00:00",
+  "eligibility_reason": "manual_evidence_not_gate_eligible",
+  "exit_code": null,
+  "expectation": null,
+  "gate_eligible": false,
+  "git_head": "036ca6b2cbaabe117a82420948e5b7c3bdbd2a83",
+  "id": "EVID-024",
+  "kind": "regression",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": null,
+  "schema_version": 1,
+  "source_fingerprint": "3dae54d518eb27185075ab8c940eb320496d7ac3ddb1f1b8611c13fb1cf583f8",
+  "stale": false,
+  "status": "passed",
+  "summary": "GitHub Actions run 32231940371 at head 036ca6b2cbaabe117a82420948e5b7c3bdbd2a83 completed 17/17 checks: 12 Python matrix jobs, 4 Node matrix jobs, and repository hygiene; the prior Node 20 and POSIX failures are green.",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004"
+  ]
+}
