@@ -397,11 +397,11 @@
       "status": "completed"
     },
     "TASK-011": {
-      "completed_at": null,
+      "completed_at": "2026-08-25T13:10:31+00:00",
       "evidence": [],
-      "note": "",
+      "note": "Verified hash-bound idempotent clean cutover in disposable clones; V2 public check passed, 59/59 V2 tests passed, forbidden V1 paths and legacy command surface were zero, schema v2 and immutable base recovery were preserved, and source-derived 2.0.0 VSIX candidate verification passed before promotion.",
       "started_at": "2026-08-25T12:34:58+00:00",
-      "status": "in_progress"
+      "status": "completed"
     },
     "TASK-012": {
       "completed_at": null,
@@ -412,7 +412,7 @@
     }
   },
   "title": "DevWeave V2 app-server harness",
-  "updated_at": "2026-08-25T12:34:58+00:00",
+  "updated_at": "2026-08-25T13:10:31+00:00",
   "verification_plan": {
     "commands": {
       "app-server-e2e": {
