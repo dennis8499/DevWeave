@@ -383,11 +383,11 @@
       "status": "completed"
     },
     "TASK-009": {
-      "completed_at": null,
+      "completed_at": "2026-08-25T12:02:30+00:00",
       "evidence": [],
-      "note": "",
-      "started_at": null,
-      "status": "pending"
+      "note": "Validation: npm run typecheck passed; npm test passed 112/112; npm run build passed. Replaced V1 prompt-copy/Wiki snapshot UI with the V2 app-server Control Center, semantic five-tab keyboard/focus/ARIA behavior, forced-colors/reduced-motion support, strict CSP, authoritative-vs-projection labels, full decisions, governed controls, and bounded/redacted screenshot-provenance evidence runner.",
+      "started_at": "2026-08-25T12:01:12+00:00",
+      "status": "completed"
     },
     "TASK-010": {
       "completed_at": null,
@@ -412,7 +412,7 @@
     }
   },
   "title": "DevWeave V2 app-server harness",
-  "updated_at": "2026-08-25T11:39:02+00:00",
+  "updated_at": "2026-08-25T12:02:30+00:00",
   "verification_plan": {
     "commands": {
       "app-server-e2e": {

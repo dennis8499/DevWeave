@@ -1,100 +1,64 @@
 {
   "name": "devweave-control-center",
-  "displayName": "DevWeave Control Center｜開發流程總覽",
-  "description": "以繁體中文呈現 DevWeave 檔案快照；工作流程命令交接到 Codex Chat，初始化則需確認固定 bootstrap 寫入。",
+  "displayName": "DevWeave Control Center",
+  "description": "以 Codex app-server 驅動具 Gate、approval、verification 與 review 的 DevWeave V2 workflow。",
   "version": "2.0.0",
   "publisher": "devweave",
   "license": "MIT",
-  "engines": {
-    "vscode": "^1.90.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "keywords": [
-    "DevWeave",
-    "SDLC",
-    "Codex",
-    "workflow"
-  ],
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "keywords": ["DevWeave", "SDLC", "Codex", "workflow"],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onView:devweave.workItems",
-    "onCommand:devweave.openDashboard",
-    "onCommand:devweave.initialize",
-    "onCommand:devweave.refresh",
-    "onCommand:devweave.copyNextAction",
-    "onCommand:devweave.wikiBootstrap",
-    "workspaceContains:.devweave/project.json"
+    "onView:devweave.runs",
+    "onCommand:devweave.openControlCenter",
+    "onCommand:devweave.startRun",
+    "onCommand:devweave.resumeRun",
+    "workspaceContains:.codex/config.toml"
   ],
   "contributes": {
     "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "devweave",
-          "title": "DevWeave",
-          "icon": "./media/devweave.svg"
-        }
-      ]
+      "activitybar": [{ "id": "devweave", "title": "DevWeave", "icon": "./media/devweave.svg" }]
     },
     "views": {
-      "devweave": [
-        {
-          "id": "devweave.workItems",
-          "name": "工作項目",
-          "when": "workbenchState != empty"
-        }
-      ]
+      "devweave": [{ "id": "devweave.runs", "name": "Runs", "when": "workbenchState != empty" }]
     },
     "commands": [
-      {
-        "command": "devweave.openDashboard",
-        "title": "DevWeave: 開啟 Control Center"
-      },
-      {
-        "command": "devweave.initialize",
-        "title": "DevWeave: 初始化 workspace"
-      },
-      {
-        "command": "devweave.refresh",
-        "title": "DevWeave: 重新整理檔案快照"
-      },
-      {
-        "command": "devweave.copyNextAction",
-        "title": "DevWeave: 開啟「詢問下一步」預覽"
-      },
-      {
-        "command": "devweave.wikiBootstrap",
-        "title": "DevWeave: 建立 Codebase Wiki（開啟預覽）"
-      }
+      { "command": "devweave.openControlCenter", "title": "DevWeave: Open Control Center" },
+      { "command": "devweave.startRun", "title": "DevWeave: Start Governed Run" },
+      { "command": "devweave.resumeRun", "title": "DevWeave: Resume Run" },
+      { "command": "devweave.steer", "title": "DevWeave: Steer Active Turn" },
+      { "command": "devweave.interrupt", "title": "DevWeave: Interrupt Active Turn" },
+      { "command": "devweave.cancel", "title": "DevWeave: Cancel Run" }
     ],
     "menus": {
       "view/title": [
-        {
-          "command": "devweave.openDashboard",
-          "when": "view == devweave.workItems",
-          "group": "navigation@1"
-        },
-        {
-          "command": "devweave.refresh",
-          "when": "view == devweave.workItems",
-          "group": "navigation@2"
-        }
+        { "command": "devweave.openControlCenter", "when": "view == devweave.runs", "group": "navigation@1" },
+        { "command": "devweave.resumeRun", "when": "view == devweave.runs", "group": "navigation@2" }
       ],
       "commandPalette": [
-        {
-          "command": "devweave.initialize",
-          "when": "workbenchState != empty"
-        },
-        {
-          "command": "devweave.copyNextAction",
-          "when": "resourceLangId == markdown"
-        },
-        {
-          "command": "devweave.wikiBootstrap",
-          "when": "workbenchState != empty"
-        }
+        { "command": "devweave.openControlCenter", "when": "workbenchState != empty" },
+        { "command": "devweave.startRun", "when": "workbenchState != empty" },
+        { "command": "devweave.resumeRun", "when": "workbenchState != empty" },
+        { "command": "devweave.steer", "when": "workbenchState != empty" },
+        { "command": "devweave.interrupt", "when": "workbenchState != empty" },
+        { "command": "devweave.cancel", "when": "workbenchState != empty" }
       ]
+    },
+    "configuration": {
+      "title": "DevWeave",
+      "properties": {
+        "devweave.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Python executable used only to launch the repository-local private host bridge."
+        },
+        "devweave.codexPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute Codex executable path. Empty means resolve Codex from PATH."
+        }
+      }
     }
   },
   "scripts": {
@@ -103,7 +67,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"test/unit/**/*.test.ts\"",
     "test:smoke": "npm run build && tsx test/smoke.test.ts",
-    "test:smoke:current": "tsx test/smoke.test.ts"
+    "test:smoke:current": "tsx test/smoke.test.ts",
+    "evidence:ui": "tsx scripts/ui-evidence.ts"
   },
   "devDependencies": {
     "@types/vscode": "^1.90.0",

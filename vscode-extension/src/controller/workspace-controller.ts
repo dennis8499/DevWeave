@@ -22,6 +22,7 @@ export interface AppServerPort {
   request(method: "thread/start" | "thread/resume" | "thread/read" | "turn/start" | "turn/steer" | "turn/interrupt" | "review/start" | "mcpServerStatus/list" | "config/mcpServer/reload", params: unknown): Promise<unknown>;
   respond(requestId: number | string, result: unknown): void;
   waitForReviewResult?(reviewerThreadId: string): Promise<unknown>;
+  waitForTurnCompleted?(turnId: string): Promise<unknown>;
   onProjection(listener: (state: AppServerProjection) => void): () => void;
   onServerRequest(listener: (request: ServerRequest) => void): () => void;
 }
@@ -34,6 +35,7 @@ interface PendingApproval {
 export interface ControllerState {
   status: "idle" | "connecting" | "ready" | "blocked" | "cancelled";
   run: Record<string, unknown> | null;
+  preflight: Record<string, unknown> | null;
   appServer: AppServerProjection;
   threadId: string;
   turnId: string;
@@ -57,7 +59,7 @@ export class WorkspaceController {
     this.broker = new ApprovalBroker(repository);
     this.reviewCoordinator = new ReviewCoordinator(appServer);
     this.stateValue = {
-      status: "idle", run: null, appServer: appServer.projection,
+      status: "idle", run: null, preflight: null, appServer: appServer.projection,
       threadId: "", turnId: "", pendingApprovals: [], review: null, diagnostics: []
     };
     appServer.onProjection((projection) => {
@@ -89,7 +91,7 @@ export class WorkspaceController {
       const thread = record(await this.appServer.request("thread/start", this.threadParams(run)));
       const threadId = extractId(record(thread.thread), "id") || extractId(thread, "threadId", "thread_id");
       if (!threadId) throw new Error("App-server did not return a thread id.");
-      this.stateValue = { ...this.stateValue, status: "ready", run, threadId };
+      this.stateValue = { ...this.stateValue, status: "ready", run, preflight, threadId };
       this.publish();
       return this.state;
     } catch (error) {
@@ -103,7 +105,8 @@ export class WorkspaceController {
     try {
       const response = record(await this.host.request("run_resume", { run_id: runId, ...(codexPath ? { codex_path: codexPath } : {}) }));
       const run = record(response.run);
-      const codex = record(record(response.preflight).codex);
+      const preflight = record(response.preflight);
+      const codex = record(preflight.codex);
       if (typeof codex.path !== "string") throw new Error("Codex preflight did not return an executable path.");
       if (this.appServer.projection.connection !== "connected") await this.appServer.connect(codex.path, this.repository);
       await this.assertRequiredMcp();
@@ -113,7 +116,7 @@ export class WorkspaceController {
         const started = record(await this.appServer.request("thread/start", this.threadParams(run)));
         activeThread = extractId(record(started.thread), "id") || extractId(started, "threadId", "thread_id");
       }
-      this.stateValue = { ...this.stateValue, status: "ready", run, threadId: activeThread };
+      this.stateValue = { ...this.stateValue, status: "ready", run, preflight, threadId: activeThread };
       this.publish();
       return this.state;
     } catch (error) {
@@ -122,7 +125,7 @@ export class WorkspaceController {
     }
   }
 
-  public async startTurn(input: string): Promise<void> {
+  public async startTurn(input: string): Promise<string> {
     this.assertReady();
     const response = record(await this.appServer.request("turn/start", {
       threadId: this.stateValue.threadId,
@@ -131,6 +134,7 @@ export class WorkspaceController {
     }));
     this.stateValue = { ...this.stateValue, turnId: extractId(record(response.turn), "id") || extractId(response, "turnId", "turn_id") };
     this.publish();
+    return this.stateValue.turnId;
   }
 
   public async steer(input: string): Promise<void> {
@@ -185,6 +189,20 @@ export class WorkspaceController {
     });
     this.setRun(record(updated));
     this.transition("cancelled");
+  }
+
+  public async refreshRun(codexPath?: string): Promise<void> {
+    const run = this.requireRun();
+    const response = record(await this.host.request("run_resume", {
+      run_id: run.run_id,
+      ...(codexPath ? { codex_path: codexPath } : {})
+    }));
+    this.stateValue = {
+      ...this.stateValue,
+      run: record(response.run),
+      preflight: record(response.preflight)
+    };
+    this.publish();
   }
 
   public async resolveApproval(requestId: number | string, decision: ApprovalDecision): Promise<void> {

@@ -1,581 +1,318 @@
+import { randomBytes } from "node:crypto";
+
 import * as vscode from "vscode";
-import { BootstrapBundle, BootstrapBundleFile, BootstrapInstaller, BootstrapReport } from "./bootstrap";
-import { ClipboardAdapter, VscodeClipboardAdapter } from "./clipboard";
-import { DashboardPanel } from "./dashboard";
-import { FileSystemPort } from "./filesystem";
-import { DashboardPreferences, Diagnostic, DisplayMode, PromptBundle, PublicCommandIntent, WorkspaceSnapshot } from "./model";
-import { DevWeavePromptComposer } from "./prompt";
-import { WorkspaceSnapshotReader } from "./snapshot";
-import { RefreshCoordinator } from "./refresh-coordinator";
-import type { RefreshChangeSet } from "./refresh-coordinator";
-import { WorkItemsTreeProvider } from "./tree";
-import { readBootstrapBundle, VscodeBootstrapResourceReader, VscodeBootstrapWorkspace } from "./vscode-bootstrap";
-import { VscodeFileSystemPort } from "./vscode-filesystem";
-import { resolveWorkSelection } from "./work-selection";
 
-export function activate(context: vscode.ExtensionContext): void {
-  const output = vscode.window.createOutputChannel("DevWeave Control Center");
-  const controller = new ExtensionController(context, output);
-  const tree = new WorkItemsTreeProvider();
-  const dashboard = new DashboardPanel(context, {
-    refresh: () => controller.refresh(),
-    initialize: () => controller.initialize(),
-    preview: (intent) => controller.preview(intent),
-    copy: (bundle) => controller.copyBundle(bundle),
-    copySuccess: () => controller.notifyCopySuccess(),
-    openFile: (path) => controller.openFile(path),
-    selectWork: (workId) => controller.selectWork(workId),
-    getPreferences: () => controller.getPreferences(),
-    setDisplayMode: (mode) => controller.setDisplayMode(mode),
-    protocolError: (message) => output.appendLine(`[protocol] ${message}`)
-  });
-  controller.attach(tree, dashboard);
+import { CodexAppServerSession } from "./app-server/session";
+import { HostBridgeClient } from "./controller/host-bridge-client";
+import { WorkspaceController, type ControllerState } from "./controller/workspace-controller";
+import type { PendingDecision, ReviewFinding, RiskLevel } from "./v2/contracts";
+import { projectUiState } from "./ui/projection";
+import { parseUiIntent, type UiIntent } from "./ui/protocol";
 
-  context.subscriptions.push(
-    output,
-    tree,
-    dashboard,
-    vscode.window.registerTreeDataProvider("devweave.workItems", tree),
-    vscode.commands.registerCommand("devweave.openDashboard", (workId?: string) => controller.openDashboard(workId)),
-    vscode.commands.registerCommand("devweave.initialize", () => controller.initialize()),
-    vscode.commands.registerCommand("devweave.refresh", () => controller.refresh()),
-    vscode.commands.registerCommand("devweave.copyNextAction", () => controller.copyNextAction()),
-    vscode.commands.registerCommand("devweave.wikiBootstrap", () => controller.previewWikiBootstrap()),
-    vscode.workspace.onDidChangeWorkspaceFolders(() => controller.handleWorkspaceFoldersChanged())
-  );
-  controller.startWatchers(context);
-  void controller.refresh();
+let activeRuntime: ExtensionRuntime | undefined;
+
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  const workspace = vscode.workspace.workspaceFolders?.[0];
+  if (!workspace) return;
+  const runtime = new ExtensionRuntime(context, workspace.uri);
+  activeRuntime = runtime;
+  context.subscriptions.push(runtime);
+  await runtime.activate();
 }
 
-export function deactivate(): void {
-  // All resources are owned by ExtensionContext subscriptions.
+export async function deactivate(): Promise<void> {
+  await activeRuntime?.shutdown();
+  activeRuntime = undefined;
 }
 
-class ExtensionController {
-  private tree: WorkItemsTreeProvider | undefined;
-  private dashboard: DashboardPanel | undefined;
-  private activeRoot: vscode.Uri | undefined;
-  private snapshot: WorkspaceSnapshot = unavailableSnapshot("尚未選擇 workspace。");
-  private selectedWorkId: string | null = null;
-  private reader: WorkspaceSnapshotReader | undefined;
-  private refreshCoordinator: RefreshCoordinator<WorkspaceSnapshot> | undefined;
-  private bootstrapBundle: BootstrapBundle | undefined;
-  private bootstrapBundlePromise: Promise<BootstrapBundle | undefined> | undefined;
-  private readonly composer = new DevWeavePromptComposer();
-  private readonly bootstrapInstaller = new BootstrapInstaller();
-  private readonly preferencesKey = "devweave.controlCenter.preferences";
-  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
-  private bootstrapTransaction = false;
+class ExtensionRuntime implements vscode.Disposable {
+  private readonly host = new HostBridgeClient();
+  private readonly appServer = new CodexAppServerSession();
+  private readonly controller: WorkspaceController;
+  private readonly tree = new RunTreeProvider();
+  private dashboard: ControlCenterPanel | undefined;
+  private hostConnected = false;
+  private disposed = false;
 
   public constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly output: vscode.OutputChannel,
-    private readonly clipboard: ClipboardAdapter = new VscodeClipboardAdapter()
-  ) {}
-
-  public attach(tree: WorkItemsTreeProvider, dashboard: DashboardPanel): void {
-    this.tree = tree;
-    this.dashboard = dashboard;
+    private readonly workspace: vscode.Uri
+  ) {
+    this.controller = new WorkspaceController(workspace.fsPath, this.host, this.appServer);
+    this.controller.subscribe((state) => {
+      this.tree.update(state);
+      this.dashboard?.update(state);
+    });
   }
 
-  public startWatchers(context: vscode.ExtensionContext): void {
-    const folders = vscode.workspace.workspaceFolders ?? [];
-    if (folders.length === 0) {
-      return;
-    }
-    for (const pattern of [".devweave/project.json", ".devweave/work-items/**", ".devweave/baseline/**", "wiki/**", ".codex/hooks.json", "AGENTS.md", "skills-lock.json", ".agents/skills/**"]) {
-      for (const folder of folders) {
-        const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder.uri, pattern));
-        watcher.onDidChange((uri) => this.scheduleRefresh(uri), undefined, context.subscriptions);
-        watcher.onDidCreate((uri) => this.scheduleRefresh(uri), undefined, context.subscriptions);
-        watcher.onDidDelete((uri) => this.scheduleRefresh(uri), undefined, context.subscriptions);
-        context.subscriptions.push(watcher);
-      }
-    }
-  }
-
-  public async refresh(changes: Partial<RefreshChangeSet> = { forceFull: true }): Promise<WorkspaceSnapshot> {
-    const root = await this.resolveRoot(false);
-    if (!root) {
-      this.snapshot = unavailableSnapshot(this.multipleRootMessage());
-      this.tree?.update(this.snapshot);
-      await this.dashboard?.refresh(this.snapshot);
-      return this.snapshot;
-    }
-    const bundle = await this.loadBootstrapBundle();
-    this.ensureRefreshCoordinator(
-      root,
-      bundle?.directories,
-      bundle?.files
+  public async activate(): Promise<void> {
+    this.context.subscriptions.push(
+      vscode.window.createTreeView("devweave.runs", { treeDataProvider: this.tree }),
+      vscode.commands.registerCommand("devweave.openControlCenter", () => this.openDashboard()),
+      vscode.commands.registerCommand("devweave.startRun", () => this.openDashboard()),
+      vscode.commands.registerCommand("devweave.resumeRun", () => this.resumePrompt()),
+      vscode.commands.registerCommand("devweave.steer", () => this.steerPrompt()),
+      vscode.commands.registerCommand("devweave.interrupt", () => this.guard(() => this.controller.interrupt())),
+      vscode.commands.registerCommand("devweave.cancel", () => this.cancelPrompt())
     );
-    await this.refreshCoordinator?.request(changes);
-    return this.snapshot;
+    this.tree.update(this.controller.state);
   }
 
-  public async openDashboard(workId?: string): Promise<void> {
-    const root = await this.resolveRoot(true);
-    if (!root) {
-      await vscode.window.showInformationMessage(this.multipleRootMessage());
-      return;
-    }
-    this.activeRoot = root;
-    if (workId) {
-      this.selectedWorkId = workId;
-    }
-    const snapshot = await this.refresh();
-    const selectedSnapshot = workId ? await this.selectWork(workId) : snapshot;
-    await this.dashboard?.show(selectedSnapshot, this.selectedWorkId ?? undefined);
+  public dispose(): void {
+    void this.shutdown();
   }
 
-  public async selectWork(workId: string | null): Promise<WorkspaceSnapshot> {
-    this.selectedWorkId = resolveWorkSelection(this.snapshot, workId);
-    if (this.selectedWorkId && this.reader) {
-      const detail = await this.reader.readWorkItemDetail(this.selectedWorkId);
-      if (detail) {
-        this.snapshot = {
-          ...this.snapshot,
-          workItems: this.snapshot.workItems.map((item) => item.id === detail.id ? detail : item),
-          selectedWorkId: this.selectedWorkId
-        };
-      } else {
-        this.snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
+  public async shutdown(): Promise<void> {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.dashboard?.dispose();
+    await Promise.allSettled([this.appServer.close(), this.host.close()]);
+  }
+
+  private openDashboard(): void {
+    if (!this.dashboard) {
+      this.dashboard = new ControlCenterPanel(this.context.extensionUri, this.controller, (intent) => this.handleIntent(intent));
+      this.dashboard.onDispose(() => { this.dashboard = undefined; });
+    }
+    this.dashboard.reveal();
+    this.dashboard.update(this.controller.state);
+  }
+
+  private async handleIntent(intent: UiIntent): Promise<void> {
+    await this.guard(async () => {
+      if (intent.type === "start") {
+        await this.ensureHost();
+        const draft = await this.createDraft(intent.goal, intent.scope, intent.risk);
+        const codexPath = this.codexPath();
+        await this.controller.startRun({ draft, slug: slug(intent.goal), ...(codexPath ? { codex_path: codexPath } : {}) });
+      } else if (intent.type === "resume") {
+        await this.ensureHost();
+        await this.controller.resumeRun(intent.runId, this.codexPath(), intent.threadId);
+      } else if (intent.type === "turn") {
+        await this.controller.startTurn(intent.text);
+      } else if (intent.type === "steer") {
+        await this.controller.steer(intent.text);
+      } else if (intent.type === "interrupt") {
+        await this.controller.interrupt();
+      } else if (intent.type === "cancel") {
+        await this.controller.cancel();
+      } else if (intent.type === "approval") {
+        await this.controller.resolveApproval(intent.requestId, intent.decision);
+      } else if (intent.type === "decision") {
+        const decision = pendingDecision(this.controller.state.run, intent.decisionId);
+        await this.controller.decide(decision, intent.optionId, intent.other);
+      } else if (intent.type === "gate") {
+        await this.controller.decideGate(intent.gateId, intent.approve, this.controller.state.review ?? undefined);
+      } else if (intent.type === "review") {
+        await this.runReview();
+      } else if (intent.type === "refresh") {
+        await this.controller.refreshRun(this.codexPath());
       }
-    } else {
-      this.snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
-    }
-    this.tree?.update(this.snapshot);
-    return this.snapshot;
-  }
-
-  public handleWorkspaceFoldersChanged(): void {
-    this.activeRoot = undefined;
-    this.selectedWorkId = null;
-    this.refreshCoordinator?.dispose();
-    this.refreshCoordinator = undefined;
-    this.reader = undefined;
-    void this.refresh();
-  }
-
-  private ensureRefreshCoordinator(root: vscode.Uri, bootstrapDirectories?: readonly string[], bootstrapFiles?: BootstrapBundleFile[]): void {
-    if (this.activeRoot?.toString() === root.toString() && this.refreshCoordinator && this.reader) {
-      return;
-    }
-    this.refreshCoordinator?.dispose();
-    this.activeRoot = root;
-    const port: FileSystemPort = new VscodeFileSystemPort(root);
-    this.reader = new WorkspaceSnapshotReader(port, {
-      rootName: root.path.split("/").filter(Boolean).at(-1) ?? "Repository",
-      rootPath: root.toString(),
-      bootstrapDirectories,
-      bootstrapFiles,
-      initialReadMode: "summary"
-    });
-    this.refreshCoordinator = new RefreshCoordinator<WorkspaceSnapshot>({
-      read: (changes) => this.reader?.readWorkspace(changes) ?? Promise.reject(new Error("Workspace snapshot reader is unavailable.")),
-      publish: (next) => this.publishSnapshot(next),
-      onError: (error) => this.output.appendLine(`[refresh] ${error instanceof Error ? error.message : String(error)}`)
     });
   }
 
-  private publishSnapshot(next: WorkspaceSnapshot): void {
-    this.snapshot = { ...next, selectedWorkId: resolveWorkSelection(next, this.selectedWorkId) };
-    this.selectedWorkId = this.snapshot.selectedWorkId;
-    this.tree?.update(this.snapshot);
-    void this.dashboard?.refresh(this.snapshot);
+  private async ensureHost(): Promise<void> {
+    if (this.hostConnected) return;
+    const python = vscode.workspace.getConfiguration("devweave", this.workspace).get<string>("pythonPath", "python");
+    const script = vscode.Uri.joinPath(
+      this.workspace,
+      ".agents", "skills", "devweave", "scripts", "devweave_v2_host.py"
+    ).fsPath;
+    await this.host.connect(python, script, this.workspace.fsPath);
+    this.hostConnected = true;
   }
 
-  private async loadBootstrapBundle(): Promise<BootstrapBundle | undefined> {
-    if (this.bootstrapBundle) return this.bootstrapBundle;
-    if (!this.bootstrapBundlePromise) {
-      this.bootstrapBundlePromise = (async () => {
-        try {
-          const resources = new VscodeBootstrapResourceReader(this.context.extensionUri);
-          const bundle = await readBootstrapBundle(resources);
-          if (!isBootstrapBundle(bundle)) throw new Error("Bootstrap manifest is malformed.");
-          this.bootstrapBundle = bundle;
-          return bundle;
-        } catch (error) {
-          this.output.appendLine(`[bootstrap] manifest unavailable: ${error instanceof Error ? error.message : String(error)}`);
-          return undefined;
+  private codexPath(): string | undefined {
+    const configured = vscode.workspace.getConfiguration("devweave", this.workspace).get<string>("codexPath", "").trim();
+    return configured || undefined;
+  }
+
+  private async createDraft(goal: string, scope: string, risk: RiskLevel): Promise<Record<string, unknown>> {
+    const normalizedScope = scope.replaceAll("\\", "/").trim();
+    if (!normalizedScope || normalizedScope.startsWith("/") || normalizedScope.split("/").includes("..")) {
+      throw new Error("Scope must be a normalized repository-relative path or pattern.");
+    }
+    const projectUri = vscode.Uri.joinPath(this.workspace, ".devweave", "project.json");
+    const project = JSON.parse(new TextDecoder().decode(await vscode.workspace.fs.readFile(projectUri))) as Record<string, unknown>;
+    if (project.schema_version !== 2 || typeof project.verification_plan !== "object" || project.verification_plan === null) {
+      throw new Error("DevWeave schema-v2 project configuration is required before starting a run.");
+    }
+    const runId = `${utcStamp()}-${slug(goal)}`.slice(0, 120);
+    return {
+      schema_version: 2,
+      run_id: runId,
+      revision: 1,
+      goal: goal.trim(),
+      scope: [normalizedScope],
+      non_goals: ["No push, pull request, merge, reset, or automatic branch switch."],
+      requirements: ["REQ-DRAFT-001"],
+      acceptance_criteria: ["AC-DRAFT-001"],
+      decisions: [{ decision_id: "DEC-DRAFT-001", summary: "Agent must refine this seed plan before its planning Gate." }],
+      tasks: [{
+        task_id: "TASK-001",
+        title: "Refine and implement the governed vertical slice",
+        requirement_ids: ["REQ-DRAFT-001"],
+        acceptance_ids: ["AC-DRAFT-001"],
+        declared_paths: [normalizedScope],
+        dependencies: []
+      }],
+      verification_plan: project.verification_plan,
+      risk,
+      risk_rationale: `User selected ${risk} risk; engine escalation remains authoritative.`
+    };
+  }
+
+  private async runReview(): Promise<void> {
+    const outcome = await this.controller.reviewForAcceptance(async (round, findings) => {
+      const summaries = findings.map((item) => `${item.finding_id}: ${item.summary}`).join("\n");
+      const turnId = await this.controller.startTurn(
+        `Resolve review round ${round} findings, run the frozen verification plan, and request completion again.\n${summaries}`
+      );
+      if (!turnId || !this.appServer.waitForTurnCompleted) throw new Error("Fix turn could not be observed.");
+      await this.appServer.waitForTurnCompleted(turnId);
+      await this.controller.refreshRun(this.codexPath());
+      const verification = record(record(this.controller.state.run).verification);
+      if (verification.status !== "passed") throw new Error("Fix round did not produce current successful verification.");
+    });
+    if (outcome.status === "blocked") {
+      throw new Error("Detached review remains blocked after its bounded rounds.");
+    }
+  }
+
+  private async resumePrompt(): Promise<void> {
+    const runId = await vscode.window.showInputBox({ title: "Resume DevWeave run", prompt: "Run ID", ignoreFocusOut: true });
+    if (!runId) return;
+    await this.guard(async () => {
+      await this.ensureHost();
+      await this.controller.resumeRun(runId, this.codexPath());
+      this.openDashboard();
+    });
+  }
+
+  private async steerPrompt(): Promise<void> {
+    const text = await vscode.window.showInputBox({ title: "Steer active Codex turn", prompt: "Additional instruction", ignoreFocusOut: true });
+    if (text) await this.guard(() => this.controller.steer(text));
+  }
+
+  private async cancelPrompt(): Promise<void> {
+    const answer = await vscode.window.showWarningMessage("Cancel the active DevWeave run?", { modal: true }, "Cancel run");
+    if (answer === "Cancel run") await this.guard(() => this.controller.cancel());
+  }
+
+  private async guard(action: () => Promise<unknown>): Promise<void> {
+    try {
+      await action();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await vscode.window.showErrorMessage(`DevWeave: ${message}`);
+    }
+  }
+}
+
+class ControlCenterPanel implements vscode.Disposable {
+  private readonly panel: vscode.WebviewPanel;
+  private readonly disposables: vscode.Disposable[] = [];
+  private disposeListener: (() => void) | undefined;
+
+  public constructor(
+    extensionUri: vscode.Uri,
+    private readonly controller: WorkspaceController,
+    onIntent: (intent: UiIntent) => Promise<void>
+  ) {
+    this.panel = vscode.window.createWebviewPanel(
+      "devweave.controlCenter",
+      "DevWeave Control Center",
+      vscode.ViewColumn.Active,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [vscode.Uri.joinPath(extensionUri, "dist")]
+      }
+    );
+    this.panel.webview.html = webviewHtml(this.panel.webview, extensionUri);
+    this.disposables.push(
+      this.panel.onDidDispose(() => this.disposeListener?.()),
+      this.panel.webview.onDidReceiveMessage(async (value: unknown) => {
+        const intent = parseUiIntent(value);
+        if (!intent) {
+          await vscode.window.showErrorMessage("DevWeave rejected an invalid Control Center message.");
+          return;
         }
-      })();
-    }
-    return this.bootstrapBundlePromise;
-  }
-
-  public async preview(intent: PublicCommandIntent): Promise<PromptBundle> {
-    const snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
-    return this.composer.compose(intent, snapshot);
-  }
-
-  public getPreferences(): DashboardPreferences {
-    const stored = this.context.workspaceState.get<Partial<DashboardPreferences>>(this.preferencesKey);
-    return { displayMode: stored?.displayMode === "advanced" ? "advanced" : "concise" };
-  }
-
-  public async setDisplayMode(mode: DisplayMode): Promise<void> {
-    await this.context.workspaceState.update(this.preferencesKey, { displayMode: mode });
-  }
-
-  public async initialize(): Promise<{ report: BootstrapReport; snapshot: WorkspaceSnapshot }> {
-    const root = await this.resolveRoot(true);
-    if (!root) {
-      const report = bootstrapFailure("workspace", this.multipleRootMessage());
-      return { report, snapshot: this.snapshot };
-    }
-    this.activeRoot = root;
-    const snapshot = await this.refresh();
-    if (snapshot.mutationBlocked) {
-      const report = bootstrapConflict(snapshot.projectPath, "目前 project.json 存在但 snapshot 有 critical diagnostic；不會自動修復或覆寫既有內容。");
-      await vscode.window.showErrorMessage("DevWeave workspace 有衝突或嚴重問題，初始化未執行。", "開啟控制中心");
-      return { report, snapshot };
-    }
-    const resources = new VscodeBootstrapResourceReader(this.context.extensionUri);
-    const bundle = await this.loadBootstrapBundle();
-    if (!bundle) {
-      const report = bootstrapFailure("manifest.json", "Bootstrap bundle manifest 無法載入；workspace 未寫入。");
-      return { report, snapshot };
-    }
-    const workspace = new VscodeBootstrapWorkspace(root);
-    const preparation = await this.bootstrapInstaller.prepare(bundle, resources, workspace);
-    const inspection = this.bootstrapInstaller.inspectPrepared(preparation);
-    if (inspection.complete) {
-      const report: BootstrapReport = {
-        ok: true,
-        complete: true,
-        status: "already_initialized",
-        created: [],
-        adopted: inspection.adopted,
-        skipped: inspection.skipped,
-        missing: [],
-        conflicts: [],
-        errors: [],
-        rolledBack: []
-      };
-      await vscode.window.showInformationMessage("目前 workspace 已完成 DevWeave 初始化。", "開啟控制中心");
-      return { report, snapshot };
-    }
-    const isRepair = snapshot.projectExists;
-    const confirmation = await vscode.window.showWarningMessage(
-      isRepair
-        ? `DevWeave control bundle 尚未完整（剩餘 ${inspection.missing.length + inspection.conflicts.length} 項）。這會只補齊無衝突缺檔，不覆寫既有不同內容。是否繼續？`
-        : "這會在目前 workspace 建立 DevWeave control bundle、六組 skills、hook、project、baseline 與 Wiki starter。是否繼續？",
-      { modal: true },
-      "繼續初始化",
-      "取消"
+        await onIntent(intent);
+      })
     );
-    if (confirmation !== "繼續初始化") {
-      const report = bootstrapFailure("workspace", "使用者取消初始化；repository 未寫入。");
-      return { report, snapshot };
-    }
-
-    try {
-      this.bootstrapTransaction = true;
-      const report = await this.bootstrapInstaller.installPrepared(preparation, workspace);
-      this.bootstrapTransaction = false;
-      const refreshed = await this.refresh();
-      this.output.appendLine(`[bootstrap] ${JSON.stringify(report)}`);
-      if (report.complete) {
-        await vscode.window.showInformationMessage("DevWeave 初始化完成；已重新整理 workspace 檔案快照。", "開啟控制中心");
-      } else {
-        await vscode.window.showErrorMessage("DevWeave 初始化未完成，請檢查衝突或錯誤路徑。", "開啟控制中心");
-      }
-      return { report, snapshot: refreshed };
-    } catch (error) {
-      this.bootstrapTransaction = false;
-      const report = bootstrapFailure("bootstrap", error instanceof Error ? error.message : String(error));
-      const refreshed = await this.refresh();
-      this.output.appendLine(`[bootstrap] ${JSON.stringify(report)}`);
-      await vscode.window.showErrorMessage("DevWeave bootstrap bundle 無法載入，workspace 未宣稱初始化成功。", "開啟控制中心");
-      return { report, snapshot: refreshed };
-    }
   }
 
-  public async copyNextAction(): Promise<void> {
-    const root = await this.resolveRoot(true);
-    if (!root) {
-      await vscode.window.showInformationMessage(this.multipleRootMessage());
-      return;
-    }
-    this.activeRoot = root;
+  public reveal(): void { this.panel.reveal(vscode.ViewColumn.Active); }
 
-    const snapshot = await this.refresh();
-    const activeWorks = snapshot.workItems.filter((work) => work.status === "active");
-    const selectedActiveWork = this.selectedWorkId
-      ? activeWorks.find((work) => work.id === this.selectedWorkId)
-      : undefined;
-    const work = activeWorks.length === 1 ? activeWorks[0] : selectedActiveWork;
-
-    if (!work) {
-      await this.dashboard?.show(snapshot, this.selectedWorkId ?? undefined);
-      await vscode.window.showInformationMessage(
-        activeWorks.length === 0
-          ? "目前沒有 active work；請先建立或選取 work，再預覽下一步。"
-          : "目前有多個 active work；請先在控制中心選取 work，再預覽下一步。"
-      );
-      return;
-    }
-
-    this.selectedWorkId = work.id;
-    const selectedSnapshot = { ...snapshot, selectedWorkId: work.id };
-    await this.dashboard?.show(selectedSnapshot, work.id);
-    await this.dashboard?.previewAction({ type: "next", workId: work.id });
+  public update(state: ControllerState): void {
+    void this.panel.webview.postMessage({ type: "state", state: projectUiState(state) });
   }
 
-  public async previewWikiBootstrap(): Promise<void> {
-    const intent = { type: "wikiBootstrap" } as const;
-    try {
-      const root = await this.resolveRoot(true);
-      if (!root) {
-        await vscode.window.showInformationMessage(this.multipleRootMessage());
-        return;
-      }
-      this.activeRoot = root;
-      const snapshot = await this.refresh();
-      await this.dashboard?.show(snapshot, this.selectedWorkId ?? undefined);
-      await this.dashboard?.previewAction(intent);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error ?? "未知錯誤");
-      this.output.appendLine(`[wiki-bootstrap] ${detail}`);
-      await vscode.window.showErrorMessage(
-        "無法在控制中心產生 Wiki bootstrap prompt 預覽；請先確認 workspace，再重新整理。",
-        "開啟控制中心"
-      );
-    }
-  }
+  public onDispose(listener: () => void): void { this.disposeListener = listener; }
 
-  public async openFile(relativePath: string): Promise<void> {
-    if (!this.activeRoot || !isSafeWorkspacePath(relativePath) || !isAllowedDevWeavePath(relativePath)) {
-      throw new Error("檔案路徑不安全，或尚未選擇 repository。");
-    }
-    const uri = vscode.Uri.joinPath(this.activeRoot, ...relativePath.replaceAll("\\", "/").split("/"));
-    const document = await vscode.workspace.openTextDocument(uri);
-    await vscode.window.showTextDocument(document, { preview: true });
-  }
-
-  public async copyBundle(bundle: PromptBundle): Promise<PromptBundle> {
-    const snapshot = { ...this.snapshot, selectedWorkId: this.selectedWorkId };
-    if (bundle.mutation && snapshot.mutationBlocked) {
-      throw new Error("目前 workspace 有 critical contract 問題，只能查看；請先使用 status 確認後再重新整理。");
-    }
-    await this.clipboard.copy(bundle.chatText);
-    return bundle;
-  }
-
-  public async notifyCopySuccess(): Promise<void> {
-    await vscode.window.showInformationMessage("DevWeave prompt 已複製到剪貼簿；請在 Codex Chat 審閱並送出。", "開啟控制中心");
-  }
-
-  private pendingRefreshPaths = new Set<string>();
-  private pendingRefreshForceFull = false;
-
-  private scheduleRefresh(uri?: vscode.Uri): void {
-    if (this.bootstrapTransaction) {
-      return;
-    }
-    const relativePath = uri ? this.relativeWorkspacePath(uri) : undefined;
-    if (relativePath) {
-      this.pendingRefreshPaths.add(relativePath);
-    } else {
-      this.pendingRefreshForceFull = true;
-    }
-    if (this.refreshTimer) {
-      clearTimeout(this.refreshTimer);
-    }
-    this.refreshTimer = setTimeout(() => {
-      this.refreshTimer = undefined;
-      const changes = {
-        paths: [...this.pendingRefreshPaths].sort(),
-        forceFull: this.pendingRefreshForceFull
-      } satisfies RefreshChangeSet;
-      this.pendingRefreshPaths.clear();
-      this.pendingRefreshForceFull = false;
-      void this.refresh(changes);
-    }, 250);
-  }
-
-  private relativeWorkspacePath(uri: vscode.Uri): string | undefined {
-    const root = this.activeRoot;
-    if (!root || uri.scheme !== root.scheme) {
-      return undefined;
-    }
-    const rootPath = root.path.replace(/\/$/, "");
-    if (!uri.path.startsWith(`${rootPath}/`)) {
-      return undefined;
-    }
-    return uri.path.slice(rootPath.length + 1).replaceAll("\\", "/");
-  }
-
-  private async resolveRoot(promptForChoice: boolean): Promise<vscode.Uri | undefined> {
-    if (this.activeRoot) {
-      return this.activeRoot;
-    }
-    const folders = vscode.workspace.workspaceFolders ?? [];
-    if (folders.length === 0) {
-      return undefined;
-    }
-    if (folders.length === 1) {
-      return folders[0].uri;
-    }
-    if (!promptForChoice) {
-      return undefined;
-    }
-    const choices = await Promise.all(folders.map(async (folder) => {
-      const state = await this.readRootState(folder.uri);
-      return {
-        label: folder.name,
-        description: `${state.label} · ${folder.uri.fsPath}`,
-        detail: state.detail,
-        uri: folder.uri
-      };
-    }));
-    const picked = await vscode.window.showQuickPick(choices, {
-      placeHolder: "選擇要開啟的 DevWeave repository（顯示 managed 狀態）"
-    });
-    return picked?.uri;
-  }
-
-  private async readRootState(uri: vscode.Uri): Promise<{ label: string; detail: string }> {
-    const projectUri = vscode.Uri.joinPath(uri, ".devweave", "project.json");
-    try {
-      const bytes = await vscode.workspace.fs.readFile(projectUri);
-      const project: unknown = JSON.parse(new TextDecoder().decode(bytes));
-      const managed = isRecord(project) && typeof project.managed === "boolean" ? project.managed : null;
-      return managed === true
-        ? { label: "已管理", detail: "DevWeave managed workspace；可讀取 workflow snapshot。" }
-        : managed === false
-          ? { label: "未啟用 managed", detail: "已有 DevWeave 設定，但需要明確啟用。" }
-          : { label: "設定不完整", detail: "project.json 存在，但 managed 欄位無法確認。" };
-    } catch {
-      return { label: "未初始化", detail: "找不到 .devweave/project.json；可選此 repository 進行初始化。" };
-    }
-  }
-
-  private multipleRootMessage(): string {
-    const count = vscode.workspace.workspaceFolders?.length ?? 0;
-    return count > 1 ? "請先在 DevWeave Control Center 選擇一個 repository。" : "目前沒有可讀取的 VS Code workspace。";
+  public dispose(): void {
+    for (const disposable of this.disposables.splice(0)) disposable.dispose();
+    this.panel.dispose();
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+class RunTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
+  private readonly changed = new vscode.EventEmitter<void>();
+  private state: ControllerState | undefined;
+  public readonly onDidChangeTreeData = this.changed.event;
+
+  public update(state: ControllerState): void {
+    this.state = state;
+    this.changed.fire();
+  }
+
+  public getTreeItem(element: vscode.TreeItem): vscode.TreeItem { return element; }
+
+  public getChildren(): vscode.TreeItem[] {
+    if (!this.state?.run) return [treeItem("No active run", "Open Control Center to start")];
+    const run = this.state.run;
+    return [
+      treeItem(String(run.run_id ?? "Unknown run"), `Run · ${String(run.status ?? this.state.status)}`),
+      treeItem(this.state.threadId || "No thread", `Thread · ${this.state.appServer.connection}`),
+      treeItem(String(record(run.verification).status ?? "pending"), "Verification"),
+      treeItem(String(record(run.review).status ?? "pending"), "Review")
+    ];
+  }
 }
 
-function isBootstrapBundle(value: unknown): value is BootstrapBundle {
-  return isRecord(value)
-    && value.schemaVersion === 1
-    && typeof value.bundleVersion === "string"
-    && Array.isArray(value.directories)
-    && Array.isArray(value.files)
-    && value.files.every((file) => isRecord(file) && typeof file.destination === "string" && typeof file.source === "string");
+function treeItem(label: string, description: string): vscode.TreeItem {
+  const item = new vscode.TreeItem(label);
+  item.description = description;
+  item.command = { command: "devweave.openControlCenter", title: "Open Control Center" };
+  return item;
 }
 
-function unavailableSnapshot(message: string): WorkspaceSnapshot {
-  const diagnostic: Diagnostic = { severity: "warning", code: "workspace_unavailable", message };
-  return {
-    capturedAt: new Date().toISOString(),
-    rootName: null,
-    rootPath: null,
-    projectPath: ".devweave/project.json",
-    projectExists: false,
-    managed: null,
-    schemaVersion: null,
-    project: null,
-    commands: [],
-    verificationProfiles: {},
-    baselineFiles: [],
-    hookPresent: false,
-    skillPresent: false,
-    bootstrap: { complete: false, expected: [], missing: [], conflicts: [], pathKinds: {}, conflictReasons: {} },
-    workItems: [],
-    knowledge: {
-      root: "wiki",
-      health: "unknown",
-      pages: [],
-      placeholderPages: [],
-      stalePages: [],
-      critical: [],
-      warnings: [diagnostic],
-      affectedPages: [],
-      pendingRefresh: [],
-      coveredChangedPaths: [],
-      uncoveredChangedPaths: [],
-      bootstrap: {
-        complete: false,
-        recommended: true,
-        reasons: ["overview_not_ready", "architecture_missing", "module_missing"],
-        overview: null,
-        architecturePages: [],
-        modulePages: []
-      },
-      review: {
-        required: false,
-        current: false,
-        disposition: null,
-        rationale: "",
-        affectedPages: [],
-        coveredChangedPaths: [],
-        uncoveredChangedPaths: [],
-        changeFingerprint: null,
-        recordedAt: null,
-        invalidatedAt: null
-      },
-      planned: null
-    },
-    diagnostics: [diagnostic],
-    mutationBlocked: false,
-    source: "filesystem",
-    authoritative: false,
-    engineObservedAt: null,
-    engineGateStatus: "unavailable",
-    projectionReadiness: "attention",
-    selectedWorkId: null
-  };
+function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+  const nonce = randomBytes(18).toString("base64");
+  const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "dist", "webview", "main.js"));
+  const styles = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "dist", "webview", "styles.css"));
+  return `<!doctype html><html lang="en"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+    <link rel="stylesheet" href="${styles}"><title>DevWeave Control Center</title></head>
+    <body><div id="app" aria-busy="false"><p>Connecting to DevWeave…</p></div><script nonce="${nonce}" src="${script}"></script></body></html>`;
 }
 
-function isSafeWorkspacePath(value: string): boolean {
-  const normalized = value.replaceAll("\\", "/");
-  return Boolean(normalized) && !normalized.startsWith("/") && !/^[A-Za-z]:/.test(normalized) && !normalized.split("/").includes("..");
+function pendingDecision(run: Record<string, unknown> | null, decisionId: string): PendingDecision {
+  const value = record(record(run).pending_decision);
+  if (value.decision_id !== decisionId) throw new Error("Pending decision is stale or unavailable.");
+  return value as unknown as PendingDecision;
 }
 
-function isAllowedDevWeavePath(value: string): boolean {
-  const normalized = value.replaceAll("\\", "/");
-  return normalized === ".devweave/project.json"
-    || normalized.startsWith(".devweave/work-items/")
-    || normalized.startsWith(".devweave/baseline/")
-    || normalized.startsWith("wiki/")
-    || normalized === ".codex/hooks.json"
-    || normalized === "AGENTS.md"
-    || normalized === "skills-lock.json"
-    || normalized.startsWith(".agents/skills/");
+function slug(value: string): string {
+  return value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "run";
 }
 
-function bootstrapFailure(path: string, reason: string): BootstrapReport {
-  return {
-    ok: false,
-    complete: false,
-    status: "failed",
-    created: [],
-    adopted: [],
-    skipped: [],
-    missing: [],
-    conflicts: [],
-    errors: [{ path, reason }],
-    rolledBack: []
-  };
+function utcStamp(): string {
+  return new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
 }
 
-function bootstrapConflict(path: string, reason: string): BootstrapReport {
-  return {
-    ok: false,
-    complete: false,
-    status: "conflict",
-    created: [],
-    adopted: [],
-    skipped: [],
-    missing: [],
-    conflicts: [{ path, reason }],
-    errors: [],
-    rolledBack: []
-  };
+function record(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }

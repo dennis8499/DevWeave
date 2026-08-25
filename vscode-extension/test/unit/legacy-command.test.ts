@@ -5,15 +5,23 @@ import test from "node:test";
 
 const extensionRoot = resolve(process.cwd());
 
-test("legacy copyNextAction command opens the Control Center preview flow", () => {
+test("V2 exposes only governed run commands and removes prompt-copy and Wiki entry points", () => {
   const packageJson = JSON.parse(readFileSync(resolve(extensionRoot, "package.json"), "utf8")) as {
-    contributes?: { commands?: Array<{ command?: string; title?: string }> };
+    activationEvents?: string[];
+    contributes?: { commands?: Array<{ command?: string }> };
   };
   const extension = readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8");
-  const method = extension.match(/public async copyNextAction\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? "";
-
-  assert.ok(packageJson.contributes?.commands?.some((command) => command.command === "devweave.copyNextAction"));
-  assert.match(method, /dashboard\?\.show\(/);
-  assert.match(method, /dashboard\?\.previewAction\(/);
-  assert.doesNotMatch(method, /await this\.copy\(\{ type: "next"/);
+  const commands = (packageJson.contributes?.commands ?? []).map((item) => item.command).sort();
+  assert.deepEqual(commands, [
+    "devweave.cancel",
+    "devweave.interrupt",
+    "devweave.openControlCenter",
+    "devweave.resumeRun",
+    "devweave.startRun",
+    "devweave.steer"
+  ]);
+  assert.doesNotMatch(JSON.stringify(packageJson), /copyNextAction|wikiBootstrap|clipboard/i);
+  assert.doesNotMatch(extension, /\.\/clipboard|\.\/prompt|\.\/dashboard|\.\/wiki-/);
+  assert.match(extension, /new CodexAppServerSession\(\)/);
+  assert.match(extension, /new WorkspaceController\(/);
 });

@@ -26,6 +26,12 @@ interface ReviewWaiter {
   timeout: NodeJS.Timeout;
 }
 
+interface TurnWaiter {
+  resolve(value: unknown): void;
+  reject(error: Error): void;
+  timeout: NodeJS.Timeout;
+}
+
 export interface ServerRequest {
   id: number | string;
   method: ServerRequestMethod;
@@ -49,6 +55,8 @@ export class CodexAppServerSession {
   private readonly emitter = new EventEmitter();
   private readonly reviewResults = new Map<string, unknown>();
   private readonly reviewWaiters = new Map<string, ReviewWaiter>();
+  private readonly turnResults = new Map<string, unknown>();
+  private readonly turnWaiters = new Map<string, TurnWaiter>();
   private projectionValue = initialProjection();
   private readonly timeoutMs: number;
   private readonly maxAggregateBytes: number;
@@ -86,6 +94,21 @@ export class CodexAppServerSession {
         reject(new AppServerError("REVIEW_TIMEOUT", "Detached review result timed out."));
       }, this.timeoutMs);
       this.reviewWaiters.set(reviewerThreadId, { resolve, reject, timeout });
+    });
+  }
+
+  public waitForTurnCompleted(turnId: string): Promise<unknown> {
+    const completed = this.turnResults.get(turnId);
+    if (completed !== undefined) {
+      this.turnResults.delete(turnId);
+      return Promise.resolve(completed);
+    }
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.turnWaiters.delete(turnId);
+        reject(new AppServerError("TURN_TIMEOUT", "Turn completion timed out."));
+      }, Math.max(this.timeoutMs, 120_000));
+      this.turnWaiters.set(turnId, { resolve, reject, timeout });
     });
   }
 
@@ -148,7 +171,9 @@ export class CodexAppServerSession {
     this.initialized = false;
     this.rejectPending(new AppServerError("SESSION_CLOSED", "App-server session closed."));
     this.rejectReviewWaiters(new AppServerError("SESSION_CLOSED", "App-server session closed."));
+    this.rejectTurnWaiters(new AppServerError("SESSION_CLOSED", "App-server session closed."));
     this.reviewResults.clear();
+    this.turnResults.clear();
     await transport?.close();
     this.projectionValue = { ...this.projectionValue, connection: "disconnected" };
     this.publish();
@@ -227,6 +252,7 @@ export class CodexAppServerSession {
     }
     if (typeof value.method === "string") {
       this.captureReviewResult(value.method, value.params);
+      this.captureTurnResult(value.method, value.params);
       this.projectionValue = reduceAppServerEvent(this.projectionValue, value.method, value.params);
       this.publish();
       return;
@@ -245,6 +271,7 @@ export class CodexAppServerSession {
     void transport?.close();
     this.rejectPending(error);
     this.rejectReviewWaiters(error);
+    this.rejectTurnWaiters(error);
     this.initialized = false;
     this.projectionValue = addDiagnostic({ ...this.projectionValue, connection: "failed" }, "app_server_failure", error.message);
     this.publish();
@@ -287,6 +314,30 @@ export class CodexAppServerSession {
       waiter.reject(error);
     }
     this.reviewWaiters.clear();
+  }
+
+  private captureTurnResult(method: string, params: unknown): void {
+    if (method !== "turn/completed" || !isRecord(params)) return;
+    const turnId = typeof params.turnId === "string" ? params.turnId : typeof params.turn_id === "string" ? params.turn_id : "";
+    if (!turnId) return;
+    const result = { status: typeof params.status === "string" ? bounded(params.status, 128) : "completed" };
+    const waiter = this.turnWaiters.get(turnId);
+    if (waiter) {
+      clearTimeout(waiter.timeout);
+      this.turnWaiters.delete(turnId);
+      waiter.resolve(result);
+    } else {
+      this.turnResults.set(turnId, result);
+      if (this.turnResults.size > 16) this.turnResults.delete(this.turnResults.keys().next().value!);
+    }
+  }
+
+  private rejectTurnWaiters(error: Error): void {
+    for (const waiter of this.turnWaiters.values()) {
+      clearTimeout(waiter.timeout);
+      waiter.reject(error);
+    }
+    this.turnWaiters.clear();
   }
 
   private publish(): void {

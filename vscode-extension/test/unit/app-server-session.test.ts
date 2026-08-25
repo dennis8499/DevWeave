@@ -119,6 +119,17 @@ test("server approval requests are surfaced and can receive a correlated respons
   await session.close();
 });
 
+test("turn completion can be awaited before or after the authoritative event arrives", async () => {
+  const { session, transport, connect } = connectedHarness();
+  await connect;
+  const pending = session.waitForTurnCompleted("turn-before");
+  transport.receive({ method: "turn/completed", params: { turnId: "turn-before", status: "completed" } });
+  assert.deepEqual(await pending, { status: "completed" });
+  transport.receive({ method: "turn/completed", params: { turnId: "turn-after", status: "failed" } });
+  assert.deepEqual(await session.waitForTurnCompleted("turn-after"), { status: "failed" });
+  await session.close();
+});
+
 test("process exit rejects calls and reconnect resumes the recorded thread", async () => {
   const transports: TranscriptTransport[] = [];
   const session = new CodexAppServerSession({

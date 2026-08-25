@@ -4,127 +4,56 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 const extensionRoot = resolve(process.cwd());
-const runtimeFiles = [
-  "src/clipboard.ts",
-  "src/bootstrap.ts",
-  "src/bootstrap-compat.ts",
-  "src/dashboard.ts",
-  "src/extension.ts",
-  "src/filesystem.ts",
-  "src/model.ts",
-  "src/prompt.ts",
-  "src/protocol.ts",
-  "src/snapshot.ts",
-  "src/tree.ts",
-  "src/vscode-filesystem.ts",
-  "src/vscode-bootstrap.ts",
-  "src/refresh-coordinator.ts",
-  "src/render-scheduler.ts",
-  "src/wiki-search.ts",
-  "src/wiki-results-mount.ts",
-  "webview/main.ts"
-];
+const source = (path: string): string => readFileSync(resolve(extensionRoot, path), "utf8");
 
-function runtimeSource(): string {
-  return runtimeFiles.map((file) => readFileSync(resolve(extensionRoot, file), "utf8")).join("\n");
-}
-
-test("Extension runtime has no process, shell, or external-network path and confines writes to bootstrap", () => {
-  const source = runtimeSource();
-  assert.doesNotMatch(source, /from ["']node:child_process["']|from ["']child_process["']/);
-  assert.doesNotMatch(source, /\b(?:exec|execFile|spawn|fork|createTerminal)\s*\(/);
-  const extensionSource = readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8");
-  assert.doesNotMatch(extensionSource, /workspace\.fs\.(?:writeFile|delete|rename)\s*\(/);
-  const bootstrapAdapter = readFileSync(resolve(extensionRoot, "src/vscode-bootstrap.ts"), "utf8");
-  assert.match(bootstrapAdapter, /workspace\.fs\.writeFile\s*\(/);
-  assert.match(bootstrapAdapter, /useTrash: false/);
-  assert.match(bootstrapAdapter, /code === "FileNotFound"/);
-  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/);
-  assert.doesNotMatch(source, /commands\.executeCommand\s*\(/);
-  assert.match(source, /env\.clipboard\.writeText\s*\(/);
+test("process execution is isolated to bounded JSONL transports with shell disabled", () => {
+  const transport = source("src/app-server/transport.ts");
+  const bridge = source("src/controller/host-bridge-client.ts");
+  const otherRuntime = [
+    "src/extension.ts", "src/app-server/session.ts", "src/app-server/event-reducer.ts",
+    "src/controller/workspace-controller.ts", "src/controller/approval-broker.ts",
+    "src/controller/review-coordinator.ts", "webview/main.ts", "webview/render.ts"
+  ].map(source).join("\n");
+  assert.match(transport, /from "node:child_process"/);
+  assert.match(transport, /spawn\(options\.executable, options\.args/);
+  assert.match(transport, /shell: false/);
+  assert.match(transport, /windowsHide: true/);
+  assert.doesNotMatch(otherRuntime, /from ["']node:child_process["']/);
+  assert.match(bridge, /args: \["-B", hostScript\]/);
+  assert.doesNotMatch(bridge, /env:\s*\{[^}]*token/is);
 });
 
-test("package and Webview keep the approved dependency and CSP boundary", () => {
-  const packageJson = JSON.parse(readFileSync(resolve(extensionRoot, "package.json"), "utf8")) as Record<string, unknown>;
-  const dependencies = Object.keys((packageJson.devDependencies ?? {}) as Record<string, unknown>);
-  assert.equal(dependencies.some((name) => name === "react" || name === "react-dom"), false);
-  assert.match(readFileSync(resolve(extensionRoot, "src/dashboard.ts"), "utf8"), /default-src 'none'/);
-  assert.match(readFileSync(resolve(extensionRoot, "src/dashboard.ts"), "utf8"), /localResourceRoots/);
-  assert.match(readFileSync(resolve(extensionRoot, "webview/main.ts"), "utf8"), /raw log/);
-  assert.doesNotMatch(readFileSync(resolve(extensionRoot, "webview/main.ts"), "utf8"), /readText\s*\(\s*item\.rawLog/);
+test("Webview has a strict CSP and no direct network, filesystem, shell, or clipboard channel", () => {
+  const extension = source("src/extension.ts");
+  const webview = source("webview/main.ts");
+  const manifest = JSON.parse(source("package.json")) as { devDependencies?: Record<string, unknown> };
+  assert.match(extension, /default-src 'none'/);
+  assert.match(extension, /script-src 'nonce-\$\{nonce\}'/);
+  assert.doesNotMatch(extension, /unsafe-inline|unsafe-eval/);
+  assert.match(extension, /localResourceRoots/);
+  assert.doesNotMatch(webview, /\b(?:fetch|XMLHttpRequest|WebSocket)\b|clipboard|child_process|workspace\.fs/i);
+  assert.equal(Boolean(manifest.devDependencies?.react || manifest.devDependencies?.["react-dom"]), false);
 });
 
-test("workflow mutations remain preview-first and bootstrap uses explicit confirmation", () => {
-  const webview = readFileSync(resolve(extensionRoot, "webview/main.ts"), "utf8");
-  const dashboard = readFileSync(resolve(extensionRoot, "src/dashboard.ts"), "utf8");
-  const extension = readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8");
-  const protocol = readFileSync(resolve(extensionRoot, "src/protocol.ts"), "utf8");
-  assert.match(webview, /id="public-command-form"/);
-  assert.match(webview, /預覽公開操作/);
-  assert.match(webview, /data-action="confirm-copy"/);
-  assert.match(webview, /type: "previewAction"/);
-  assert.match(webview, /type: "copyAction"/);
-  assert.match(webview, /new.*feature.*refactor.*bug.*next.*status.*revise.*approve/s);
-  assert.doesNotMatch(webview, /ActionIntent JSON|compose-json|data-intent/);
-  assert.doesNotMatch(webview, /type: "(?:doctor|commandSet|taskStart|knowledgePlan|close|validate)"/);
-  assert.doesNotMatch(webview, /targetPaths|machineCommand|bundle\.gate/);
-  assert.match(dashboard, /case "previewAction"/);
-  assert.match(dashboard, /case "copyAction"/);
-  assert.match(webview, /data-action="initialize"/);
-  assert.match(webview, /type: "initialize"/);
-  assert.match(protocol, /case "initialize"/);
-  assert.match(dashboard, /case "initialize"/);
-  assert.match(extension, /showWarningMessage\([\s\S]*modal: true/);
-  assert.match(extension, /new BootstrapInstaller\(\)/);
+test("reasoning and unvalidated Webview messages cannot cross the presentation boundary", () => {
+  const reducer = source("src/app-server/event-reducer.ts");
+  const renderer = source("webview/render.ts");
+  const extension = source("src/extension.ts");
+  assert.match(reducer, /type === "reasoning"/);
+  assert.match(renderer, /item\.type !== "reasoning"/);
+  assert.match(extension, /const intent = parseUiIntent\(value\)/);
+  assert.match(extension, /rejected an invalid Control Center message/);
+  assert.doesNotMatch(renderer, /hasPrivateContent[^\n]*content/);
 });
 
-test("Wiki bootstrap has three prompt-only entrances with one public intent", () => {
-  const webview = readFileSync(resolve(extensionRoot, "webview/main.ts"), "utf8");
-  const extension = readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8");
-  const packageJson = JSON.parse(readFileSync(resolve(extensionRoot, "package.json"), "utf8")) as {
-    activationEvents?: string[];
-    contributes?: { commands?: Array<{ command?: string; title?: string }>; menus?: { commandPalette?: Array<{ command?: string }> } };
-  };
-  const commands = packageJson.contributes?.commands ?? [];
-  const palette = packageJson.contributes?.menus?.commandPalette ?? [];
-
-  assert.match(webview, /wikiBootstrap/);
-  assert.match(webview, /data-action="wiki-bootstrap"/);
-  assert.match(webview, /data-action="wiki-bootstrap"/);
-  assert.match(webview, /action === "wiki-bootstrap"[\s\S]*type: "wikiBootstrap"/);
-  assert.ok(commands.some((item) => item.command === "devweave.wikiBootstrap" && item.title === "DevWeave: 建立 Codebase Wiki（開啟預覽）"));
-  assert.ok(palette.some((item) => item.command === "devweave.wikiBootstrap"));
-  assert.ok(packageJson.activationEvents?.includes("onCommand:devweave.wikiBootstrap"));
-  assert.match(extension, /registerCommand\("devweave\.wikiBootstrap"/);
-  assert.match(extension, /previewWikiBootstrap[\s\S]*dashboard\?\.show[\s\S]*dashboard\?\.previewAction\(intent\)/);
-  assert.doesNotMatch(extension, /previewWikiBootstrap[\s\S]*copyBundle\(bundle\)/);
-  assert.match(extension, /showWarningMessage\([\s\S]*modal: true/);
-  assert.doesNotMatch(extension, /devweave\.py|knowledge bootstrap|workspace\.fs\.writeFile/);
-});
-
-test("P2 preferences and Wiki browsing stay Extension-local and discoverable", () => {
-  const webview = readFileSync(resolve(extensionRoot, "webview/main.ts"), "utf8");
-  const extension = readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8");
-  const protocol = readFileSync(resolve(extensionRoot, "src/protocol.ts"), "utf8");
-  assert.match(webview, /set-display-mode/);
-  assert.match(webview, /show-all-wiki/);
-  assert.match(webview, /wiki-query/);
-  assert.match(webview, /wiki-type/);
-  assert.match(webview, /輸入後按 Enter 套用搜尋/);
-  assert.match(webview, /wikiSearch\.updateDraft/);
-  assert.match(webview, /wikiSearch\.submit/);
-  assert.match(webview, /id="wiki-results"/);
-  assert.match(webview, /knowledgeRenderScheduler/);
-  assert.doesNotMatch(webview, /renderKnowledgeOnly/);
-  assert.match(webview, /case "help"/);
-  assert.match(webview, /bootstrap\.complete/);
-  assert.match(webview, /初始化／補齊 DevWeave/);
-  assert.match(readFileSync(resolve(extensionRoot, "src/extension.ts"), "utf8"), /\.inspectPrepared\(preparation\)/);
-  assert.doesNotMatch(webview, /Snapshot may be newer than engine-observed state/);
-  assert.match(extension, /workspaceState\.get/);
-  assert.match(extension, /workspaceState\.update/);
-  assert.match(extension, /已管理/);
-  assert.match(extension, /未初始化/);
-  assert.match(protocol, /case "setDisplayMode"/);
-  assert.match(protocol, /isDisplayMode/);
+test("all privileged workflow mutations route through the authenticated private host bridge", () => {
+  const extension = source("src/extension.ts");
+  const controller = source("src/controller/workspace-controller.ts");
+  const bridge = source("src/controller/host-bridge-client.ts");
+  assert.doesNotMatch(extension, /workspace\.fs\.(?:writeFile|delete|rename)\s*\(/);
+  assert.match(controller, /this\.host\.request\("run_start"/);
+  assert.match(controller, /this\.host\.request\("decision_resolve"/);
+  assert.match(controller, /this\.host\.request\("gate_decide"/);
+  assert.match(bridge, /createHmac\("sha256", this\.token\)/);
+  assert.match(bridge, /this\.send\(\{ type: "hello", token: this\.token/);
 });

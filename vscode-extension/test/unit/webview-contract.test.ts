@@ -2,68 +2,117 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
-import { dashboardPanelState, dashboardSectionDefinitions, moveDashboardSection } from "../../src/dashboard-sections";
-import { mountWikiResults } from "../../src/wiki-results-mount";
+
+import { initialProjection } from "../../src/app-server/event-reducer";
+import type { UiProjection } from "../../src/ui/projection";
+import { parseUiIntent } from "../../src/ui/protocol";
+import { nextTabIndex, renderControlCenter, TABS } from "../../webview/render";
 
 const extensionRoot = resolve(process.cwd());
 
-test("Wiki result mount writes rendered markup into the dedicated result host", () => {
-  const host = { innerHTML: "" };
-  const fakeDocument = {
-    querySelector(selector: string) {
-      return selector === "#wiki-results" ? host : null;
-    }
+function fixture(): UiProjection {
+  const appServer = initialProjection();
+  appServer.connection = "connected";
+  appServer.threadStatus = "active";
+  appServer.turnStatus = "completed";
+  appServer.plan = [{ step: "Implement vertical slice" }];
+  appServer.diff = "+<unsafe>";
+  appServer.usage = { inputTokens: 3, outputTokens: 4, totalTokens: 7 };
+  appServer.items = {
+    visible: { id: "visible", type: "agentMessage", status: "completed", authoritative: true, content: "done <ok>" },
+    private: { id: "private", type: "reasoning", status: "completed", authoritative: true, hasPrivateContent: true }
   };
+  return {
+    source: "authoritative+projection",
+    stale: false,
+    status: "ready",
+    run: {
+      run_id: "run-1",
+      status: "awaiting_gate",
+      plan: { goal: "Ship <script>" },
+      verification: { status: "passed" },
+      review: { status: "passed" },
+      gates: { G2: { status: "pending" } },
+      pending_decision: {
+        decision_id: "D-1", question: "Choose?", allow_other: true,
+        options: [{ option_id: "safe", label: "Safe" }]
+      }
+    },
+    preflight: {
+      status: "ready",
+      codex: { version: "codex-cli 1.2.3" },
+      app_server: { schema_sha256: "a".repeat(64) }
+    },
+    threadId: "thread-1",
+    turnId: "turn-1",
+    appServer,
+    pendingApprovals: [{
+      request: { id: "approval-1", method: "item/fileChange/requestApproval", params: {} },
+      assessment: { eligible: true, reason: "Declared task scope", paths: ["src/app.ts"], readOnly: false }
+    }],
+    review: {
+      status: "passed", round: 1, reviewerThreadId: "review-thread",
+      findings: [{
+        schema_version: 2, finding_id: "F-1", severity: "warning", summary: "Bounded",
+        paths: ["src/app.ts"], requirement_ids: ["REQ-1"], acceptance_ids: ["AC-1"],
+        task_ids: ["TASK-1"], status: "open", round: 1
+      }],
+      unresolvedCritical: false
+    },
+    diagnostics: ["healthy"]
+  };
+}
 
-  assert.equal(mountWikiResults(fakeDocument, "<p>結果</p>"), true);
-  assert.equal(host.innerHTML, "<p>結果</p>");
+test("Control Center renders the complete V2 state with authority and safe escaping", () => {
+  const html = renderControlCenter(fixture());
+  for (const label of ["Connection", "Preflight", "Codex", "Run", "Thread", "Turn", "Usage", "Plan &amp; diff", "Gates", "Tools, approvals &amp; decisions", "Verification &amp; review", "Diagnostics"]) {
+    assert.match(html, new RegExp(label));
+  }
+  assert.match(html, /Authoritative \/ current/);
+  assert.match(html, /codex-cli 1\.2\.3/);
+  assert.match(html, /7 total \(3 in \/ 4 out\)/);
+  assert.match(html, /Ship &lt;script&gt;/);
+  assert.match(html, /\+&lt;unsafe&gt;/);
+  assert.match(html, /done &lt;ok&gt;/);
+  assert.match(html, /data-action="decision-other"/);
+  assert.doesNotMatch(html, /type="reasoning"|>reasoning<|private start|private final/);
 });
 
-test("Webview contract keeps preview metadata, stale reset, and accessible five-tab navigation", () => {
-  const source = readFileSync(resolve(extensionRoot, "webview/main.ts"), "utf8");
-  const styles = readFileSync(resolve(extensionRoot, "webview/styles.css"), "utf8");
-  assert.match(source, /mountWikiResults\(document, renderKnowledgeResults\(\)\)/);
-  assert.match(source, /message\.revision !== snapshotRevision/);
-  assert.match(source, /pendingIntent = message\.intent/);
-  assert.match(source, /role="tablist"[\s\S]*aria-orientation="horizontal"/);
-  assert.match(source, /role="tabpanel"/);
-  assert.match(source, /sectionDefinitions\.map\(\(\[section\]\) => renderSectionPanel\(section\)\)/);
-  assert.match(source, /hidden aria-hidden=\\"true\\"/);
-  assert.match(source, /aria-labelledby="\$\{panel\.labelledBy\}"/);
-  assert.match(source, /aria-controls="tabpanel-/);
-  assert.match(source, /ArrowRight|ArrowDown/);
-  assert.match(source, /ArrowLeft|ArrowUp/);
-  assert.match(source, /moveDashboardSection\(currentSection, event\.key\)/);
-  assert.match(source, /tabindex="\$\{selectedSection === id \? 0 : -1\}"/);
-  assert.match(source, /目前有多個 active work/);
-  assert.match(source, /取消勾選即可查詢全部 active work/);
-  assert.match(source, /case "next"[\s\S]*activeWorks\.length === 0/);
-  assert.match(source, /case "status"[\s\S]*\{ type: command, all: true \}/);
-  assert.match(source, /errorDetail = message\.detail/);
-  assert.match(source, /查看 technical 詳情/);
-  assert.match(source, /預覽公開操作/);
-  assert.match(source, /renderPlanModeHandoff/);
-  assert.match(source, /先切換 Plan Mode，再貼到 Codex Chat/);
-  assert.match(source, /bundle\.planModeGuidance\?\.required/);
-  assert.match(source, /message\.bundle\.planModeGuidance\?\.required/);
-  assert.match(source, /data-action="confirm-copy"/);
-  assert.doesNotMatch(source, /request_user_input|requestUserInput/);
-  assert.doesNotMatch(source, /Preview public command/);
-  assert.match(styles, /@media \(forced-colors: active\)/);
+test("five semantic tabs use roving tabindex, hidden inactive panels, and complete keyboard movement", () => {
+  const html = renderControlCenter(fixture(), "plan");
+  assert.equal(TABS.length, 5);
+  assert.equal(html.match(/role="tab"/g)?.length, 5);
+  assert.equal(html.match(/role="tabpanel"/g)?.length, 5);
+  assert.equal(html.match(/role="tabpanel"[^>]*hidden/g)?.length, 4);
+  assert.match(html, /id="tab-plan"[^>]*aria-selected="true"[^>]*tabindex="0"/);
+  assert.equal(nextTabIndex(0, "ArrowRight"), 1);
+  assert.equal(nextTabIndex(0, "ArrowLeft"), 4);
+  assert.equal(nextTabIndex(2, "ArrowDown"), 3);
+  assert.equal(nextTabIndex(2, "ArrowUp"), 1);
+  assert.equal(nextTabIndex(2, "Home"), 0);
+  assert.equal(nextTabIndex(2, "End"), 4);
+  assert.equal(nextTabIndex(2, "PageDown"), 2);
+});
 
-  const definitions = dashboardSectionDefinitions;
-  assert.equal(definitions.length, 5);
-  const panelStates = definitions.map(([section]) => dashboardPanelState(section, "overview"));
-  assert.deepEqual(panelStates.map((panel) => panel.id), definitions.map(([section]) => `tabpanel-${section}`));
-  assert.deepEqual(panelStates.map((panel) => panel.labelledBy), definitions.map(([section]) => `section-tab-${section}`));
-  assert.equal(panelStates.filter((panel) => panel.hidden).length, 4);
-  assert.equal(panelStates.find((panel) => panel.id === "tabpanel-overview")?.tabIndex, 0);
-  assert.equal(moveDashboardSection("overview", "ArrowRight"), "work");
-  assert.equal(moveDashboardSection("overview", "ArrowLeft"), "help");
-  assert.equal(moveDashboardSection("work", "ArrowDown"), "knowledge");
-  assert.equal(moveDashboardSection("knowledge", "ArrowUp"), "work");
-  assert.equal(moveDashboardSection("knowledge", "Home"), "overview");
-  assert.equal(moveDashboardSection("knowledge", "End"), "help");
-  assert.equal(moveDashboardSection("overview", "PageDown"), null);
-  console.log("[accessibility] tabs=5 panels=5 hidden-inactive=4 keyboard=arrows/Home/End focus-restore=section-key forced-colors=checked");
+test("Webview intents are exact, bounded, and contain no legacy prompt-copy or Wiki surface", () => {
+  assert.deepEqual(parseUiIntent({ type: "start", goal: "Implement V2", scope: "src/**", risk: "high" }), {
+    type: "start", goal: "Implement V2", scope: "src/**", risk: "high"
+  });
+  assert.deepEqual(parseUiIntent({ type: "approval", requestId: "one", decision: "decline" }), {
+    type: "approval", requestId: "one", decision: "decline"
+  });
+  assert.equal(parseUiIntent({ type: "cancel", extra: true }), null);
+  assert.equal(parseUiIntent({ type: "decision", decisionId: "D", optionId: "one", other: "two" }), null);
+  assert.equal(parseUiIntent({ type: "copyNextAction" }), null);
+  assert.equal(parseUiIntent({ type: "wikiBootstrap" }), null);
+});
+
+test("Webview source preserves focus and supports forced colors and reduced motion", () => {
+  const main = readFileSync(resolve(extensionRoot, "webview/main.ts"), "utf8");
+  const styles = readFileSync(resolve(extensionRoot, "webview/styles.css"), "utf8");
+  assert.match(main, /dataset\.focusKey/);
+  assert.match(main, /CSS\.escape\(focusKey\)/);
+  assert.match(main, /nextTabIndex\(current, event\.key, tabs\.length\)/);
+  assert.match(styles, /@media \(forced-colors: active\)/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 });
