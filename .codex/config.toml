@@ -1,0 +1,16 @@
+[mcp_servers.devweave]
+command = "python"
+args = ["-B", ".agents/skills/devweave/scripts/devweave_v2_cli.py", "--repo", ".", "mcp-serve"]
+required = true
+startup_timeout_sec = 15
+tool_timeout_sec = 360
+enabled_tools = [
+  "run_inspect",
+  "context_read",
+  "plan_save",
+  "decision_request",
+  "task_update",
+  "verification_run",
+  "verification_read",
+  "completion_request",
+]

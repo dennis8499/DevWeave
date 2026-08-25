@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 from typing import Any, Sequence
 
 from .errors import DevWeaveError, ErrorCode
@@ -63,6 +64,9 @@ def emit(payload: dict[str, Any]) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
+        if args.command == "mcp-serve":
+            from .mcp_server import run_stdio
+            return run_stdio(Path(args.repo))
         raise DevWeaveError(
             ErrorCode.NOT_IMPLEMENTED,
             "The transitional V2 command handler is not active yet.",

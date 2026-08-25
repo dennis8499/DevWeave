@@ -15,6 +15,8 @@ from .plan_store import PlanStore
 from .risk import RISK_ORDER, escalate_risk, policy_for
 from .run_state import definition_fingerprint, invalidate_gates, new_exec_plan, planning_gates_current
 from .verification_contracts import RiskLevel
+from .verification_engine import VerificationEngine
+from .verification_store import VerificationReportStore
 
 Clock = Callable[[], str]
 
@@ -26,10 +28,20 @@ def utc_now() -> str:
 class RunService:
     """Coordinates domain mutations; adapters only receive a narrow facade."""
 
-    def __init__(self, repository: Path, *, store: PlanStore | None = None, clock: Clock = utc_now) -> None:
+    def __init__(
+        self,
+        repository: Path,
+        *,
+        store: PlanStore | None = None,
+        clock: Clock = utc_now,
+        verification_engine: VerificationEngine | None = None,
+        verification_store: VerificationReportStore | None = None,
+    ) -> None:
         self.repository = repository.resolve()
         self.store = store or PlanStore(self.repository)
         self.clock = clock
+        self.verification_engine = verification_engine
+        self.verification_store = verification_store or VerificationReportStore(self.repository)
 
     def agent(self) -> "AgentFacade":
         return AgentFacade(self)
@@ -197,9 +209,48 @@ class AgentFacade:
 
         return self._service.mutate(run_id, expected_revision, mutation_id, mutation)
 
-    def verification_run(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        del args, kwargs
-        raise DevWeaveError(ErrorCode.NOT_IMPLEMENTED, "Verification engine is installed by TASK-004.")
+    def verification_run(
+        self,
+        run_id: str,
+        *,
+        expected_revision: int,
+        mutation_id: str,
+        paths: list[str] | None = None,
+    ) -> dict[str, Any]:
+        engine = self._service.verification_engine
+        if engine is None:
+            raise DevWeaveError(ErrorCode.BLOCKED, "Verification engine is not configured.")
+        plan = self._service.inspect(run_id)
+        if mutation_id in plan["applied_mutations"]:
+            existing = self._service.verification_store.load(run_id, mutation_id)
+            if existing is None:
+                raise DevWeaveError(ErrorCode.CONFLICT, "Verification mutation is recorded but its runtime report is unavailable.")
+            return {"run": plan, "report": existing}
+        if plan["revision"] != expected_revision:
+            raise DevWeaveError(ErrorCode.STALE_REVISION, "Verification expected a stale run revision.")
+        if plan["phase"] not in {"implementation", "verification"} or not planning_gates_current(plan):
+            raise DevWeaveError(ErrorCode.GATE_REQUIRED, "Current planning gates do not allow verification.")
+        report = self._service.verification_store.load(run_id, mutation_id)
+        if report is None:
+            report = engine.run(
+                profile=RiskLevel(plan["risk"]),
+                plan_digest=plan["definition_fingerprint"],
+                changed_paths=tuple(paths or ()),
+            )
+            report = self._service.verification_store.save_once(run_id, mutation_id, report)
+
+        def mutation(candidate: dict[str, Any]) -> None:
+            evidence_ids = [item["evidence_id"] for item in report["evidence"]]
+            candidate["verification"]["status"] = "passed" if report["gate_eligible"] else "failed"
+            candidate["verification"]["evidence_ids"] = evidence_ids
+            candidate["verification"]["reports"][mutation_id] = {
+                "gate_eligible": bool(report["gate_eligible"]),
+                "evidence_ids": evidence_ids,
+                "plan_digest": report["plan_digest"],
+            }
+
+        updated = self._service.mutate(run_id, expected_revision, mutation_id, mutation)
+        return {"run": updated, "report": report}
 
     def verification_read(self, run_id: str) -> dict[str, Any]:
         plan = self._service.inspect(run_id)

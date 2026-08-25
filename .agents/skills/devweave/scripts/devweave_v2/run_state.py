@@ -73,7 +73,7 @@ def new_exec_plan(
         "tasks": tasks,
         "pending_decision": None,
         "decision_history": [],
-        "verification": {"status": "pending", "evidence_ids": []},
+        "verification": {"status": "pending", "evidence_ids": [], "reports": {}},
         "review": {"mode": policy.review_mode, "max_rounds": policy.max_review_rounds, "round": 0, "status": "pending", "finding_ids": []},
         "completion_requested": False,
         "blockers": [],
@@ -143,7 +143,7 @@ def invalidate_gates(plan: dict[str, Any]) -> None:
     plan["status"] = "awaiting_gate"
     plan["phase"] = "planning"
     plan["completion_requested"] = False
-    plan["verification"] = {"status": "pending", "evidence_ids": []}
+    plan["verification"] = {"status": "pending", "evidence_ids": [], "reports": {}}
     plan["review"]["round"] = 0
     plan["review"]["status"] = "pending"
     plan["review"]["finding_ids"] = []

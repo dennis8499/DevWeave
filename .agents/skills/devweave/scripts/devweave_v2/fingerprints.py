@@ -18,7 +18,7 @@ class FileObservation:
     digest: str
 
 
-IGNORED_PREFIXES = (".git/", ".devweave/runtime/")
+IGNORED_PREFIXES = (".git/", ".devweave/runtime/", "docs/exec-plans/active/")
 
 
 def file_digest(path: Path) -> str:
