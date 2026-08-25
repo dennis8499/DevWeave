@@ -200,10 +200,10 @@
       "status": "pending"
     },
     "build": {
-      "approved_at": null,
-      "approved_by": null,
-      "fingerprint": null,
-      "status": "pending"
+      "approved_at": "2026-08-25T10:44:47+00:00",
+      "approved_by": "user",
+      "fingerprint": "238276ea2b1b3cc137fe8865e44643a3fe889eb42589ca9a3155aace3d695a8d",
+      "status": "approved"
     },
     "scope": {
       "approved_at": "2026-08-25T08:58:36+00:00",
@@ -299,7 +299,7 @@
     "upserts": []
   },
   "last_verification": null,
-  "phase": "design",
+  "phase": "implementation",
   "risk": {
     "downgrade_rationale": null,
     "level": "high",
@@ -325,8 +325,269 @@
     "rationale": "V2 是整體 harness clean cutover：重組單一 Skill 與 Python engine、加入 project-scoped Codex/MCP 設定、更新 machine state/基線、壓縮根指引、建立架構與 docs 真實來源、遷移測試/fixtures、把 VS Code Extension 改為 app-server rich client、移除 Wiki 與 v1/VSIX tracked runtime artifacts，並同步 README、ignore 與 provenance。"
   },
   "status": "active",
-  "tasks": {},
+  "tasks": {
+    "TASK-001": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    },
+    "TASK-002": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    },
+    "TASK-003": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    },
+    "TASK-004": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    },
+    "TASK-005": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    },
+    "TASK-006": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    },
+    "TASK-007": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    },
+    "TASK-008": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    },
+    "TASK-009": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    },
+    "TASK-010": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    },
+    "TASK-011": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    },
+    "TASK-012": {
+      "completed_at": null,
+      "evidence": [],
+      "note": "",
+      "started_at": null,
+      "status": "pending"
+    }
+  },
   "title": "DevWeave V2 app-server harness",
-  "updated_at": "2026-08-25T08:58:36+00:00",
+  "updated_at": "2026-08-25T10:44:47+00:00",
+  "verification_plan": {
+    "commands": {
+      "app-server-e2e": {
+        "definition_digest": "sha256:055985b434d26c136c36e1eb367f185a1667c1d6348d9f1c4111f5c48894c64b",
+        "depends_on": [
+          "unit-tests-v2"
+        ],
+        "exclusive_group": null,
+        "expected_success_exit_codes": [
+          0
+        ],
+        "gate_eligibility": "zero-only",
+        "outputs": [],
+        "stage": 1,
+        "writes": "none"
+      },
+      "extension-tests": {
+        "definition_digest": "sha256:16ee6eab666621f8dccaa1c54ea2e3443056752da369a55ef4020d6a5956e899",
+        "depends_on": [],
+        "exclusive_group": null,
+        "expected_success_exit_codes": [
+          0
+        ],
+        "gate_eligibility": "zero-only",
+        "outputs": [],
+        "stage": 0,
+        "writes": "none"
+      },
+      "extension-typecheck": {
+        "definition_digest": "sha256:7effb79647f879c6eea5b497b844641c1c462657a106b3b5a9a85a7e3bae530c",
+        "depends_on": [],
+        "exclusive_group": null,
+        "expected_success_exit_codes": [
+          0
+        ],
+        "gate_eligibility": "zero-only",
+        "outputs": [],
+        "stage": 0,
+        "writes": "none"
+      },
+      "unit-tests-cli": {
+        "definition_digest": "sha256:937b31373e1e06fedb9491abdc9169b7668fe771f1e7bc5749b42cc1ec0bada9",
+        "depends_on": [],
+        "exclusive_group": null,
+        "expected_success_exit_codes": [
+          0
+        ],
+        "gate_eligibility": "zero-only",
+        "outputs": [],
+        "stage": 0,
+        "writes": "none"
+      },
+      "unit-tests-contract": {
+        "definition_digest": "sha256:3c8ed4f0f52aedede99934273a9c1c6dedfefb08e0a5bff79f3a35a49a6435ec",
+        "depends_on": [],
+        "exclusive_group": null,
+        "expected_success_exit_codes": [
+          0
+        ],
+        "gate_eligibility": "zero-only",
+        "outputs": [],
+        "stage": 0,
+        "writes": "none"
+      },
+      "unit-tests-core": {
+        "definition_digest": "sha256:9fefba877aab989ebb4dc51ec361c88a1d583339a8025d82d48bd8688b60dca9",
+        "depends_on": [],
+        "exclusive_group": null,
+        "expected_success_exit_codes": [
+          0
+        ],
+        "gate_eligibility": "zero-only",
+        "outputs": [],
+        "stage": 0,
+        "writes": "none"
+      },
+      "unit-tests-guard": {
+        "definition_digest": "sha256:a38fd273abc335d3a8edea2b7ad574f4025b74962f38d45053947aa3385264cb",
+        "depends_on": [],
+        "exclusive_group": null,
+        "expected_success_exit_codes": [
+          0
+        ],
+        "gate_eligibility": "zero-only",
+        "outputs": [],
+        "stage": 0,
+        "writes": "none"
+      },
+      "unit-tests-knowledge": {
+        "definition_digest": "sha256:ebfa3e45b1fb0108e4210ddb102955819391c51106f51f740483320d2119235a",
+        "depends_on": [],
+        "exclusive_group": null,
+        "expected_success_exit_codes": [
+          0
+        ],
+        "gate_eligibility": "zero-only",
+        "outputs": [],
+        "stage": 0,
+        "writes": "none"
+      },
+      "unit-tests-v2": {
+        "definition_digest": "sha256:196f6fa1c46efe5fdedc71fda56330e87549cb76393c4d62c8d1d087f66f4d44",
+        "depends_on": [],
+        "exclusive_group": null,
+        "expected_success_exit_codes": [
+          0
+        ],
+        "gate_eligibility": "zero-only",
+        "outputs": [],
+        "stage": 0,
+        "writes": "none"
+      }
+    },
+    "dependency_closure": {
+      "app-server-e2e": [
+        "unit-tests-v2"
+      ],
+      "extension-tests": [],
+      "extension-typecheck": [],
+      "unit-tests-cli": [],
+      "unit-tests-contract": [],
+      "unit-tests-core": [],
+      "unit-tests-guard": [],
+      "unit-tests-knowledge": [],
+      "unit-tests-v2": []
+    },
+    "frozen_at": "2026-08-25T10:44:47+00:00",
+    "not_applicable": [],
+    "plan_digest": "sha256:84a0b3bf59cc2edc154bfb0b102c87b6772cbd0f6b9c5f70fa217ef93e77605e",
+    "plan_id": "plan-bb36c8a0d4776b3e",
+    "policy_version": 2,
+    "profile": "high",
+    "project_policy_digest": "sha256:377a1734d16f37f443d5bfbf3d4aa616bad545b1a0e0f806f98f3592502cee1c",
+    "release_stage": null,
+    "required_commands": [
+      "app-server-e2e",
+      "extension-package",
+      "extension-smoke",
+      "extension-tests",
+      "extension-typecheck",
+      "unit-tests-cli",
+      "unit-tests-contract",
+      "unit-tests-core",
+      "unit-tests-guard",
+      "unit-tests-knowledge",
+      "unit-tests-v2"
+    ],
+    "risk": "high",
+    "schema_version": 1,
+    "selected_commands": [
+      "app-server-e2e",
+      "extension-tests",
+      "extension-typecheck",
+      "unit-tests-cli",
+      "unit-tests-contract",
+      "unit-tests-core",
+      "unit-tests-guard",
+      "unit-tests-knowledge",
+      "unit-tests-v2"
+    ],
+    "selection_basis_paths": [],
+    "skipped": [
+      {
+        "id": "extension-package",
+        "reason": "release-only"
+      },
+      {
+        "id": "extension-smoke",
+        "reason": "release-only-dependency:extension-package"
+      }
+    ],
+    "source_fingerprint_at_freeze": "8b83ec46c3cc2ad78f898c21ed48e17a961c3e48ac0f11d0e7098d1b3a41203e",
+    "source_fingerprint_at_plan": "8b83ec46c3cc2ad78f898c21ed48e17a961c3e48ac0f11d0e7098d1b3a41203e",
+    "stale": false,
+    "stale_reason": null
+  },
   "waivers": []
 }
