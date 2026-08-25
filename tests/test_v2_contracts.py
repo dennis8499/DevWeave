@@ -103,7 +103,7 @@ class PackageContractTests(unittest.TestCase):
         package_root = SCRIPT_ROOT / "devweave_v2"
         for path in package_root.glob("*.py"):
             source = path.read_text(encoding="utf-8")
-            self.assertNotIn("vscode-extension", source, str(path))
+            self.assertNotRegex(source, r"(?m)^\s*(?:from|import)\s+vscode(?:_|\.)extension")
             self.assertNotIn("devweave_core", source, str(path))
             self.assertLessEqual(len(source.splitlines()), 500, str(path))
 

@@ -1,7 +1,52 @@
 export const DEVWEAVE_VERSION = "2.0.0" as const;
 export const DEVWEAVE_SCHEMA_VERSION = 2 as const;
+export const PUBLIC_SCHEMA_NAMES = ["PendingDecision", "ReviewFinding", "RunPlanDraft", "RunSnapshot", "VerificationPlan"] as const;
 
 export type RiskLevel = "low" | "standard" | "high";
+
+export interface VerificationCommand {
+  command_id: string;
+  argv: string[];
+  cwd: string;
+  affected_paths: string[];
+  writes: "none" | "declared";
+  outputs: string[];
+  dependencies: string[];
+  timeout_seconds: number;
+  risk_profiles: RiskLevel[];
+  expected_exit_codes: number[];
+  release_only: boolean;
+  definition_digest: string;
+}
+
+export interface VerificationPlan {
+  schema_version: 2;
+  plan_id: string;
+  commands: VerificationCommand[];
+}
+
+export interface RunPlanDraft {
+  schema_version: 2;
+  run_id: string;
+  revision: number;
+  goal: string;
+  scope: string[];
+  non_goals: string[];
+  requirements: string[];
+  acceptance_criteria: string[];
+  decisions: Array<{ decision_id: string; summary: string }>;
+  tasks: Array<{
+    task_id: string;
+    title: string;
+    requirement_ids: string[];
+    acceptance_ids: string[];
+    declared_paths: string[];
+    dependencies: string[];
+  }>;
+  verification_plan: VerificationPlan;
+  risk: RiskLevel;
+  risk_rationale: string;
+}
 export type RunStatus =
   | "awaiting_gate"
   | "implementing"

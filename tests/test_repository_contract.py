@@ -64,7 +64,7 @@ def run_windows_hook(
 
 
 class RepositoryContractTests(unittest.TestCase):
-    def test_devweave_is_the_only_router_with_expected_companions(self) -> None:
+    def test_devweave_is_the_only_router_during_the_legacy_cutover(self) -> None:
         discovered = {
             path.parent.name
             for path in (REPOSITORY_ROOT / ".agents" / "skills").glob("*/SKILL.md")
@@ -73,7 +73,10 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertEqual(EXPECTED_REPOSITORY_SKILLS, skills)
 
         agents = (REPOSITORY_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        self.assertIn("DevWeave remains the sole SDLC router.", agents)
+        self.assertIn("Use the [DevWeave skill]", agents)
+        self.assertIn("One-time cutover note", agents)
+        for legacy_name in sorted(COMPANION_SKILLS):
+            self.assertNotIn(legacy_name, agents)
 
         for name in sorted(skills):
             source = (
@@ -181,178 +184,107 @@ class RepositoryContractTests(unittest.TestCase):
                         f"{markdown}: missing relative link target: {raw_target}",
                     )
 
-    def test_companion_skill_precedence_policy_covers_side_effect_boundaries(
+    def test_root_map_covers_v2_authority_and_side_effect_boundaries(
         self,
     ) -> None:
         agents = (REPOSITORY_ROOT / "AGENTS.md").read_text(encoding="utf-8")
         required_fragments = (
-            "DevWeave remains the sole SDLC router.",
-            "`grill-me`/`grilling` during requirements",
-            "`codebase-design` during G2 design",
-            "`diagnosing-bugs` for bug discovery",
-            "`tdd` only during implementation with a current G2 approval",
-            "Do not independently create or update `CONTEXT.md`, ADRs, `docs/agents/`",
-            "Before G2, do not modify tracked product source or tests.",
-            "Keep Wiki read-only until verification.",
-            "Do not create issues, branches, worktrees, commits, pushes, pull requests",
-            "Never edit DevWeave JSON/JSONL ledgers directly.",
-            "run `$devweave revise` from the earliest affected phase",
-            "Do not update them automatically",
+            "documentation index",
+            "ARCHITECTURE.md",
+            "Sources of truth",
+            "Agent-facing MCP exposes exactly eight workflow tools",
+            "Start/resume, human decisions, Gates, and cancel remain host-only",
+            "shell=False",
+            "undeclared writes",
+            "symlink escape",
+            "Never persist raw reasoning",
+            "Do not push, open a pull request, merge, reset, or switch branches",
+            "Do not edit canonical run JSON by hand",
+            "exact code/path plus owner, reason, and unexpired date",
         )
         for fragment in required_fragments:
             self.assertIn(fragment, agents)
 
+        self.assertLessEqual(len(agents.splitlines()), 100)
+        self.assertLessEqual(len(agents.encode("utf-8")), 8_000)
+        for legacy_name in sorted(COMPANION_SKILLS):
+            self.assertNotIn(legacy_name, agents)
+
     def test_interactive_decision_policy_is_explicit(self) -> None:
-        agents = (REPOSITORY_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        product = (REPOSITORY_ROOT / "docs" / "product.md").read_text(
+            encoding="utf-8"
+        )
+        design = (REPOSITORY_ROOT / "docs" / "design.md").read_text(
+            encoding="utf-8"
+        )
+        planning = (
+            REPOSITORY_ROOT
+            / ".agents"
+            / "skills"
+            / "devweave"
+            / "assets"
+            / "v2-skill"
+            / "references"
+            / "planning.md"
+        ).read_text(encoding="utf-8")
         router = (
-            REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "SKILL.md"
-        ).read_text(encoding="utf-8")
-        requirements = (
             REPOSITORY_ROOT
             / ".agents"
             / "skills"
             / "devweave"
-            / "references"
-            / "requirements-phase.md"
-        ).read_text(encoding="utf-8")
-        design = (
-            REPOSITORY_ROOT
-            / ".agents"
-            / "skills"
-            / "devweave"
-            / "references"
-            / "design-phase.md"
-        ).read_text(encoding="utf-8")
-        verification = (
-            REPOSITORY_ROOT
-            / ".agents"
-            / "skills"
-            / "devweave"
-            / "references"
-            / "verification-phase.md"
-        ).read_text(encoding="utf-8")
-        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
-        manual = (
-            REPOSITORY_ROOT / "docs" / "使用手冊.md"
+            / "assets"
+            / "v2-skill"
+            / "SKILL.md"
         ).read_text(encoding="utf-8")
 
         for fragment in (
-            "Interactive decision contract:",
-            "Facts that can be discovered from Wiki, source, tests, or approved artifacts",
-            "native-question-contract.md",
-            "request_user_input",
-            "Plan-first is mandatory",
-            "two or three mutually exclusive options",
-            "structured numbered fallback",
-            "Each question is asked one at a time with a recommendation and trade-off",
-            "never permits the agent to invent a decision or approve a Gate",
-            "New requirements, design, scope, or task decisions use `$devweave revise`",
-        ):
-            self.assertIn(fragment, agents)
-
-        for fragment in (
-            "## Interactive decision protocol",
-            "During G1, use `grill-me`/`grilling`; during G2, use `codebase-design`.",
-            "Follow [native-question-contract.md](references/native-question-contract.md)",
-            "Plan Mode is the formal native-question entry",
-            "request_user_input",
-            "structured numbered fallback",
-            "Ask one material decision at a time.",
-            "Do not silently choose an unresolved material decision",
-            "Before G1 approval, present the answered material decisions",
-            "Before G2 approval, present the answered design decisions",
-            "Gate summaries are Double Checks against the current artifacts",
-        ):
-            self.assertIn(fragment, router)
-
-        for fragment in (
-            "grill-me`/`grilling` for material requirements decisions and follow",
-            "follow [native-question-contract.md](native-question-contract.md)",
-            "Plan Mode as the formal native-question entry",
-            "request_user_input",
-            "structured numbered fallback",
-            "Wait for the user's answer before recording the next decision",
-            "Stop at the Gate if approval is absent",
-        ):
-            self.assertIn(fragment, requirements)
-
-        for fragment in (
-            "using `codebase-design` vocabulary",
-            "For each material design choice, follow",
-            "native-question-contract.md",
-            "Plan Mode",
-            "Stop before product-code or tracked-test changes",
+            "typed `PendingDecision` records",
+            "two or three options",
+            "recommendation",
+            "optional custom answer",
+            "Only the host can answer them",
         ):
             self.assertIn(fragment, design)
 
         for fragment in (
-            "Treat G3 as a conformance check against the approved",
-            "request_user_input",
-            "Do not silently resolve a newly discovered product or design decision",
-            "silence or an inferred acceptance is not approval",
+            "material product choice",
+            "two or three mutually exclusive options",
+            "recommendation",
+            "optional custom-answer policy",
+            "Stop the affected task until the host resolves it",
+            "Do not call a Gate operation",
+            "interpret silence as approval",
         ):
-            self.assertIn(fragment, verification)
+            self.assertIn(fragment, planning)
 
-        for fragment in (
-            "G1 的逐題決策流程是",
-            "G1/G2/Gate 的正式入口是",
-            "request_user_input",
-            "structured numbered fallback",
-            "G2 使用 `codebase-design` 在 Plan Mode 逐題確認",
-            "Plan Mode",
-            "每道 Gate 都是 validation 後的 Double Check",
-            "若 Gate 發現新需求或設計決策，必須使用 `revise`",
-        ):
-            self.assertIn(fragment, readme)
+        self.assertIn("Pending decision round-trip", product)
+        self.assertIn("malformed/stale input leaves the task pending", product)
+        self.assertIn("decisions, Gates, and cancellation", router)
+        self.assertIn("Agent/reviewer output is evidence, never approval", router)
 
-        for fragment in (
-            "使用 `grill-me`／`grilling` 逐題確認 material requirements",
-            "G1/G2/Gate 的正式入口是 Plan Mode",
-            "request_user_input",
-            "structured numbered fallback",
-            "在 Plan Mode 使用 `codebase-design` 逐題確認 material design trade-off",
-            "G1/G2 Gate 是對目前 artifacts 的 Double Check",
-            "必須使用 `revise` 回到最早受影響 phase",
-        ):
-            self.assertIn(fragment, manual)
-
-    def test_native_question_contract_is_shared_without_host_or_engine_adapters(
+    def test_pending_decisions_are_host_only_without_agent_passthrough(
         self,
     ) -> None:
-        contract = (
+        router = (
             REPOSITORY_ROOT
             / ".agents"
             / "skills"
             / "devweave"
-            / "references"
-            / "native-question-contract.md"
+            / "assets"
+            / "v2-skill"
+            / "SKILL.md"
         ).read_text(encoding="utf-8")
-        for fragment in (
-            "canonical host tool name is `request_user_input`",
-            "questions` contains exactly one item",
-            "options` contains two or three mutually exclusive choices",
-            "(Recommended)",
-            "host-provided `Other`",
-            "Before current G2",
-            "return to Plan Mode",
-            "structured numbered fallback",
-            "existing validation and CLI `approve`/`revise` contract",
-            "Tool visibility is a host capability",
-        ):
-            self.assertIn(fragment, contract)
-        self.assertNotIn("requestUserInput(", contract)
-
-        for name in sorted(COMPANION_SKILLS):
-            source = (
-                REPOSITORY_ROOT / ".agents" / "skills" / name / "SKILL.md"
-            ).read_text(encoding="utf-8")
-            self.assertIn("native question contract", source, name)
-            self.assertIn("Plan Mode", source, name)
-        router = (
-            REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "SKILL.md"
-        ).read_text(encoding="utf-8")
-        self.assertIn("native-question-contract.md", router)
-        self.assertIn("request_user_input", router)
+        product = (REPOSITORY_ROOT / "docs" / "product.md").read_text(
+            encoding="utf-8"
+        )
+        security = (REPOSITORY_ROOT / "docs" / "security.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("decision_request", router)
+        self.assertIn("decision_resolve", product)
+        self.assertIn("Host/agent capability isolation", product)
+        self.assertIn("MCP cannot discover or forward", security)
+        self.assertIn("decision resolution", security)
 
         extension_sources = list(
             (REPOSITORY_ROOT / "vscode-extension" / "src").rglob("*.ts")
@@ -361,40 +293,33 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertNotIn("request_user_input", path.read_text(encoding="utf-8"), path)
             self.assertNotIn("requestUserInput", path.read_text(encoding="utf-8"), path)
 
-    def test_initial_plan_mode_preflight_and_control_center_handoff_are_documented(
+    def test_codex_preflight_and_control_center_ownership_are_documented(
         self,
     ) -> None:
-        agents = (REPOSITORY_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        router = (REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "SKILL.md").read_text(encoding="utf-8")
-        contract = (
-            REPOSITORY_ROOT
-            / ".agents"
-            / "skills"
-            / "devweave"
-            / "references"
-            / "native-question-contract.md"
-        ).read_text(encoding="utf-8")
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
-        manual = (REPOSITORY_ROOT / "docs" / "使用手冊.md").read_text(encoding="utf-8")
-        extension_readme = (REPOSITORY_ROOT / "vscode-extension" / "README.md").read_text(encoding="utf-8")
-        bootstrap_agents = (
-            REPOSITORY_ROOT / "vscode-extension" / "assets" / "bootstrap" / "AGENTS.md"
+        product = (REPOSITORY_ROOT / "docs" / "product.md").read_text(
+            encoding="utf-8"
+        )
+        design = (REPOSITORY_ROOT / "docs" / "design.md").read_text(
+            encoding="utf-8"
+        )
+        security = (REPOSITORY_ROOT / "docs" / "security.md").read_text(
+            encoding="utf-8"
+        )
+        extension = (
+            REPOSITORY_ROOT / "vscode-extension" / "src" / "extension.ts"
         ).read_text(encoding="utf-8")
 
-        for source in (agents, router, contract):
-            self.assertIn("request_user_input", source)
-            self.assertIn("explicitly chooses compatibility", source)
-            self.assertIn("start", source)
-            self.assertIn("bind", source)
-
-        self.assertIn("Initial Plan Mode preflight", router)
-        self.assertIn("## Initial mutation preflight", contract)
-        self.assertIn("Plan Mode preflight", agents)
-        self.assertIn("Plan Mode preflight", readme)
-        self.assertIn("Plan Mode preflight", manual)
-        self.assertIn("Plan Mode preflight", bootstrap_agents)
-        self.assertIn("先切換 Plan Mode，再貼到 Codex Chat", extension_readme)
-        self.assertIn("不會嘗試切換 host mode", extension_readme)
+        self.assertIn("Missing Codex is a hard, machine-readable blocker", product)
+        self.assertIn("locally installed Codex CLI", readme)
+        self.assertIn("never downloads Codex", readme)
+        self.assertIn("Control Center", design)
+        self.assertIn("host facade contains five lifecycle mutations", design)
+        self.assertIn("Codex is resolved locally and never downloaded", security)
+        self.assertIn("codexPath", extension)
+        self.assertIn("devweave_v2_host.py", extension)
+        self.assertIn("startRun", extension)
+        self.assertNotIn("clipboard.writeText", extension)
 
     def test_runtime_has_no_openspec_or_third_party_imports(self) -> None:
         for path in SCRIPT_ROOT.glob("*.py"):
@@ -409,6 +334,7 @@ class RepositoryContractTests(unittest.TestCase):
                     imported.add(node.module.split(".", 1)[0])
             non_standard = imported - set(sys.stdlib_module_names) - {
                 "devweave_core",
+                "devweave_v2",
                 "command_policy",
                 "knowledge_core",
             }
@@ -534,128 +460,103 @@ class RepositoryContractTests(unittest.TestCase):
                 self.assertTrue(checks[name]["ok"], checks[name])
             self.assertTrue(report["ok"], report["checks"])
 
-    def test_codebase_wiki_and_current_release_contracts_are_documented(self) -> None:
-        documents = {
-            ".agents/skills/devweave/SKILL.md": (
-                "$devweave wiki bootstrap",
-                "knowledge review",
-                "knowledge scaffold",
-                "at most five related pages",
-                "read-only Wiki preflight",
-                "custom-only",
-            ),
-            ".agents/skills/devweave/references/requirements-phase.md": (
-                "bootstrap",
-                "source fallback",
-                "content hash",
-            ),
-            ".agents/skills/devweave/references/verification-phase.md": (
-                "promote|no-update",
-                "one to five content",
-                "placeholder",
-            ),
-            ".agents/skills/devweave/references/contracts.md": (
-                "knowledge_profile",
-                "knowledge_review_required",
-                "knowledge bootstrap",
-                "knowledge scaffold",
-                "reserved-starter preflight",
-            ),
-            "AGENTS.md": (
-                "$devweave wiki bootstrap",
-                "Knowledge Review",
-                "no-update",
-                "Initialization preflight",
-            ),
-            "README.md": (
-                "$devweave wiki bootstrap",
-                "Codebase LLM Wiki",
-                "Knowledge Review",
-                "read-only preflight",
-                "半套 `.devweave/`",
-            ),
-            "docs/使用手冊.md": (
-                "knowledge bootstrap",
-                "knowledge review",
-                "knowledge scaffold",
-                "exclusive-create",
-                "partial control bundle",
-            ),
-            "vscode-extension/README.md": (
-                "DevWeave: Bootstrap Codebase Wiki",
-                "$devweave wiki bootstrap",
-                "九個公開",
-                "semantic contract",
-                "adopted",
-            ),
-            "vscode-extension/assets/bootstrap/AGENTS.md": (
-                "Initialization order",
-                "partial control bundle",
-            ),
-        }
-        for relative, fragments in documents.items():
-            source = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
-            for fragment in fragments:
-                self.assertIn(fragment, source, f"{relative}: {fragment}")
-            self.assertNotIn("八個公開", source, relative)
-
-        release_surfaces = (
-            "README.md",
-            "docs/使用手冊.md",
-            "vscode-extension/README.md",
-            "vscode-extension/webview/help-content.ts",
+    def test_v2_knowledge_tree_and_release_contract_are_documented(self) -> None:
+        required = (
+            "ARCHITECTURE.md",
+            "docs/index.md",
+            "docs/product.md",
+            "docs/design.md",
+            "docs/reliability.md",
+            "docs/security.md",
+            "docs/quality.md",
+            "docs/generated/README.md",
+            "docs/exec-plans/active/README.md",
+            "docs/exec-plans/completed/README.md",
+            "docs/exec-plans/tech-debt.md",
         )
-        release_contract = (
-            "本次提供 0.2.3 VSIX",
-            "本次認證環境",
-            "Windows x64 build 10.0.26200／25H2",
-            "VS Code 1.131.0",
-            "Python 3.14.6",
-            "Git 2.51.0.windows.1",
-            "目前 Codex host",
-            "技術門檻",
-            "Python full suite 111 項",
-            "Extension unit tests 88 項",
-            "symlink 權限",
-            "停止散布",
-            "不會自動刪除 `.devweave`、Wiki 或 workspace 資料",
-            "PreToolUse",
-            "commandWindows",
-            "py -3 -X utf8 -B",
-            "CMD",
-            "PowerShell 7",
-            "VS Code terminal",
-            "launcher failure",
+        for relative in required:
+            self.assertTrue((REPOSITORY_ROOT / relative).is_file(), relative)
+
+        index = (REPOSITORY_ROOT / "docs" / "index.md").read_text(
+            encoding="utf-8"
         )
-        for relative in release_surfaces:
-            source = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
-            for fragment in release_contract:
-                self.assertIn(fragment, source, f"{relative}: {fragment}")
-            self.assertNotIn("本次提供 0.2.2 VSIX", source, relative)
-            self.assertNotIn("停用或解除安裝 0.2.2", source, relative)
-            self.assertNotRegex(source, r"\b0\.(?:1\.0|2\.0)\b", relative)
+        for label in (
+            "Architecture",
+            "Product",
+            "Design",
+            "Reliability",
+            "Security",
+            "Quality",
+            "Active ExecPlans",
+            "Completed ExecPlans",
+            "Tech debt",
+            "Generated references",
+        ):
+            self.assertIn(label, index)
 
-    def test_high_risk_review_stays_on_the_single_router_and_read_only_extension(self) -> None:
-        router = (REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "SKILL.md").read_text(encoding="utf-8")
-        verification = (REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "references" / "verification-phase.md").read_text(encoding="utf-8")
-        contracts = (REPOSITORY_ROOT / ".agents" / "skills" / "devweave" / "references" / "contracts.md").read_text(encoding="utf-8")
-        agents = (REPOSITORY_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        for source in (router, verification, contracts, agents):
-            self.assertIn("isolated", source)
-            self.assertIn("read-only", source)
-            self.assertIn("review record", source)
-            self.assertIn("human", source.lower())
-        self.assertIn("There is no public `$devweave review` chat verb.", router)
-        self.assertIn("Python engine does not spawn", verification)
-        self.assertIn("VS Code Extension does not invoke", verification)
-        self.assertIn("review-critical", contracts)
-        self.assertIn("G2 `Design It Twice`", agents)
+        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("# DevWeave 2.0.0", readme)
+        self.assertIn("exactly eight allowlisted MCP tools", readme)
+        self.assertIn("six verbs", readme)
+        self.assertIn("clean cutover", readme)
+        self.assertIn("never downloads Codex", readme)
+        self.assertIn("falls back to a clipboard workflow", readme)
 
-        core_source = (SCRIPT_ROOT / "devweave_core.py").read_text(encoding="utf-8")
-        extension_source = (REPOSITORY_ROOT / "vscode-extension" / "src" / "presentation.ts").read_text(encoding="utf-8")
-        self.assertIn('"kind": "review"', core_source)
-        self.assertIn("independent-review", extension_source)
-        self.assertNotIn("multi_agent", core_source)
+        canonical_surfaces = [
+            REPOSITORY_ROOT / "AGENTS.md",
+            REPOSITORY_ROOT / "ARCHITECTURE.md",
+            *(REPOSITORY_ROOT / "docs" / name for name in (
+                "index.md",
+                "product.md",
+                "design.md",
+                "reliability.md",
+                "security.md",
+                "quality.md",
+            )),
+        ]
+        for path in canonical_surfaces:
+            source = path.read_text(encoding="utf-8")
+            for legacy_name in sorted(COMPANION_SKILLS):
+                self.assertNotIn(legacy_name, source, path)
+
+    def test_high_risk_review_is_bounded_detached_and_human_accepted(self) -> None:
+        skill_root = (
+            REPOSITORY_ROOT
+            / ".agents"
+            / "skills"
+            / "devweave"
+            / "assets"
+            / "v2-skill"
+        )
+        router = (skill_root / "SKILL.md").read_text(encoding="utf-8")
+        verification = (skill_root / "references" / "verification.md").read_text(
+            encoding="utf-8"
+        )
+        product = (REPOSITORY_ROOT / "docs" / "product.md").read_text(
+            encoding="utf-8"
+        )
+        design = (REPOSITORY_ROOT / "docs" / "design.md").read_text(
+            encoding="utf-8"
+        )
+        coordinator = (
+            REPOSITORY_ROOT
+            / "vscode-extension"
+            / "src"
+            / "controller"
+            / "review-coordinator.ts"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("high risk permits at most three detached", router)
+        self.assertIn("Human acceptance remains mandatory", router)
+        self.assertIn("reviewer output is evidence, never approval", router)
+        self.assertIn("stops after three rounds", verification)
+        self.assertIn("Unresolved critical findings", verification)
+        self.assertIn("human Gate", verification)
+        self.assertIn("AC-014: Bounded independent review", product)
+        self.assertIn("A reviewer cannot reuse the implementation thread identity", design)
+        self.assertIn("raw reviewer reasoning is not persisted", design)
+        self.assertIn("maxRounds", coordinator)
+        self.assertIn("detached", coordinator)
 
 
 if __name__ == "__main__":

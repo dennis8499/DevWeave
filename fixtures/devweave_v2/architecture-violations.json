@@ -1,0 +1,61 @@
+[
+  {
+    "name": "oversized-module",
+    "path": ".agents/skills/devweave/scripts/devweave_v2/canonical.py",
+    "mode": "repeat",
+    "content": "pass\n",
+    "count": 501,
+    "expected_code": "MODULE_TOO_LARGE"
+  },
+  {
+    "name": "reverse-python-dependency",
+    "path": ".agents/skills/devweave/scripts/devweave_v2/canonical.py",
+    "mode": "replace",
+    "content": "from .cli import main\n",
+    "expected_code": "REVERSE_DEPENDENCY"
+  },
+  {
+    "name": "reverse-typescript-dependency",
+    "path": "vscode-extension/src/app-server/protocol.ts",
+    "mode": "replace",
+    "content": "import type { UiProjection } from \"../ui/projection\";\n",
+    "expected_code": "REVERSE_DEPENDENCY"
+  },
+  {
+    "name": "long-root-instructions",
+    "path": "AGENTS.md",
+    "mode": "repeat",
+    "content": "instruction\n",
+    "count": 101,
+    "expected_code": "ROOT_INSTRUCTIONS_TOO_LARGE"
+  },
+  {
+    "name": "public-schema-drift",
+    "path": "docs/generated/public-schema-catalog.json",
+    "mode": "replace",
+    "content": "{}\n",
+    "expected_code": "PUBLIC_SCHEMA_DRIFT"
+  },
+  {
+    "name": "broken-doc-link",
+    "path": "docs/index.md",
+    "mode": "append",
+    "content": "\n[Missing](does-not-exist.md)\n",
+    "expected_code": "BROKEN_DOC_LINK"
+  },
+  {
+    "name": "untraced-acceptance",
+    "path": "docs/product.md",
+    "mode": "append",
+    "content": "\n### AC-999: Fixture only\nNo quality trace.\n",
+    "expected_code": "UNTRACED_ACCEPTANCE",
+    "expected_path": "docs/quality.md"
+  },
+  {
+    "name": "duplicate-canonical-topic",
+    "path": "docs/reliability.md",
+    "mode": "append",
+    "content": "\n<!-- canonical-topic: product -->\n",
+    "expected_code": "DUPLICATE_CANONICAL_TOPIC"
+  }
+]

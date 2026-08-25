@@ -1,153 +1,60 @@
 ---
 name: devweave
-description: Drive repository-managed software changes and Codebase Wiki bootstrap through Wiki-first discovery, design, implementation, verification, and explicit human gates. Use when the user explicitly invokes $devweave for a new project, feature, refactor, bug, or Wiki bootstrap, or when a managed repository request would modify product code, tests, schemas, dependencies, build, or CI configuration.
+description: Govern repository changes with typed plans, risk-adaptive Gates, scoped tasks, controlled verification, and Codex app-server. Trigger on `$devweave`, DevWeave run/status/check/verify requests, or managed product changes.
 ---
 
 # DevWeave
 
-Use DevWeave as the repository's sole SDLC router. Keep machine state in the Python engine, keep human-facing artifacts and Gate summaries in Traditional Chinese unless requested otherwise, and treat companion Skills as phase methods rather than lifecycle owners.
+DevWeave is the only project workflow skill. Read the repository [knowledge map](../../../docs/index.md) and [architecture](../../../ARCHITECTURE.md); do not load all references by default.
 
-## Activation boundary
+## Route first
 
-1. Check for `.devweave/project.json` at the Git repository root.
-2. Without a project file, activate only for an explicit `$devweave` request. For `new`, `feature`, `refactor`, or `bug`, run `init`, inspect likely build/test/lint/typecheck commands, configure the commands, then run `start` before the first `status`.
-3. With `managed: true`, activate implicitly for requests that modify product code, tests, schemas, dependencies, build configuration, or CI configuration. Read-only exploration, explanation, status reporting, and review do not create a work item.
-4. Keep Git ownership with the user: do not create branches, worktrees, commits, pushes, pull requests, or remote-tracker records.
+1. Inspect `.devweave/project.json` without mutating it.
+2. For schema version 2, use the V2 public CLI for diagnostics and the project MCP tools for agent work. Host-only lifecycle operations remain in the VS Code controller.
+3. Read the current ExecPlan and load only the reference for its phase.
+4. If a fact is discoverable in docs, source, schemas, or tests, inspect it. Ask the user only for a material product decision.
+5. Stop at every required human Gate. Agent output never counts as approval.
 
-The public chat surface is:
+## Capability split
 
-- `$devweave new <goal>`
-- `$devweave feature <request>`
-- `$devweave refactor <target and outcome>`
-- `$devweave bug <symptom>`
-- `$devweave next [work-id]`
-- `$devweave status [work-id]`
-- `$devweave revise [work-id] <decision change>`
-- `$devweave approve [work-id]`
-- `$devweave wiki bootstrap`
+Agent MCP tools are exactly:
 
-There is no public `$devweave review` chat verb. The machine-only `review record` CLI is
-used by the existing router to persist one isolated high-risk G3 reviewer result; it does
-not create a second lifecycle, router, or orchestrator.
+- `run_inspect`
+- `context_read`
+- `plan_save`
+- `decision_request`
+- `task_update`
+- `verification_run`
+- `verification_read`
+- `completion_request`
 
-Translate those intents into engine commands. Never edit `state.json`, `events.jsonl`, evidence summaries, or project machine state directly.
+Only the authenticated host may start or resume a run, resolve a pending decision, decide a Gate, or cancel. Do not discover or invoke an alternate mutation path.
 
-## Initial Plan Mode preflight
+## Lifecycle
 
-Every pre-G2 mutation entry must complete a Plan Mode preflight before it creates or modifies a Work Item. This applies to `$devweave new`, `$devweave feature`, `$devweave refactor`, `$devweave bug`, `$devweave wiki bootstrap`, and `revise` when the requested change returns a Work Item to G1/requirements or G2/design. The preflight is also the ordering rule for the corresponding `start`, `bind`, `revise`, and bootstrap Work Item paths: none of those mutations may run before the preflight passes.
+- Planning produces a strict `RunPlanDraft`, immutable task definitions, scoped paths, acceptance IDs, a frozen verification plan, and risk rationale. Start implementation only after every planning Gate is current.
+- Implementation takes ready tasks in dependency order, changes only declared paths, and records progress through `task_update`. A material requirement/design/scope change returns to planning.
+- Verification executes only the frozen plan. A successful process is evidence only when source, plan, command definition, outputs, and declared effects reconcile.
+- Completion requires risk-selected review: low self-review, standard one detached review, high no more than three detached fix/reverify rounds. Unresolved critical findings block acceptance.
 
-The only repository-visible evidence of native host support is whether the Codex host exposes `request_user_input`. If it is visible, continue through the existing G1/G2 lifecycle. If it is not visible, tell the user to switch to Plan Mode and stop before resolving or creating the Work Item, binding the session, revising the work, or creating a bootstrap Work Item. The Router must not claim that it can inspect or switch the host mode.
+## Safety invariants
 
-If the host cannot switch modes, or the user explicitly chooses compatibility, use the same one-question-at-a-time structured numbered fallback defined by [native-question-contract.md](references/native-question-contract.md). A compatibility choice must be explicit; cancellation, silence, timeout, malformed input, or ambiguity stops the command without artifact, Work Item, binding, or Gate mutation. Read-only inspection such as `status` and `next` remains available.
+- Use structured argv with `shell=False`; never turn a configured command into shell permission.
+- Reject stale revisions, unknown fields/methods, traversal, symlink escape, undeclared writes, and destructive Git commands before mutation.
+- Keep the network denied unless an approved verification command explicitly declares otherwise.
+- Do not persist raw reasoning, full prompts, secrets, or invented usage/cost. Bound and redact diagnostics.
+- Do not push, open a PR, merge, reset, or switch back without separate user authorization.
+- Never hand-edit canonical plan/runtime/evidence state.
 
-For an explicit `new`, `feature`, `refactor`, or `bug` request in an uninitialized repository, the startup order is an exception to the normal continuation protocol: run `init`, configure proposed commands, and run `start` before the first `status`. Do not treat the expected absence of a work item before `start` as a blocker.
+## Phase references
 
-The uninitialized startup exception does not bypass the initial Plan Mode preflight: `init` and command configuration may complete as the existing startup exception requires, but the preflight must pass before `start` or its binding path runs.
+The V2-only release skill is prepared under `assets/v2-skill/` and installed by the hash-bound finalizer. During the one authorized transition run, use these existing engine-returned references:
 
-`init` performs a read-only Wiki preflight before acquiring the project lock or creating `.devweave` control state, then repeats the inspection inside the lock before writing anything. A missing, empty, or custom-only `wiki/` is compatible: starter files and typed directories are created only when absent. Existing `index.md`, `overview.md`, `log.md`, or starter directories are checked as reserved paths; wrong filesystem types or frontmatter return `knowledge_conflict` while preserving all existing bytes and leaving no partial control bundle from that call.
+- [Requirements](references/requirements-phase.md)
+- [Design](references/design-phase.md)
+- [Implementation](references/implementation-phase.md)
+- [Verification and legacy G3](references/verification-phase.md)
 
-For `$devweave wiki bootstrap`, run `knowledge bootstrap` without a scope argument. Report `already_complete` without creating a work item; otherwise use the returned created or resumed standard feature work item, bind it, and continue through the same G1/G2/G3 protocol. Bootstrap explores the whole repository, changes no product source, selects three to five high-value content pages in G2, and writes Wiki only in G3.
+## Transition exception
 
-## Operating sequence
-
-For every active turn, first apply the initial Plan Mode preflight when the intent is a listed pre-G2 mutation entry. Only after that preflight passes may the Router resolve the work item, bind the session, read the single phase reference returned by `instructions`, complete that phase's artifact and CLI state, run its validation, and stop at the next human Gate. Treat a turn as complete only when the phase reference's completion criterion passes and the next action is either an approved Gate or an explicit stop for human input.
-
-## Engine protocol
-
-Run the engine from the repository root:
-
-```text
-python .agents/skills/devweave/scripts/devweave.py --repo . <command>
-```
-
-Every engine response is JSON. Treat a nonzero exit code or `"ok": false` as a blocker and report its diagnostic. The stable exit codes and JSON contract are in [contracts.md](references/contracts.md).
-
-For every active turn:
-
-1. For a listed pre-G2 mutation entry, complete the initial Plan Mode preflight before `status` is used to resolve a mutable Work Item or before any command that can create/resume one. Read-only status used to explain the stop is allowed.
-2. Resolve with `status --work <id>` or `status`. If several candidates remain, show their IDs, titles, kinds, phases, and statuses and ask the user to choose.
-3. Run `bind --work <id>` and never fabricate a session ID. Treat the session as trusted only when the PreToolUse hook confirms the work ID; `awaiting_hook` means the guard may be untrusted.
-4. Run `instructions --work <id>` and read only its returned `reference`. Read [profiles.md](references/profiles.md) only when profile or risk rules are needed.
-5. Complete the phase artifact and CLI state/evidence, then run `validate --work <id>` before presenting an approval summary.
-6. Stop for explicit human approval at G1, G2, and G3. Run `approve` only after the user clearly approves the current gate.
-
-## Phase routing
-
-- **G1 requirements:** read Wiki-first context, inspect accepted baseline and the smallest necessary source ranges, then use `grill-me`/`grilling` for material requirements decisions. Produce complete `brief.md` and `requirements.md`, record risk and scope, validate `scope`, and stop at the Gate.
-- **G2 design:** keep Wiki read-only, use `codebase-design` vocabulary for module, interface, seam, adapter, depth, locality, and test surface, compare viable options, complete `design.md` and immutable `plan.md`, validate `build`, and stop before product-code or tracked-test changes.
-- **Implementation:** use the CLI task loop in dependency order. With current G2, use `tdd` for red → minimal green vertical slices and `diagnosing-bugs` for approved diagnosis work. Keep Wiki read-only and record targeted evidence.
-- **G3 verification:** inspect the complete diff, run every command required by the risk profile, reconcile scope/baseline/evidence, complete `acceptance.md`, and finish the Knowledge Review. Standard and low-risk work do not start the independent reviewer; high-risk work uses exactly one isolated read-only reviewer through the existing router and machine-only `review record` boundary.
-
-## Interactive decision protocol
-
-Facts and decisions have different handling:
-
-- Read Wiki, repository guidance, source, tests, and existing artifacts to answer facts that are discoverable in the environment. Do not ask the user to repeat repository facts.
-- During G1, use `grill-me`/`grilling`; during G2, use `codebase-design`. Ask only material decisions that affect user value, scope, interface, seam, risk, compatibility, acceptance, rollback, or observability.
-- Follow [native-question-contract.md](references/native-question-contract.md). Before current G2, Plan Mode is the formal native-question entry for G1/G2/Gate decisions; when `request_user_input` is visible, call the host tool with exactly one question, two or three mutually exclusive options, the recommended option first marked `(Recommended)`, descriptions, and host `Other`.
-- If a pre-G2 ordinary-mode Skill needs a material decision and the native tool is not visible, stop and request Plan Mode. If the host cannot switch modes or the user explicitly chooses compatibility, use the same structured numbered fallback with an explicit custom-answer entry; never use an unbounded freeform question. After current G2, ordinary mode may execute only approved tasks; new material decisions use `revise`.
-- Ask one material decision at a time. Include the current evidence, the recommended option, the meaningful trade-off, and the consequence of each answer. Wait for the user's answer before asking the next question or changing the artifact.
-- Treat host tool visibility as external capability. Do not create a fake API, question ledger, Extension dialog, or ordinary-mode native-support claim.
-- Do not silently choose an unresolved material decision, treat silence or ambiguous agreement as approval, or continue past a blocked question. Low-risk equivalent implementation details may be chosen by Codex only when recorded as assumptions in the current artifact and Gate summary.
-- Return user answers to the current phase artifacts: G1 to `brief.md`/`requirements.md`, G2 to `design.md`/`plan.md`. Do not create a second spec, question ledger, or conversation state.
-- If an answer changes an approved requirement, design, scope, or task, use `revise` from the earliest affected phase and wait for the invalidated Gate to be reapproved.
-
-The decision loop is complete when every material decision has a recorded answer or an explicit unresolved blocker, the answer is returned to the current artifact, and the relevant Gate summary reflects the current evidence. Silence, an inferred answer, or Codex's recommendation never closes the loop.
-
-## Wiki-first knowledge discipline
-
-- In G1, read `wiki/index.md` first and then at most five related pages. Record the complete read set with `knowledge context`, including each page's status, content hash, and source fingerprint. Record a gap before source fallback for missing, placeholder, stale, contradictory, or insufficient knowledge, then inspect only the smallest necessary raw-source range. Current source behavior and approved DevWeave artifacts win conflicts.
-- Treat `.devweave/baseline/` as accepted governance truth and `wiki/` as detailed module, entity, dependency, pattern, decision, guide, and synthesis knowledge.
-- If bootstrap is recommended, mention `$devweave wiki bootstrap` without blocking ordinary work.
-- Keep Wiki read-only throughout G2 and implementation. New design decisions remain in `design.md` until verification.
-- In verification, every new-format work item must record `knowledge review --disposition promote|no-update --rationale <text>`. Product-source fingerprint changes invalidate the review and plan. Legacy work items remain compatible and are not retrospectively blocked.
-- Use `promote` for durable reusable knowledge. Record a non-empty plan with one to five content-page upserts/deletes, refresh or delete every affected page, and cover durable uncovered changes with one or more pages rather than one page per file. Use `knowledge scaffold` for a planned new page, replace its placeholder content, update coupled `wiki/index.md` and `wiki/log.md`, append one work-attributed `promote` entry, and seal every upsert plus index/log.
-- Use `no-update` only for non-bootstrap work with no affected page, no Wiki diff, and a non-empty rationale. Critical lint, placeholders or template tokens on seal targets, undeclared Wiki changes, unrefreshed affected pages, rewritten log history, more than five content targets, or an incomplete bootstrap block G3; unrelated warnings are reported without blocking.
-
-The knowledge branch is complete only when its ordered context or current promotion plan is recorded, every required page obligation is covered, and the corresponding fingerprint remains current at validation.
-
-When starting work, use `start --kind new|feature|refactor|bug --title <title>`. Set risk with `risk`, scope with `scope`, verification commands with `command set`, tasks with `task`, evidence with `evidence add` or a profile-batched `verify --profile <low|standard|high> --max-parallel 3`, baseline decisions with `baseline`, and rejection/rework with `revise`. Use individual `verify --command <id>` calls for legacy or intentionally isolated checks. `scope` replaces the complete scope set: pass every path in one call by repeating `--path`, for example `scope --path src --path tests`. Close only after G3 is current and approved.
-
-## Gate discipline
-
-- G1 approves `brief.md`, `requirements.md`, risk, scope, and entry-specific discovery evidence.
-- G2 approves `design.md`, the immutable task definitions in `plan.md`, and high-risk analyses.
-- Implementation may start only when G2 remains current. Record task progress in `state.json` through engine commands; never check off tasks in `plan.md`.
-- G3 approves `acceptance.md`, current source-bound evidence, required command results, scope compliance, living baseline updates, and a current Knowledge Review disposition. For high-risk G3, the existing router starts exactly one isolated read-only Independent Review Agent after final artifacts stabilize; Python only records its bounded, redacted `kind: review` evidence. Missing/unavailable/advisory results warn, named critical findings block unless an exact narrow `review-critical` waiver exists, and human approval remains required.
-- Before G1 approval, present the answered material decisions, problem, scope, non-goals, acceptance criteria, assumptions, waivers, and unresolved gaps after `validate --gate scope`; stop until the user clearly approves G1.
-- Before G2 approval, present the answered design decisions, selected and rejected options, interfaces, data flow, failure modes, rollback, verification strategy, task order, and residual risk after `validate --gate build`; stop until the user clearly approves G2.
-- Gate summaries are Double Checks against the current artifacts, not a license to invent a new requirement or design. A newly discovered decision returns through `revise`; G3 verifies conformance to approved intent.
-- G1 fingerprints the recorded knowledge context. Product verification excludes `wiki/`; G3 separately fingerprints the knowledge tree and promotion ledger.
-- Any stale fingerprint means the previous approval or evidence is no longer valid. Return to the earliest phase reported by `instructions` and do not bypass it with manual state edits.
-- Waivers must be explicit, narrow, justified, attributable, and accepted by the relevant gate. A waiver is not a generic substitute for missing validation.
-
-G3 is complete only when the current acceptance artifact, task/evidence graph, source and knowledge fingerprints, baseline decisions, scope diff, Knowledge Review, and required command results all reconcile successfully and explicit human approval has been recorded.
-
-Use the current phase reference:
-
-- [requirements-phase.md](references/requirements-phase.md)
-- [design-phase.md](references/design-phase.md)
-- [implementation-phase.md](references/implementation-phase.md)
-- [verification-phase.md](references/verification-phase.md)
-
-Artifact grammar, trace IDs, fingerprints, and state contracts are defined in [contracts.md](references/contracts.md). Templates in `assets/` are engine-owned inputs and should not be copied by hand.
-
-## Verification Policy v2
-
-The sole command-policy source is `scripts/command_policy.py`. Guard, verification,
-Doctor, command mutation and G3 must consume its evaluator and canonical digests.
-G2 freezes `state.verification_plan`; a profile runner must return that plan digest,
-and G3 must reuse the plan's selected/skipped/not-applicable sets.
-
-Configured commands are never direct Bash permissions. They run only through
-`devweave verify` with `shell=False`, fixed argv/cwd, bounded timeout, executable
-trust, repository-state snapshots, declared-output reconciliation and engine-owned
-evidence. Read-only Bash is an argv allowlist: shell operators, substitutions,
-redirection, output-producing flags and unknown flags fail closed, consistently for
-POSIX, CMD and PowerShell-shaped payloads.
-
-Evidence eligibility is engine-derived. Only current, zero-exit, plan/command/source
-bound, controlled-executor evidence with no undeclared writes is gate-eligible;
-`expect=nonzero`, `expect=any`, reproduction, diagnostic, failed, timed-out or stale
-evidence can never satisfy G3. Policy mutations after G2 are made through the Router
-and deterministically stale the plan, affected evidence and downstream gates.
+Only run `20260825-163914-feature-devweave-v2-app-server-harness` may use the legacy CLI to finish its already-approved TASK-010 through TASK-012 and high-risk G3. Do not start, revise, or mutate any other V1 work item. Its state/event files remain engine-owned. After G3, use only the reviewed hash-bound finalizer; then run the V2 `check` and complete verification again before release.

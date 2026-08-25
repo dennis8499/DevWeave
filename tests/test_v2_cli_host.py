@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import io
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -206,6 +207,17 @@ class PublicCliProcessTests(unittest.TestCase):
             (repo / ".codex").mkdir()
             (repo / ".devweave" / "project.json").write_bytes((ROOT / "fixtures" / "devweave_v2" / "project.json").read_bytes())
             (repo / ".codex" / "config.toml").write_bytes((ROOT / ".codex" / "config.toml").read_bytes())
+            for relative in ("AGENTS.md", "ARCHITECTURE.md", "README.md"):
+                shutil.copy2(ROOT / relative, repo / relative)
+            shutil.copytree(ROOT / "docs", repo / "docs")
+            skill = repo / ".agents" / "skills" / "devweave"
+            (skill / "references").mkdir(parents=True)
+            shutil.copy2(ROOT / ".agents" / "skills" / "devweave" / "SKILL.md", skill / "SKILL.md")
+            for source in (ROOT / ".agents" / "skills" / "devweave" / "references").glob("*.md"):
+                shutil.copy2(source, skill / "references" / source.name)
+            contracts = repo / "vscode-extension" / "src" / "v2"
+            contracts.mkdir(parents=True)
+            shutil.copy2(ROOT / "vscode-extension" / "src" / "v2" / "contracts.ts", contracts / "contracts.ts")
             checked = subprocess.run(
                 [sys.executable, "-B", str(SCRIPT_ROOT / "devweave_v2_cli.py"), "--repo", str(repo), "check"],
                 capture_output=True, text=True, encoding="utf-8", shell=False,
@@ -219,7 +231,7 @@ class PublicCliProcessTests(unittest.TestCase):
             payload = json.loads(failed.stdout)
             self.assertEqual(failed.returncode, 3)
             self.assertEqual(payload["error"]["code"], ErrorCode.CODEX_UNAVAILABLE)
-            self.assertFalse((repo / "docs" / "exec-plans").exists())
+            self.assertEqual(list((repo / "docs" / "exec-plans" / "active").glob("*.json")), [])
 
 
 if __name__ == "__main__":

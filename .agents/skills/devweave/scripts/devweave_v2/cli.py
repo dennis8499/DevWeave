@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
+from .architecture_check import ArchitectureChecker
 from .canonical import sha256
 from .codex_doctor import CodexDoctor
 from .errors import DevWeaveError, ErrorCode
@@ -107,10 +108,12 @@ def _dispatch(args: argparse.Namespace, repository: Path) -> Any:
         text = mcp.read_text(encoding="utf-8")
         if "[mcp_servers.devweave]" not in text or "required = true" not in text:
             raise DevWeaveError(ErrorCode.CONFLICT, "DevWeave MCP configuration is not required/current.")
+        architecture = ArchitectureChecker(repository).assert_valid()
         return {
             "status": "passed",
             "schema_version": config.schema_version,
             "verification_commands": len(config.verification_plan.commands),
+            "architecture": architecture,
         }
     if args.command == "verify":
         config = load_project_config(repository)

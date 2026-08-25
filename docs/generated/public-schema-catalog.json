@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "schemas": [
+    {
+      "name": "PendingDecision",
+      "additional_properties": false,
+      "traces": ["REQ-008", "AC-008", "AC-011", "AC-016"]
+    },
+    {
+      "name": "ReviewFinding",
+      "additional_properties": false,
+      "traces": ["REQ-014", "AC-011", "AC-014"]
+    },
+    {
+      "name": "RunPlanDraft",
+      "additional_properties": false,
+      "traces": ["REQ-007", "REQ-011", "AC-007", "AC-011"]
+    },
+    {
+      "name": "RunSnapshot",
+      "additional_properties": false,
+      "traces": ["REQ-007", "REQ-011", "AC-007", "AC-011", "AC-017"]
+    },
+    {
+      "name": "VerificationPlan",
+      "additional_properties": false,
+      "traces": ["REQ-013", "AC-011", "AC-013"]
+    }
+  ]
+}
