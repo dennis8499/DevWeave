@@ -141,7 +141,8 @@ class CutoverFinalizerTests(unittest.TestCase):
 
 class RepositoryReleaseContractTests(unittest.TestCase):
     def test_staged_project_is_strict_schema_v2_with_release_dag(self) -> None:
-        path = REPOSITORY_ROOT / ".agents/skills/devweave/assets/v2-cutover/project.json"
+        staged = REPOSITORY_ROOT / ".agents/skills/devweave/assets/v2-cutover/project.json"
+        path = staged if staged.is_file() else REPOSITORY_ROOT / ".devweave/project.json"
         config = ProjectConfig.from_dict(json.loads(path.read_text(encoding="utf-8")))
         command_ids = {command.command_id for command in config.verification_plan.commands}
         self.assertEqual(
@@ -158,9 +159,13 @@ class RepositoryReleaseContractTests(unittest.TestCase):
         manifest_path = REPOSITORY_ROOT / "docs/generated/v2-cutover-manifest.json"
         finalizer = CutoverFinalizer(REPOSITORY_ROOT, manifest_path)
         report = finalizer.check()
-        self.assertEqual("ready", report["status"])
-        self.assertEqual(6, report["pending_replacements"])
-        self.assertGreater(report["pending_deletions"], 600)
+        self.assertIn(report["status"], {"ready", "already_applied"})
+        if report["status"] == "ready":
+            self.assertEqual(6, report["pending_replacements"])
+            self.assertGreater(report["pending_deletions"], 600)
+        else:
+            self.assertEqual(6, report["completed_replacements"])
+            self.assertGreater(report["completed_deletions"], 600)
 
 
 if __name__ == "__main__":
