@@ -341,11 +341,11 @@
       "status": "completed"
     },
     "TASK-003": {
-      "completed_at": null,
+      "completed_at": "2026-08-25T11:03:53+00:00",
       "evidence": [],
-      "note": "",
-      "started_at": null,
-      "status": "pending"
+      "note": "Shell-free GitPort/transaction與Git-ref V1 exporter完成；23個V2 tests通過。Disposable repos覆蓋clean/dirty/untracked/detached/collision/unrelated diff/base drift/scoped commit；master export兩次byte-identical並確認21 closed/411 evidence、inputs未改。",
+      "started_at": "2026-08-25T11:00:25+00:00",
+      "status": "completed"
     },
     "TASK-004": {
       "completed_at": null,
@@ -412,7 +412,7 @@
     }
   },
   "title": "DevWeave V2 app-server harness",
-  "updated_at": "2026-08-25T10:59:49+00:00",
+  "updated_at": "2026-08-25T11:03:53+00:00",
   "verification_plan": {
     "commands": {
       "app-server-e2e": {
