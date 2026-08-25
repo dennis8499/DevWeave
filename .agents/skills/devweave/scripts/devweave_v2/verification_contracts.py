@@ -79,7 +79,7 @@ class VerificationCommand:
             argv=argv,
             cwd=relative_path(data["cwd"], "VerificationCommand.cwd") if data["cwd"] != "." else ".",
             affected_paths=relative_paths(data["affected_paths"], "VerificationCommand.affected_paths"),
-            writes=text(data["writes"], "VerificationCommand.writes", maximum=32),
+            writes=_writes(data["writes"]),
             outputs=relative_paths(data["outputs"], "VerificationCommand.outputs"),
             dependencies=strings(data["dependencies"], "VerificationCommand.dependencies"),
             timeout_seconds=integer(data["timeout_seconds"], "VerificationCommand.timeout_seconds", minimum=1, maximum=3600),
@@ -88,6 +88,14 @@ class VerificationCommand:
             release_only=boolean(data["release_only"], "VerificationCommand.release_only"),
             definition_digest=text(data["definition_digest"], "VerificationCommand.definition_digest", minimum=64, maximum=64),
         )
+
+
+def _writes(value: Any) -> str:
+    result = text(value, "VerificationCommand.writes", maximum=32)
+    if result not in {"none", "declared"}:
+        from .errors import ContractError, ErrorCode
+        raise ContractError(ErrorCode.INVALID_VALUE, "VerificationCommand.writes must be none or declared.")
+    return result
 
 
 @dataclass(frozen=True, slots=True)
