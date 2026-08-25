@@ -20,6 +20,12 @@ interface PendingRequest {
   timeout: NodeJS.Timeout;
 }
 
+interface ReviewWaiter {
+  resolve(value: unknown): void;
+  reject(error: Error): void;
+  timeout: NodeJS.Timeout;
+}
+
 export interface ServerRequest {
   id: number | string;
   method: ServerRequestMethod;
@@ -41,6 +47,8 @@ export class CodexAppServerSession {
   private executable = "";
   private cwd = "";
   private readonly emitter = new EventEmitter();
+  private readonly reviewResults = new Map<string, unknown>();
+  private readonly reviewWaiters = new Map<string, ReviewWaiter>();
   private projectionValue = initialProjection();
   private readonly timeoutMs: number;
   private readonly maxAggregateBytes: number;
@@ -64,6 +72,21 @@ export class CodexAppServerSession {
   public onServerRequest(listener: (request: ServerRequest) => void): () => void {
     this.emitter.on("serverRequest", listener);
     return () => this.emitter.off("serverRequest", listener);
+  }
+
+  public waitForReviewResult(reviewerThreadId: string): Promise<unknown> {
+    const completed = this.reviewResults.get(reviewerThreadId);
+    if (completed !== undefined) {
+      this.reviewResults.delete(reviewerThreadId);
+      return Promise.resolve(completed);
+    }
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.reviewWaiters.delete(reviewerThreadId);
+        reject(new AppServerError("REVIEW_TIMEOUT", "Detached review result timed out."));
+      }, this.timeoutMs);
+      this.reviewWaiters.set(reviewerThreadId, { resolve, reject, timeout });
+    });
   }
 
   public async connect(executable: string, cwd: string): Promise<unknown> {
@@ -124,6 +147,8 @@ export class CodexAppServerSession {
     this.transport = undefined;
     this.initialized = false;
     this.rejectPending(new AppServerError("SESSION_CLOSED", "App-server session closed."));
+    this.rejectReviewWaiters(new AppServerError("SESSION_CLOSED", "App-server session closed."));
+    this.reviewResults.clear();
     await transport?.close();
     this.projectionValue = { ...this.projectionValue, connection: "disconnected" };
     this.publish();
@@ -201,6 +226,7 @@ export class CodexAppServerSession {
       return;
     }
     if (typeof value.method === "string") {
+      this.captureReviewResult(value.method, value.params);
       this.projectionValue = reduceAppServerEvent(this.projectionValue, value.method, value.params);
       this.publish();
       return;
@@ -218,6 +244,7 @@ export class CodexAppServerSession {
     this.transport = undefined;
     void transport?.close();
     this.rejectPending(error);
+    this.rejectReviewWaiters(error);
     this.initialized = false;
     this.projectionValue = addDiagnostic({ ...this.projectionValue, connection: "failed" }, "app_server_failure", error.message);
     this.publish();
@@ -229,6 +256,37 @@ export class CodexAppServerSession {
       pending.reject(error);
     }
     this.pending.clear();
+  }
+
+  private captureReviewResult(method: string, params: unknown): void {
+    if (method !== "item/completed" || !isRecord(params)) return;
+    const item = isRecord(params.item) ? params.item : params;
+    if (item.type !== "exitedReviewMode") return;
+    const threadId = typeof params.threadId === "string"
+      ? params.threadId
+      : typeof params.thread_id === "string" ? params.thread_id : "";
+    if (!threadId) return;
+    const result = {
+      text: typeof item.text === "string" ? bounded(item.text, 262_144) : "",
+      findings: Array.isArray(item.findings) ? structuredClone(item.findings).slice(0, 128) : undefined
+    };
+    const waiter = this.reviewWaiters.get(threadId);
+    if (waiter) {
+      clearTimeout(waiter.timeout);
+      this.reviewWaiters.delete(threadId);
+      waiter.resolve(result);
+    } else {
+      this.reviewResults.set(threadId, result);
+      if (this.reviewResults.size > 16) this.reviewResults.delete(this.reviewResults.keys().next().value!);
+    }
+  }
+
+  private rejectReviewWaiters(error: Error): void {
+    for (const waiter of this.reviewWaiters.values()) {
+      clearTimeout(waiter.timeout);
+      waiter.reject(error);
+    }
+    this.reviewWaiters.clear();
   }
 
   private publish(): void {

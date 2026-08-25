@@ -376,11 +376,11 @@
       "status": "completed"
     },
     "TASK-008": {
-      "completed_at": null,
+      "completed_at": "2026-08-25T11:39:02+00:00",
       "evidence": [],
-      "note": "",
-      "started_at": null,
-      "status": "pending"
+      "note": "WorkspaceController、HostBridgeClient、ApprovalBroker與ReviewCoordinator完成；required MCP exact tools、phase sandbox、scope denial、explicit approval、host-only routing、detached identity及high max-three loop均有測試。Python V2 50/50、Extension 107/107、typecheck與build通過。",
+      "started_at": "2026-08-25T11:30:58+00:00",
+      "status": "completed"
     },
     "TASK-009": {
       "completed_at": null,
@@ -412,7 +412,7 @@
     }
   },
   "title": "DevWeave V2 app-server harness",
-  "updated_at": "2026-08-25T11:29:10+00:00",
+  "updated_at": "2026-08-25T11:39:02+00:00",
   "verification_plan": {
     "commands": {
       "app-server-e2e": {

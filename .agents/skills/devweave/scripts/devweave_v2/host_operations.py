@@ -77,13 +77,18 @@ class HostOperationAdapter:
         )
 
     def _gate_decide(self, raw: dict[str, Any]) -> dict[str, Any]:
-        data = strict_object(raw, name="gate_decide", required=("run_id", "expected_revision", "mutation_id", "gate_id", "approve"))
+        data = strict_object(
+            raw, name="gate_decide",
+            required=("run_id", "expected_revision", "mutation_id", "gate_id", "approve"),
+            optional=("review_result",),
+        )
         return self.service.host().gate_decide(
             text(data["run_id"], "run_id", maximum=128),
             expected_revision=integer(data["expected_revision"], "expected_revision", minimum=1),
             mutation_id=text(data["mutation_id"], "mutation_id", maximum=128),
             gate_id=text(data["gate_id"], "gate_id", maximum=128),
             approve=boolean(data["approve"], "approve"),
+            review_result=data.get("review_result"),
         )
 
     def _run_cancel(self, raw: dict[str, Any]) -> dict[str, Any]:

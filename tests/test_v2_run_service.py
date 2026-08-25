@@ -167,6 +167,54 @@ class RunServiceTests(unittest.TestCase):
         )
         self.assertEqual(plan["tasks"]["TASK-001"]["definition"], before_definition)
 
+    def test_acceptance_requires_current_verification_and_detached_review(self) -> None:
+        plan = self.h.start("standard")
+        plan = self.h.service.host().gate_decide(
+            plan["run_id"], expected_revision=1, mutation_id="approve-plan", gate_id="plan", approve=True
+        )
+        plan = self.h.service.agent().task_update(
+            plan["run_id"], expected_revision=2, mutation_id="complete-task", task_id="TASK-001", status="completed"
+        )
+        with self.assertRaises(DevWeaveError) as unverified:
+            self.h.service.agent().completion_request(
+                plan["run_id"], expected_revision=3, mutation_id="premature-completion"
+            )
+        self.assertEqual(unverified.exception.code, ErrorCode.BLOCKED)
+        plan = self.h.service.mutate(
+            plan["run_id"], 3, "record-verification",
+            lambda candidate: candidate["verification"].update({"status": "passed", "evidence_ids": ["VER-1"]}),
+        )
+        plan = self.h.service.agent().completion_request(
+            plan["run_id"], expected_revision=4, mutation_id="completion-request"
+        )
+        self.assertEqual(plan["status"], "reviewing")
+        with self.assertRaises(DevWeaveError) as missing:
+            self.h.service.host().gate_decide(
+                plan["run_id"], expected_revision=5, mutation_id="accept-no-review",
+                gate_id="acceptance", approve=True,
+            )
+        self.assertEqual(missing.exception.code, ErrorCode.GATE_REQUIRED)
+        with self.assertRaises(DevWeaveError) as reused:
+            self.h.service.host().gate_decide(
+                plan["run_id"], expected_revision=5, mutation_id="accept-reused-review",
+                gate_id="acceptance", approve=True,
+                review_result={
+                    "detached": True, "implementation_thread_id": "thread-1", "reviewer_thread_id": "thread-1",
+                    "round": 1, "unresolved_critical": False, "finding_ids": [],
+                },
+            )
+        self.assertEqual(reused.exception.code, ErrorCode.BLOCKED)
+        completed = self.h.service.host().gate_decide(
+            plan["run_id"], expected_revision=5, mutation_id="accept-detached-review",
+            gate_id="acceptance", approve=True,
+            review_result={
+                "detached": True, "implementation_thread_id": "thread-1", "reviewer_thread_id": "review-1",
+                "round": 1, "unresolved_critical": False, "finding_ids": ["FIND-1"],
+            },
+        )
+        self.assertEqual(completed["status"], "completed")
+        self.assertEqual(completed["review"]["finding_ids"], ["FIND-1"])
+
     def test_reducer_is_deterministic_and_duplicate_events_do_not_duplicate_effects(self) -> None:
         plan = self.h.start("low")
         events = [

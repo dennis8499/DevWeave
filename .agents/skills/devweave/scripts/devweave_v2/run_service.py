@@ -228,7 +228,7 @@ class AgentFacade:
             return {"run": plan, "report": existing}
         if plan["revision"] != expected_revision:
             raise DevWeaveError(ErrorCode.STALE_REVISION, "Verification expected a stale run revision.")
-        if plan["phase"] not in {"implementation", "verification"} or not planning_gates_current(plan):
+        if plan["phase"] not in {"implementation", "verification", "review"} or not planning_gates_current(plan):
             raise DevWeaveError(ErrorCode.GATE_REQUIRED, "Current planning gates do not allow verification.")
         report = self._service.verification_store.load(run_id, mutation_id)
         if report is None:
@@ -263,9 +263,15 @@ class AgentFacade:
             incomplete = sorted(task_id for task_id, value in plan["tasks"].items() if value["status"] != "completed")
             if incomplete:
                 raise DevWeaveError(ErrorCode.BLOCKED, "Tasks remain incomplete.", {"tasks": incomplete})
+            if plan["verification"]["status"] != "passed":
+                raise DevWeaveError(ErrorCode.BLOCKED, "Current successful verification is required before completion.")
             plan["completion_requested"] = True
-            plan["phase"] = "verification"
-            plan["status"] = "verifying"
+            if RiskLevel(plan["risk"]) is RiskLevel.LOW:
+                plan["phase"] = "acceptance"
+                plan["status"] = "awaiting_acceptance"
+            else:
+                plan["phase"] = "review"
+                plan["status"] = "reviewing"
 
         return self._service.mutate(run_id, expected_revision, mutation_id, mutation)
 
@@ -338,10 +344,39 @@ class HostFacade:
         mutation_id: str,
         gate_id: str,
         approve: bool,
+        review_result: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         safe_gate = identifier(gate_id, "gate_id")
 
         def mutation(plan: dict[str, Any]) -> None:
+            if safe_gate == "acceptance":
+                if not approve:
+                    gate = plan["gates"].get("acceptance")
+                    if gate is not None:
+                        gate["status"] = "rejected"
+                        gate["fingerprint"] = plan["definition_fingerprint"]
+                        gate["approved_revision"] = 0
+                        gate["decided_at"] = self._service.clock()
+                    plan["status"] = "blocked"
+                    plan["blockers"].append("gate_rejected:acceptance")
+                    return
+                if not plan["completion_requested"] or plan["verification"]["status"] != "passed":
+                    raise DevWeaveError(ErrorCode.GATE_REQUIRED, "Acceptance requires completion request and current verification.")
+                risk = RiskLevel(plan["risk"])
+                if risk is not RiskLevel.LOW:
+                    validated_review = _validate_review_result(review_result, plan["review"]["max_rounds"])
+                    plan["review"].update(validated_review)
+                else:
+                    plan["review"].update({"round": 1, "status": "passed", "finding_ids": []})
+                gate = plan["gates"].get("acceptance")
+                if gate is not None:
+                    gate["status"] = "approved"
+                    gate["fingerprint"] = plan["definition_fingerprint"]
+                    gate["approved_revision"] = expected_revision + 1
+                    gate["decided_at"] = self._service.clock()
+                plan["status"] = "completed"
+                plan["phase"] = "closed"
+                return
             gate = plan["gates"].get(safe_gate)
             if gate is None:
                 raise DevWeaveError(ErrorCode.INVALID_VALUE, "Gate is not required by current risk policy.")
@@ -352,11 +387,6 @@ class HostFacade:
             if not approve:
                 plan["status"] = "blocked"
                 plan["blockers"].append(f"gate_rejected:{safe_gate}")
-            elif safe_gate == "acceptance":
-                if not plan["completion_requested"]:
-                    raise DevWeaveError(ErrorCode.GATE_REQUIRED, "Acceptance cannot precede completion request.")
-                plan["status"] = "completed"
-                plan["phase"] = "closed"
             elif planning_gates_current(plan):
                 plan["status"] = "implementing"
                 plan["phase"] = "implementation"
@@ -371,3 +401,23 @@ class HostFacade:
             plan["phase"] = "closed"
 
         return self._service.mutate(run_id, expected_revision, mutation_id, mutation)
+
+
+def _validate_review_result(raw: dict[str, Any] | None, max_rounds: int) -> dict[str, Any]:
+    from .contract_utils import boolean, sequence, strict_object, strings
+    if raw is None:
+        raise DevWeaveError(ErrorCode.GATE_REQUIRED, "Detached review evidence is required for acceptance.")
+    data = strict_object(
+        raw,
+        name="review_result",
+        required=("detached", "implementation_thread_id", "reviewer_thread_id", "round", "unresolved_critical", "finding_ids"),
+    )
+    detached = boolean(data["detached"], "review_result.detached")
+    implementation_thread = text(data["implementation_thread_id"], "review_result.implementation_thread_id", maximum=256)
+    reviewer_thread = text(data["reviewer_thread_id"], "review_result.reviewer_thread_id", maximum=256)
+    round_number = integer(data["round"], "review_result.round", minimum=1, maximum=max_rounds)
+    unresolved = boolean(data["unresolved_critical"], "review_result.unresolved_critical")
+    finding_ids = list(strings(data["finding_ids"], "review_result.finding_ids"))
+    if not detached or implementation_thread == reviewer_thread or unresolved:
+        raise DevWeaveError(ErrorCode.BLOCKED, "Acceptance review is not detached and clear of critical findings.")
+    return {"round": round_number, "status": "passed", "finding_ids": finding_ids}
