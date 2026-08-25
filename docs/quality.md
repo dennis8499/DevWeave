@@ -5,6 +5,8 @@
 
 From the repository root, run the V2 Python suite and public repository check. From `vscode-extension/`, run typecheck, unit tests, build, package verification, smoke/E2E where applicable, and UI evidence collection. High-risk release acceptance also requires a real Codex app-server transcript, recovery rehearsal, and detached review.
 
+The Windows certification runner is explicitly opt-in. It may use the operator's existing Codex login/network and send bounded workspace-related context to the Codex service; without that authorization, the report must remain `blocked` rather than substituting mocks or treating a local protocol-only probe as certification.
+
 The architecture checker reports stable codes including `ROOT_INSTRUCTIONS_TOO_LARGE`, `MODULE_TOO_LARGE`, `REVERSE_DEPENDENCY`, `PUBLIC_SCHEMA_DRIFT`, `BROKEN_DOC_LINK`, `UNTRACED_ACCEPTANCE`, `DUPLICATE_CANONICAL_TOPIC`, and `NAVIGATION_TOO_DEEP`. A waiver is valid only for the exact code/path recorded in [architecture exceptions](architecture-exceptions.json), with owner, rationale, and unexpired date.
 
 ## Acceptance traces

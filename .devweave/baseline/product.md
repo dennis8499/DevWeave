@@ -43,3 +43,13 @@ Bootstrap provenance: `20260803-112312-feature-vs-code-devweave`（待 G3 核准
 Codebase LLM Wiki provenance: `20260803-161041-feature-codebase-llm-wiki`（待 G3 核准）。
 
 Independent Review provenance: `20260804-122803-feature-g3-review-agent`（待 G3 核准）。
+
+## DevWeave V2 transition candidate（等待 G3）
+
+- DevWeave V2 的主要產品介面是 VS Code Control Center，透過本機 Codex `app-server` 維持 thread/turn、串流事件、steer、interrupt、native approval 與 detached review；clipboard prompt handoff、Wiki runtime 與 legacy companion routing 不再是 V2 workflow。
+- Extension host 擁有 run start/resume、decision、Gate 與 cancel 等高影響操作。Project-scoped MCP 僅向 agent 暴露 `run_inspect`、`context_read`、`plan_save`、`decision_request`、`task_update`、`verification_run`、`verification_read`、`completion_request` 八項工具。
+- 公開版本統一為 `2.0.0`；V2 CLI 為 `doctor`、`inspect`、`check`、`verify`、`export-v1` 與 `mcp-serve`，並使用 versioned typed contracts 與 machine-readable error codes。
+- Breaking cutover 採 hash-bound manifest/finalizer；已在 disposable clone 驗證 V1 raw runtime、Wiki/baseline、legacy companions、clipboard-first UI 與 tracked VSIX 可精確移除，base ref 與 Git history 仍可用於調查與復原。
+- 真實 Windows Codex model turn／detached review E2E 尚未執行，因其會把工作區相關內容交給既有 Codex 服務；在取得明確外部資料傳送授權前，不宣稱 Windows V2 certification 完成。
+
+V2 candidate provenance: `20260825-163914-feature-devweave-v2-app-server-harness`（等待 G3 核准與 finalizer cutover）。

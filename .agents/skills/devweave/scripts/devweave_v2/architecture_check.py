@@ -78,6 +78,7 @@ PYTHON_LAYERS = {
     "architecture_check": 3, "cutover": 3, "git_port": 3, "plan_store": 3, "reducer": 3,
     "v1_export": 3, "verification_engine": 3, "verification_store": 3,
     "codex_doctor": 4, "git_transaction": 4, "run_service": 4, "service_factory": 4,
+    "transition_record": 4,
     "__init__": 5, "__main__": 5, "cli": 5, "host_bridge": 5,
     "host_operations": 5, "mcp_server": 5, "mcp_tools": 5,
 }

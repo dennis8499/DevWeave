@@ -15,13 +15,19 @@ if str(SCRIPT_ROOT) not in sys.path:
 
 from devweave_v2.cutover import (  # noqa: E402
     CutoverFinalizer,
+    TRANSITION_COMPLETION_PATH,
+    TRANSITION_RUN_ID,
     _git_files,
     _is_legacy,
     generate_manifest,
     write_manifest,
 )
+from devweave_v2.canonical import dumps  # noqa: E402
 from devweave_v2.errors import DevWeaveError, ErrorCode  # noqa: E402
+from devweave_v2.plan_contracts import RunPlanDraft  # noqa: E402
 from devweave_v2.project_config import ProjectConfig  # noqa: E402
+from devweave_v2.run_state import new_exec_plan, validate_exec_plan  # noqa: E402
+from devweave_v2.transition_record import WORK_ROOT, record_transition_completion  # noqa: E402
 
 
 class CutoverFinalizerTests(unittest.TestCase):
@@ -56,6 +62,9 @@ class CutoverFinalizerTests(unittest.TestCase):
             "final skill\n",
             (self.repository / ".agents/skills/devweave/SKILL.md").read_text(encoding="utf-8"),
         )
+        archived = self.repository / TRANSITION_COMPLETION_PATH
+        self.assertTrue(archived.is_file())
+        self.assertEqual("completed", validate_exec_plan(json.loads(archived.read_text(encoding="utf-8")))["status"])
         installed = json.loads((self.repository / ".devweave/project.json").read_text(encoding="utf-8"))
         self.assertEqual(2, installed["schema_version"])
         for relative in _git_files(self.repository):
@@ -99,6 +108,25 @@ class CutoverFinalizerTests(unittest.TestCase):
         self.assertEqual(ErrorCode.CONFLICT, caught.exception.code)
         self.assertTrue(added.exists())
 
+    def test_apply_requires_hash_bound_completed_transition_record(self) -> None:
+        (self.repository / TRANSITION_COMPLETION_PATH).unlink()
+        write_manifest(self.manifest_path, generate_manifest(self.repository, base_ref=self.base_ref))
+        finalizer = CutoverFinalizer(self.repository, self.manifest_path)
+        self.assertFalse(finalizer.check()["completion_record_ready"])
+        with self.assertRaises(DevWeaveError) as caught:
+            finalizer.apply(approved_manifest_sha256=finalizer.manifest_sha256)
+        self.assertEqual(ErrorCode.BLOCKED, caught.exception.code)
+        self.assertEqual("old agents\n", (self.repository / "AGENTS.md").read_text(encoding="utf-8"))
+
+    def test_retained_completion_record_drift_fails_before_mutation(self) -> None:
+        path = self.repository / TRANSITION_COMPLETION_PATH
+        path.write_text(path.read_text(encoding="utf-8") + " ", encoding="utf-8")
+        finalizer = CutoverFinalizer(self.repository, self.manifest_path)
+        with self.assertRaises(DevWeaveError) as caught:
+            finalizer.apply(approved_manifest_sha256=finalizer.manifest_sha256)
+        self.assertEqual(ErrorCode.CONFLICT, caught.exception.code)
+        self.assertEqual("old agents\n", (self.repository / "AGENTS.md").read_text(encoding="utf-8"))
+
     def _write_fixture(self) -> None:
         files = {
             "AGENTS.md": "old agents\n",
@@ -130,6 +158,122 @@ class CutoverFinalizerTests(unittest.TestCase):
             path = self.repository / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(content.encode("utf-8"))
+        draft_raw = json.loads((REPOSITORY_ROOT / "fixtures/devweave_v2/run-plan-draft.json").read_text(encoding="utf-8"))
+        draft_raw["run_id"] = TRANSITION_RUN_ID
+        draft = RunPlanDraft.from_dict(draft_raw)
+        plan = new_exec_plan(
+            draft,
+            base_branch="master",
+            base_ref="a" * 40,
+            run_branch="devweave/transition-fixture",
+            now="2026-08-25T00:00:00Z",
+        )
+        for gate in plan["gates"].values():
+            gate.update(
+                {
+                    "status": "approved",
+                    "fingerprint": plan["definition_fingerprint"],
+                    "approved_revision": 1,
+                    "decided_at": "2026-08-25T00:00:00Z",
+                }
+            )
+        for task in plan["tasks"].values():
+            task.update({"status": "completed", "progress": "verified"})
+        plan.update(
+            {
+                "status": "completed",
+                "phase": "closed",
+                "verification": {"status": "passed", "evidence_ids": ["VER-1"], "reports": {}},
+                "review": {
+                    "mode": "detached_fix_reverify", "max_rounds": 3, "round": 1,
+                    "status": "passed", "finding_ids": [],
+                },
+                "completion_requested": True,
+            }
+        )
+        completed = self.repository / TRANSITION_COMPLETION_PATH
+        completed.parent.mkdir(parents=True, exist_ok=True)
+        completed.write_text(dumps(validate_exec_plan(plan)), encoding="utf-8")
+
+    def _git(self, *args: str) -> str:
+        result = subprocess.run(
+            ["git", *args], cwd=self.repository, check=True, capture_output=True,
+            text=True, encoding="utf-8", shell=False,
+        )
+        return result.stdout
+
+
+class TransitionCompletionRecordTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory(prefix="devweave-transition-record-")
+        self.addCleanup(self.temporary.cleanup)
+        self.repository = Path(self.temporary.name)
+        source_work = REPOSITORY_ROOT / WORK_ROOT
+        target_work = self.repository / WORK_ROOT
+        target_work.mkdir(parents=True)
+        for name in ("requirements.md", "design.md", "plan.md", "acceptance.md"):
+            shutil.copy2(source_work / name, target_work / name)
+        staged = self.repository / ".agents/skills/devweave/assets/v2-cutover/project.json"
+        staged.parent.mkdir(parents=True)
+        shutil.copy2(REPOSITORY_ROOT / ".agents/skills/devweave/assets/v2-cutover/project.json", staged)
+        generated = self.repository / "docs/generated"
+        generated.mkdir(parents=True)
+        shutil.copy2(REPOSITORY_ROOT / "docs/generated/v1-export.json", generated / "v1-export.json")
+        shutil.copy2(REPOSITORY_ROOT / "docs/generated/v1-export.md", generated / "v1-export.md")
+
+        state = json.loads((source_work / "state.json").read_text(encoding="utf-8"))
+        state["status"] = "closed"
+        state["base_source"].update({"branch": "master", "head": "a" * 40})
+        state["knowledge_review"].update({"disposition": "no-update", "rationale": "V2 docs are canonical."})
+        for gate in state["gates"].values():
+            gate.update({"status": "approved", "approved_at": "2026-08-25T00:00:00Z", "approved_by": "user"})
+        for task in state["tasks"].values():
+            task.update({"status": "completed", "completed_at": "2026-08-25T00:00:00Z", "note": "verified"})
+        source_head = "b" * 40
+        acceptance_ids = [f"AC-{index:03d}" for index in range(1, 23)]
+        state["evidence"] = {
+            "EVID-VERIFY": {
+                "id": "EVID-VERIFY", "kind": "verification", "status": "passed", "stale": False,
+                "binds_current_source": True, "git_head": source_head, "source_fingerprint": "c" * 64,
+                "observed_result": "success", "covers": acceptance_ids,
+            },
+            "EVID-REVIEW": {
+                "id": "EVID-REVIEW", "kind": "review", "status": "passed", "stale": False,
+                "binds_current_source": True, "git_head": source_head, "source_fingerprint": "c" * 64,
+                "review": {
+                    "context_mode": "isolated_read_only", "result": "passed", "reviewer_id": "reviewer-1",
+                    "report_sha256": "d" * 64, "covers": acceptance_ids, "findings": [
+                        {"id": "FIND-1", "severity": "advisory", "title": "Bounded residual", "evidence": "fixture"}
+                    ],
+                },
+            },
+        }
+        state["last_verification"] = {
+            "at": "2026-08-25T00:00:00Z", "evidence_id": "EVID-VERIFY", "source_fingerprint": "c" * 64,
+        }
+        (target_work / "state.json").write_text(dumps(state), encoding="utf-8")
+        self._git("init", "-q")
+        self._git("config", "user.email", "devweave@example.invalid")
+        self._git("config", "user.name", "DevWeave Test")
+        self._git("checkout", "-qb", "devweave/20260825-163914-app-server-harness")
+        self._git("add", "-A")
+        self._git("commit", "-qm", "closed transition fixture")
+        self.source_head = source_head
+
+    def test_closed_transition_projects_to_strict_completed_exec_plan(self) -> None:
+        result = record_transition_completion(
+            self.repository,
+            work_id=TRANSITION_RUN_ID,
+            expected_source_head=self.source_head,
+        )
+        self.assertEqual("recorded", result["status"])
+        target = self.repository / TRANSITION_COMPLETION_PATH
+        plan = validate_exec_plan(json.loads(target.read_text(encoding="utf-8")))
+        self.assertEqual(("completed", "closed", "high"), (plan["status"], plan["phase"], plan["risk"]))
+        self.assertEqual(12, len(plan["tasks"]))
+        self.assertEqual(22, len(plan["plan"]["acceptance_criteria"]))
+        self.assertEqual(["EVID-VERIFY", "EVID-REVIEW"], plan["verification"]["evidence_ids"])
+        self.assertEqual(["FIND-1"], plan["review"]["finding_ids"])
 
     def _git(self, *args: str) -> str:
         result = subprocess.run(
@@ -163,9 +307,11 @@ class RepositoryReleaseContractTests(unittest.TestCase):
         if report["status"] == "ready":
             self.assertEqual(6, report["pending_replacements"])
             self.assertGreater(report["pending_deletions"], 600)
+            self.assertFalse(report["completion_record_ready"])
         else:
             self.assertEqual(6, report["completed_replacements"])
             self.assertGreater(report["completed_deletions"], 600)
+            self.assertTrue(report["completion_record_ready"])
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from pathlib import Path
 from devweave_v2.canonical import dumps
 from devweave_v2.cutover import CutoverFinalizer, generate_manifest, write_manifest
 from devweave_v2.errors import DevWeaveError, ErrorCode
+from devweave_v2.transition_record import record_transition_completion
 from devweave_v2.version import SCHEMA_VERSION
 
 
@@ -20,6 +21,10 @@ def parser() -> argparse.ArgumentParser:
     prepare = commands.add_parser("prepare")
     prepare.add_argument("--base-ref", required=True)
     prepare.add_argument("--output", default="docs/generated/v2-cutover-manifest.json")
+
+    record = commands.add_parser("record-transition")
+    record.add_argument("--work", required=True)
+    record.add_argument("--expected-source-head", required=True)
 
     check = commands.add_parser("check")
     check.add_argument("--manifest", default="docs/generated/v2-cutover-manifest.json")
@@ -34,7 +39,13 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser().parse_args(argv)
     repository = Path(arguments.repo).resolve()
     try:
-        if arguments.command == "prepare":
+        if arguments.command == "record-transition":
+            result = record_transition_completion(
+                repository,
+                work_id=arguments.work,
+                expected_source_head=arguments.expected_source_head,
+            )
+        elif arguments.command == "prepare":
             output = _inside(repository, arguments.output)
             manifest = generate_manifest(repository, base_ref=arguments.base_ref)
             write_manifest(output, manifest)

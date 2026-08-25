@@ -71,3 +71,15 @@ Independent Review provenance: `20260804-122803-feature-g3-review-agent`（待 G
 - `expect=nonzero` 與 `expect=any` 可以保存 reproduction/diagnostic result，但永遠不滿足 required command、AC coverage、regression evidence 或 G3 acceptance。G3 只接受 frozen Effective Verification Plan 中 current、zero-only、engine-eligible evidence。
 - Command definition 的 argv、cwd、writes、outputs、depends_on、timeout 或 release policy 改變會改變 command/policy digest，使舊 plan、G2/G3 與 evidence stale。Runner 與 G3 必須回報相同 plan digest 與 selected/skipped/not-applicable 集合。
 - High-risk verification 的 controlled profile 應保留 release-only command 與依賴的明確 skip reason；本 Work Item 的 current profile 為 7 selected、2 release-only skipped。每筆 machine state 仍只能由 atomic typed mutation 寫入，不直接編輯 state/events/evidence ledger。
+
+## DevWeave V2 certification candidate（等待 G3）
+
+- V2 Python suite：64/64 通過；repository contract：16/16 通過。
+- Extension unit/DOM/security suite：113/113 通過；TypeScript typecheck 與 production build 通過。
+- 真實 VS Code `1.131.0` Extension Host smoke 通過；Control Center evidence 為 9/9 assertions、1 張 screenshot，綁定 commit `c82c9e8023b209a7a063bf15eee69e4a67334ae2`、Codex `0.149.0-alpha.4.3` 與 schema hash `def4a7e9c01d3eaf697ad5a8ada283e6733c9b54892bc4e6928eb1132320d85a`。
+- Codex executable SHA-256 為 `21f44f04e70d41d011268863d5109f5d7fc2862c14f390083e39ca3398b5ca47`；doctor 讀取 291 個 schema files 並通過 10 MiB aggregate bound。實際 local app-server/MCP probe 已完成 initialize、thread start 與 exact tool inventory，不包含 model turn。
+- 2.0.0 VSIX candidate 已通過 source/provenance/entry verification；最終 artifact 必須在最後 source commit 後重建，並保持未追蹤。
+- Disposable-clone cutover rehearsal 已通過 V2 public check、V2 tests、forbidden V1 path/command scan、schema-v2、base-ref 與 clean-tree assertions。
+- 尚未通過的 release blocker 是會使用既有 Codex login/network 並傳送工作區相關內容的 live model-turn／detached-review E2E，以及其後 exactly-one isolated high-risk review 與 human G3。未完成前 AC-001、AC-014、AC-021 不得標示通過，Windows certification 也維持 blocked。
+
+V2 candidate provenance: `20260825-163914-feature-devweave-v2-app-server-harness`（等待 G3 核准與 finalizer cutover）。

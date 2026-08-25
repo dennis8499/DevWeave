@@ -61,6 +61,17 @@ Codebase LLM Wiki provenance: `20260803-161041-feature-codebase-llm-wiki`（待 
 
 Independent Review provenance: `20260804-122803-feature-g3-review-agent`（待 G3 核准）。
 
+## DevWeave V2 app-server architecture candidate（等待 G3）
+
+- V2 採 `Extension/Webview -> authenticated host bridge -> devweave_v2 application/core -> storage/git/verification adapters` 的單向邊界；agent 僅經 project-scoped MCP 進入受限 facade，host-only mutation 不會出現在 MCP discovery。
+- 實際相容性探測以 Codex CLI `0.149.0-alpha.4.3` 完成；其 generated app-server schema 含 291 個 JSON files。實作已依真實 protocol 對齊 thread-scoped MCP inventory、object-shaped tool map、`thread/start` sandbox enum、`turn/start` sandbox policy、`turn/steer.expectedTurnId`、`reviewThreadId`、nested thread/turn events、`item.review` 與 `tokenUsage.total`。
+- MCP `tools/list` 僅接受缺省/null cursor 與合法 `_meta`，未知欄位、非 null cursor 或 malformed metadata 均 fail closed；實際 app-server thread probe 已看到且只看到八個 DevWeave tools。
+- `ExecPlan` 是唯一 canonical run authority；event/process/cache/thread state 位於 ignored runtime storage，可由 ordered events 重建。Canonical serialization、atomic replace/append、revision/mutation idempotency 與 scoped local phase commits共同提供 restart/recovery boundary。
+- Controlled verification 使用 `shell=False`、固定 argv/cwd、runtime executable provenance、DAG/stage、declared effect reconciliation 與 per-command `env_allowlist`；只有 baseline OS variables 與明確允許名稱可傳入 child process。
+- Breaking finalizer 只接受 current manifest hash，並在任何 path/hash drift 時停止。主工作樹在 G3 前刻意維持 V1 transition authority；disposable clone 已證明 final tree 可通過 V2 checker且不依賴被刪除的 V1 truth。
+
+V2 candidate provenance: `20260825-163914-feature-devweave-v2-app-server-harness`（等待 G3 核准與 finalizer cutover）。
+
 ## Skill Governance Overlay
 
 - DevWeave 仍是唯一 SDLC router；`codebase-design`、`diagnosing-bugs`、`grill-me`、`grilling` 與 `tdd` 是唯一五個 project-local companion allowlist，僅提供 current phase method，不建立第二套 lifecycle。

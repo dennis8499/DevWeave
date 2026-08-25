@@ -12,11 +12,15 @@ from typing import Any, Iterable
 
 from .canonical import dumps, sha256
 from .errors import DevWeaveError, ErrorCode
+from .run_state import validate_exec_plan
 from .version import VERSION
 
-MANIFEST_SCHEMA_VERSION = 1
+MANIFEST_SCHEMA_VERSION = 2
 MAX_MANIFEST_ENTRIES = 2_000
 MAX_FILE_BYTES = 50_000_000
+MAX_COMPLETION_RECORD_BYTES = 1_000_000
+TRANSITION_RUN_ID = "20260825-163914-feature-devweave-v2-app-server-harness"
+TRANSITION_COMPLETION_PATH = f"docs/exec-plans/completed/{TRANSITION_RUN_ID}.json"
 
 REPLACEMENT_PATHS = (
     (".agents/skills/devweave/assets/v2-cutover/AGENTS.md", "AGENTS.md"),
@@ -129,6 +133,16 @@ def generate_manifest(repository: Path, *, base_ref: str) -> dict[str, Any]:
 
     if len(deletions) + len(replacements) > MAX_MANIFEST_ENTRIES:
         raise DevWeaveError(ErrorCode.BOUND_EXCEEDED, "Cutover manifest contains too many entries.")
+    retained: list[dict[str, str]] = []
+    completion_path = _safe_path(root, TRANSITION_COMPLETION_PATH)
+    if completion_path.is_file():
+        _validate_completion_record(completion_path)
+        retained.append(
+            {
+                "path": TRANSITION_COMPLETION_PATH,
+                "sha256": canonical_file_sha256(completion_path),
+            }
+        )
     payload = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "product_version": VERSION,
@@ -136,6 +150,7 @@ def generate_manifest(repository: Path, *, base_ref: str) -> dict[str, Any]:
         "base_ref": _git(root, "rev-parse", f"{base_ref}^{{commit}}").strip(),
         "replacements": replacements,
         "deletions": deletions,
+        "retained": retained,
     }
     return {**payload, "manifest_sha256": sha256(payload)}
 
@@ -164,6 +179,8 @@ class CutoverFinalizer:
             "pending_deletions": report["pending_deletions"],
             "completed_replacements": report["completed_replacements"],
             "completed_deletions": report["completed_deletions"],
+            "retained_records": report["retained_records"],
+            "completion_record_ready": report["completion_record_ready"],
         }
 
     def apply(self, *, approved_manifest_sha256: str, fail_after: int | None = None) -> dict[str, Any]:
@@ -174,6 +191,12 @@ class CutoverFinalizer:
                 {"expected": self.manifest_sha256},
             )
         report = self._preflight()
+        if not report["completion_record_ready"]:
+            raise DevWeaveError(
+                ErrorCode.BLOCKED,
+                "Cutover requires a hash-bound completed transition ExecPlan.",
+                {"path": TRANSITION_COMPLETION_PATH},
+            )
         if report["status"] == "already_applied":
             return {"status": "already_applied", "manifest_sha256": self.manifest_sha256, "mutations": 0}
 
@@ -210,6 +233,7 @@ class CutoverFinalizer:
         errors: list[dict[str, str]] = []
         pending_replacements = completed_replacements = 0
         pending_deletions = completed_deletions = 0
+        retained_records = 0
 
         tracked_legacy = {path for path in _git_files(self.repository) if _is_legacy(path)}
         declared_deletions = {item["path"] for item in self.manifest["deletions"]}
@@ -241,6 +265,22 @@ class CutoverFinalizer:
             else:
                 pending_deletions += 1
 
+        declared_retained = {item["path"] for item in self.manifest["retained"]}
+        completion_path = _safe_path(self.repository, TRANSITION_COMPLETION_PATH)
+        if completion_path.exists() and TRANSITION_COMPLETION_PATH not in declared_retained:
+            errors.append({"path": TRANSITION_COMPLETION_PATH, "reason": "unlisted completion record"})
+        for item in self.manifest["retained"]:
+            path = _safe_path(self.repository, item["path"])
+            if not path.is_file() or canonical_file_sha256(path) != item["sha256"]:
+                errors.append({"path": item["path"], "reason": "retained record hash mismatch"})
+                continue
+            try:
+                _validate_completion_record(path)
+            except DevWeaveError:
+                errors.append({"path": item["path"], "reason": "retained completion record is invalid"})
+                continue
+            retained_records += 1
+
         if errors:
             raise DevWeaveError(
                 ErrorCode.CONFLICT,
@@ -254,6 +294,8 @@ class CutoverFinalizer:
             "pending_deletions": pending_deletions,
             "completed_replacements": completed_replacements,
             "completed_deletions": completed_deletions,
+            "retained_records": retained_records,
+            "completion_record_ready": retained_records == 1,
         }
 
 
@@ -275,7 +317,7 @@ def _load_manifest(repository: Path, path: Path) -> dict[str, Any]:
         raise DevWeaveError(ErrorCode.INVALID_JSON, "Cutover manifest is unavailable or invalid JSON.") from exc
     required = {
         "schema_version", "product_version", "prepared_from_head", "base_ref",
-        "replacements", "deletions", "manifest_sha256",
+        "replacements", "deletions", "retained", "manifest_sha256",
     }
     if not isinstance(raw, dict) or set(raw) != required:
         raise DevWeaveError(ErrorCode.UNKNOWN_FIELD, "Cutover manifest fields do not match the strict contract.")
@@ -284,9 +326,9 @@ def _load_manifest(repository: Path, path: Path) -> dict[str, Any]:
     payload = {key: value for key, value in raw.items() if key != "manifest_sha256"}
     if raw["manifest_sha256"] != sha256(payload):
         raise DevWeaveError(ErrorCode.CONFLICT, "Cutover manifest canonical hash mismatch.")
-    if not isinstance(raw["replacements"], list) or not isinstance(raw["deletions"], list):
+    if not isinstance(raw["replacements"], list) or not isinstance(raw["deletions"], list) or not isinstance(raw["retained"], list):
         raise DevWeaveError(ErrorCode.INVALID_TYPE, "Cutover operations must be arrays.")
-    if len(raw["replacements"]) + len(raw["deletions"]) > MAX_MANIFEST_ENTRIES:
+    if len(raw["replacements"]) + len(raw["deletions"]) + len(raw["retained"]) > MAX_MANIFEST_ENTRIES:
         raise DevWeaveError(ErrorCode.BOUND_EXCEEDED, "Cutover manifest contains too many entries.")
 
     exact_replacements = {(source, destination) for source, destination in REPLACEMENT_PATHS}
@@ -314,8 +356,36 @@ def _load_manifest(repository: Path, path: Path) -> dict[str, Any]:
     for source, _destination in REPLACEMENT_PATHS:
         if source not in seen:
             raise DevWeaveError(ErrorCode.REQUIRED_FIELD, "Replacement sources must be deleted after cutover.", {"path": source})
+    if len(raw["retained"]) > 1:
+        raise DevWeaveError(ErrorCode.BOUND_EXCEEDED, "Cutover may bind only the transition completion record.")
+    for item in raw["retained"]:
+        _strict_item(item, {"path", "sha256"})
+        if _relative(item["path"]) != TRANSITION_COMPLETION_PATH:
+            raise DevWeaveError(ErrorCode.FORBIDDEN, "Cutover retained path is not allowlisted.")
+        _hash_value(item["sha256"], "sha256")
     _safe_path(repository, path.relative_to(repository).as_posix())
     return raw
+
+
+def _validate_completion_record(path: Path) -> dict[str, Any]:
+    try:
+        if path.is_symlink() or not path.is_file():
+            raise DevWeaveError(ErrorCode.FORBIDDEN, "Transition completion record must be a regular file.")
+        if path.stat().st_size > MAX_COMPLETION_RECORD_BYTES:
+            raise DevWeaveError(ErrorCode.BOUND_EXCEEDED, "Transition completion record exceeds its size bound.")
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except DevWeaveError:
+        raise
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DevWeaveError(ErrorCode.INVALID_JSON, "Transition completion record is invalid JSON.") from exc
+    plan = validate_exec_plan(raw)
+    if plan["run_id"] != TRANSITION_RUN_ID or plan["status"] != "completed" or plan["phase"] != "closed":
+        raise DevWeaveError(
+            ErrorCode.CONFLICT,
+            "Transition completion record is not the closed V2 cutover ExecPlan.",
+            {"path": TRANSITION_COMPLETION_PATH},
+        )
+    return plan
 
 
 def _strict_item(value: Any, fields: set[str]) -> None:

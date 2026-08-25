@@ -407,12 +407,12 @@
       "completed_at": null,
       "evidence": [],
       "note": "",
-      "started_at": null,
-      "status": "pending"
+      "started_at": "2026-08-25T13:12:10+00:00",
+      "status": "in_progress"
     }
   },
   "title": "DevWeave V2 app-server harness",
-  "updated_at": "2026-08-25T13:10:31+00:00",
+  "updated_at": "2026-08-25T13:12:10+00:00",
   "verification_plan": {
     "commands": {
       "app-server-e2e": {

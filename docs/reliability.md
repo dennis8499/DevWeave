@@ -13,6 +13,7 @@ The reducer reconstructs the RunSnapshot from the ExecPlan and ordered events. I
 
 - Executables resolve at runtime from approved portable candidates.
 - Processes receive argv tokens with `shell=False`, a repository-bounded cwd, timeout, bounded stdout/stderr, and denied network by default.
+- Child environments contain only the fixed operating-system baseline plus variables named by that command's `env_allowlist`; an unlisted parent variable cannot influence execution.
 - Dependency closure and stage ordering are deterministic.
 - Commands declaring writes run serially; undeclared effects invalidate evidence.
 - Evidence binds the source snapshot, plan digest, definition digest, resolved executable hash, result, and reconciliation.
@@ -24,7 +25,7 @@ Every run records its immutable base ref and run branch. Scoped phase commits ar
 
 ## Release recovery
 
-The cutover finalizer is manifest- and hash-bound, rehearsed in a disposable clone, and fail-closed on any path/hash drift. Packaging builds a candidate artifact, verifies provenance/content, then promotes it; failed verification leaves the last current release intact. Binary artifacts and runtime evidence stay untracked.
+The cutover finalizer is manifest- and hash-bound, rehearsed in a disposable clone, and fail-closed on any path/hash drift. Its release-only projector accepts only the authorized, closed V1 transition with current passing verification, exactly one current isolated review, and all three approved Gates; apply then requires that strict completed ExecPlan to be hash-bound as a retained record. Packaging builds a candidate artifact, verifies provenance/content, then promotes it; failed verification leaves the last current release intact. Binary artifacts and runtime evidence stay untracked.
 
 ## Bounded operation
 
