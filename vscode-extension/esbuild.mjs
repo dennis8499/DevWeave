@@ -12,10 +12,8 @@ const repositoryRoot = join(root, "..");
 const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
 const version = packageJson.version;
 const outdir = join(root, "dist");
-const esbuildPath = (value) => value.replaceAll("\\", "/");
-const esbuildRoot = esbuildPath(root);
-const extensionEntry = esbuildPath(join(root, "src", "extension.ts"));
-const webviewEntry = esbuildPath(join(root, "webview", "main.ts"));
+const extensionEntry = "./src/extension.ts";
+const webviewEntry = "./webview/main.ts";
 const execFileAsync = promisify(execFile);
 
 await rm(outdir, { recursive: true, force: true });
@@ -25,7 +23,7 @@ await mkdir(join(outdir, "media"), { recursive: true });
 
 const shared = {
   bundle: true,
-  absWorkingDir: esbuildRoot,
+  absWorkingDir: root,
   sourcemap: production ? false : "linked",
   minify: production,
   logLevel: "info"

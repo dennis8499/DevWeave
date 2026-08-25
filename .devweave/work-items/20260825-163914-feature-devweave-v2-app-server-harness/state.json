@@ -369,11 +369,11 @@
       "status": "completed"
     },
     "TASK-007": {
-      "completed_at": null,
+      "completed_at": "2026-08-25T11:29:10+00:00",
       "evidence": [],
-      "note": "",
-      "started_at": null,
-      "status": "pending"
+      "note": "CodexAppServerSession、shell-free JSONL transport與authoritative event reducer完成；9個scripted protocol tests、Extension 96-test regression、typecheck通過，sandbox外build成功。覆蓋handshake/allowlist/out-of-order/approvals/plan-diff-item-usage/malformed-oversized/exit-reconnect/timeout/reasoning discard。",
+      "started_at": "2026-08-25T11:22:25+00:00",
+      "status": "completed"
     },
     "TASK-008": {
       "completed_at": null,
@@ -412,7 +412,7 @@
     }
   },
   "title": "DevWeave V2 app-server harness",
-  "updated_at": "2026-08-25T11:22:08+00:00",
+  "updated_at": "2026-08-25T11:29:10+00:00",
   "verification_plan": {
     "commands": {
       "app-server-e2e": {
