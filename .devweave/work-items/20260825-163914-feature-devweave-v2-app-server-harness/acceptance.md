@@ -6,9 +6,9 @@
 
 - Risk/profile：`high`／feature；G1 與 G2 已由使用者核准，human G3 尚未核准。
 - Immutable base ref：`3662d8622b46a1cab6931da988db3c4280def783`。
-- 已驗證 UI code anchor：`c82c9e8023b209a7a063bf15eee69e4a67334ae2`；其後加入 completed-transition ExecPlan 的 finalizer guard與本 G3 候選文件，皆已由 V2/repository tests覆蓋。最終 UI/package evidence仍須在 source freeze後重綁。
+- 已驗證 release source anchor：`709b096e26a770738134b49301ea340a9f21d697`；其後只允許 evidence文字與 generated manifest刷新，若產品 source再變更則必須重新綁定。
 - Codex provenance：CLI `0.149.0-alpha.4.3`，executable SHA-256 `21f44f04e70d41d011268863d5109f5d7fc2862c14f390083e39ca3398b5ca47`，291 個 generated schema files，schema SHA-256 `def4a7e9c01d3eaf697ad5a8ada283e6733c9b54892bc4e6928eb1132320d85a`。
-- UI evidence：9/9 assertions、1 screenshot；report 綁定 run、code anchor、Codex version 與 schema hash，screenshot SHA-256 `02214188e66a9611d40655c3236fa3c066a6693abe9452c288950cc489fd83e0`，bounded log 中 secret 已 redacted。
+- UI evidence：9/9 assertions、1 screenshot；report 綁定 run、release source anchor、Codex version 與 schema hash，screenshot SHA-256 `5656e468ae601a3035406c4a55515d85d344c8537ca53be7f7f19d3d6c9d4bbe`，bounded log 中 secret 已 redacted。
 
 ## 驗證矩陣
 
@@ -45,7 +45,7 @@
 - Repository contract：16/16 通過。
 - Extension unit/DOM/security：113/113 通過；typecheck 與 production build 通過。
 - Real VS Code Extension Host smoke：通過；empty-workspace 與 repository-workspace command registration 都已驗證。
-- 2.0.0 package：candidate build/verify 通過，共 9 entries；最後 source freeze 後必須再建置並記錄最終 VSIX hash。
+- 2.0.0 package：source-derived candidate build/verify 通過，共 9 entries；provenance SHA-256 `6e850b26bc8b2ffd43b028b0bec423e76e2e1596360572117374174a056c08a7`，VSIX SHA-256 `0bad85eab1b1823814dfddf4075bdad449bc82cc977a559009bc798952a75dc4`，artifact保持未追蹤。
 - Disposable cutover clone：V2 public check、V2 tests、schema-v2、forbidden V1 paths/commands、base-ref invariant與 clean tree全部通過。
 - Formal release evidence 未完成：live Codex E2E、exactly-one isolated reviewer、human G3、main finalizer與 post-cutover full matrix。
 
