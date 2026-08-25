@@ -116,12 +116,13 @@ class GitTransactionTests(unittest.TestCase):
 
 class V1ExportTests(unittest.TestCase):
     def test_repository_v1_export_is_byte_stable_and_counts_recorded_history(self) -> None:
+        recorded_base_ref = "3662d8622b46a1cab6931da988db3c4280def783"
         adapter = GitAdapter(ROOT)
         exporter = V1Exporter(adapter)
         before = git(ROOT, "status", "--porcelain=v1", "--untracked-files=all").stdout
         with tempfile.TemporaryDirectory(prefix="devweave-v1-export-a-") as first_dir, tempfile.TemporaryDirectory(prefix="devweave-v1-export-b-") as second_dir:
-            first = exporter.write("master", Path(first_dir))
-            second = exporter.write("master", Path(second_dir))
+            first = exporter.write(recorded_base_ref, Path(first_dir))
+            second = exporter.write(recorded_base_ref, Path(second_dir))
             self.assertEqual(first[0].read_bytes(), second[0].read_bytes())
             self.assertEqual(first[1].read_bytes(), second[1].read_bytes())
             payload = json.loads(first[0].read_text(encoding="utf-8"))
@@ -131,7 +132,7 @@ class V1ExportTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["closed_work_items"], 21)
         self.assertEqual(payload["summary"]["evidence_files"], 411)
         self.assertFalse(payload["recovery"]["raw_data_copied"])
-        self.assertEqual(payload["resolved_source_ref"], "3662d8622b46a1cab6931da988db3c4280def783")
+        self.assertEqual(payload["resolved_source_ref"], recorded_base_ref)
 
 
 if __name__ == "__main__":
