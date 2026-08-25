@@ -13,11 +13,26 @@ let activeRuntime: ExtensionRuntime | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const workspace = vscode.workspace.workspaceFolders?.[0];
-  if (!workspace) return;
+  if (!workspace) {
+    registerEmptyWorkspaceCommands(context);
+    return;
+  }
   const runtime = new ExtensionRuntime(context, workspace.uri);
   activeRuntime = runtime;
   context.subscriptions.push(runtime);
   await runtime.activate();
+}
+
+function registerEmptyWorkspaceCommands(context: vscode.ExtensionContext): void {
+  const unavailable = (): Thenable<string | undefined> => vscode.window.showErrorMessage(
+    "DevWeave requires an open repository workspace."
+  );
+  for (const command of [
+    "devweave.openControlCenter", "devweave.startRun", "devweave.resumeRun",
+    "devweave.steer", "devweave.interrupt", "devweave.cancel"
+  ]) {
+    context.subscriptions.push(vscode.commands.registerCommand(command, unavailable));
+  }
 }
 
 export async function deactivate(): Promise<void> {
