@@ -9,7 +9,7 @@ test("the release bundle contract names every approved DevWeave control input", 
   const packageJson = JSON.parse(readFileSync(resolve(extensionRoot, "package.json"), "utf8")) as { version?: string };
   const buildSource = readFileSync(resolve(extensionRoot, "esbuild.mjs"), "utf8");
 
-  assert.equal(packageJson.version, "0.2.3");
+  assert.equal(packageJson.version, "2.0.0");
   assert.match(buildSource, /const version = packageJson\.version/);
   assert.match(buildSource, /bundleVersion:\s*version/);
   assert.match(buildSource, /AGENTS\.md/);

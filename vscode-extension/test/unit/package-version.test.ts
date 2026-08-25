@@ -14,7 +14,7 @@ test("release package is wired through the candidate-first orchestrator", () => 
   const verifier = readFileSync(resolve(extensionRoot, "scripts/verify-package.mjs"), "utf8");
   const orchestrator = readFileSync(resolve(extensionRoot, "scripts/release-orchestrator.mjs"), "utf8");
 
-  assert.equal(packageJson.version, "0.2.3");
+  assert.equal(packageJson.version, "2.0.0");
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages?.[""]?.version, packageJson.version);
   assert.equal(packageJson.scripts?.package, "node esbuild.mjs --production && node scripts/release-orchestrator.mjs");
@@ -24,7 +24,7 @@ test("release package is wired through the candidate-first orchestrator", () => 
   assert.match(builder, /Usage: node scripts\/package-vsix\.mjs --output/);
   assert.match(builder, /flag: "wx"/);
   assert.match(builder, /must name a unique candidate artifact/);
-  assert.match(verifier, /package version must be 0\.2\.3/);
+  assert.match(verifier, /package version must be 2\.0\.0/);
   assert.match(verifier, /--artifact/);
   assert.match(verifier, /Usage: node scripts\/verify-package\.mjs --artifact/);
   assert.match(verifier, /join\(extensionRoot, "\.\.", "\.codex", "hooks\.json"\)/);

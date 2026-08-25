@@ -12,7 +12,7 @@ const artifactPath = parseArtifactPath(process.argv.slice(2));
 const packageJson = JSON.parse(await readFile(join(extensionRoot, "package.json"), "utf8"));
 const version = packageJson.version;
 const execFileAsync = promisify(execFile);
-assert.equal(version, "0.2.3", "package version must be 0.2.3");
+assert.equal(version, "2.0.0", "package version must be 2.0.0");
 
 const bootstrapRoot = join(extensionRoot, "dist", "bootstrap");
 const manifest = JSON.parse(await readFile(join(bootstrapRoot, "manifest.json"), "utf8"));

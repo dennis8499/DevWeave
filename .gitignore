@@ -1,1 +1,6 @@
 .devweave/cache/
+.devweave/runtime/
+**/__pycache__/
+*.py[cod]
+vscode-extension/*.vsix
+vscode-extension/.release/

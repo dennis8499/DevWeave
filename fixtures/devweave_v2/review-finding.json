@@ -1,0 +1,1 @@
+{"acceptance_ids":["AC-001"],"finding_id":"FIND-001","paths":["src/app.py"],"requirement_ids":["REQ-001"],"round":1,"schema_version":2,"severity":"warning","status":"open","summary":"The fixture requires explicit handling.","task_ids":["TASK-001"]}

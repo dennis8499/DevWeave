@@ -327,11 +327,11 @@
   "status": "active",
   "tasks": {
     "TASK-001": {
-      "completed_at": null,
+      "completed_at": "2026-08-25T10:54:11+00:00",
       "evidence": [],
-      "note": "",
-      "started_at": null,
-      "status": "pending"
+      "note": "V2 package、五個strict schema、canonical JSON、stable errors、2.0.0版本一致性與公開CLI allowlist已完成；Python V2 8/8及Extension regression 88/88通過，git diff --check無錯。",
+      "started_at": "2026-08-25T10:46:31+00:00",
+      "status": "completed"
     },
     "TASK-002": {
       "completed_at": null,
@@ -412,7 +412,7 @@
     }
   },
   "title": "DevWeave V2 app-server harness",
-  "updated_at": "2026-08-25T10:44:47+00:00",
+  "updated_at": "2026-08-25T10:54:11+00:00",
   "verification_plan": {
     "commands": {
       "app-server-e2e": {

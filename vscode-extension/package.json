@@ -2,7 +2,7 @@
   "name": "devweave-control-center",
   "displayName": "DevWeave Control Center｜開發流程總覽",
   "description": "以繁體中文呈現 DevWeave 檔案快照；工作流程命令交接到 Codex Chat，初始化則需確認固定 bootstrap 寫入。",
-  "version": "0.2.3",
+  "version": "2.0.0",
   "publisher": "devweave",
   "license": "MIT",
   "engines": {
