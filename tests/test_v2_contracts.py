@@ -87,7 +87,7 @@ class PackageContractTests(unittest.TestCase):
 
     def test_transitional_launcher_emits_stable_error_envelope(self) -> None:
         result = subprocess.run(
-            [sys.executable, "-B", str(SCRIPT_ROOT / "devweave_v2_cli.py"), "check"],
+            [sys.executable, "-B", str(SCRIPT_ROOT / "devweave_v2_cli.py"), "inspect", "--run", "does-not-exist"],
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -97,7 +97,7 @@ class PackageContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 4)
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["schema_version"], 2)
-        self.assertEqual(payload["error"]["code"], ErrorCode.NOT_IMPLEMENTED)
+        self.assertEqual(payload["error"]["code"], ErrorCode.NOT_FOUND)
 
     def test_public_package_has_no_reverse_extension_dependency(self) -> None:
         package_root = SCRIPT_ROOT / "devweave_v2"
