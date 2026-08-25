@@ -1,0 +1,332 @@
+{
+  "base_baseline": {
+    "files": {
+      ".devweave/baseline/architecture.md": "c5ab2a0ae2e5c3e1f1783e0b4d5f4bf2a67c5895716f41ac02fb887504f4bb6b",
+      ".devweave/baseline/product.md": "b34b0042dab71aa5cfb45747644664bd40d76b3fe795328ca033455375b8a409",
+      ".devweave/baseline/quality.md": "90c699a7f11cb46d41b90e02a8c1c7868bf5686c8005a6b66b996cac6667e763"
+    },
+    "fingerprint": "6cc6d8058c3f2271536a29de61194277094070ec530d606f9663fed8a88ae2b5"
+  },
+  "base_knowledge": {
+    "files": {
+      "wiki/architecture/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/architecture/devweave-knowledge-workflow.md": "4e43df4ea8f0cc928062237484fe10d7bd48592246c32d5040154cb7aac83a48",
+      "wiki/decisions/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/dependencies/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/entities/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/guides/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/index.md": "0f3079a5ba2585e210d46db552de411fb7e1cbdf3a44dd4d7dc7b73217bdb43e",
+      "wiki/log.md": "3e5fea32baa2fb10917c1ed4200627d3cad58e1a1b2f95b0dd8214149fcedd82",
+      "wiki/modules/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/modules/command-policy-engine.md": "77a643f8185df1f9bfb0bc04926438fa18a7573421a7d248c7ac119455cb91aa",
+      "wiki/modules/knowledge-engine.md": "c3f7248ab27598254847c464b75be8114eaefe48b82d6468c4ba178f8b256335",
+      "wiki/modules/vscode-extension.md": "2c7ee5ba9f1a99cf075c999c6cbb3b54ce763a14cbb181bfc3b7042212da2ad5",
+      "wiki/overview.md": "08e05b30cf79c9848ac16e2343f6a50e45afe414b12b991ec0482c4030829570",
+      "wiki/patterns/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "wiki/synthesis/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fingerprint": "18383198f1bde5420074f419a7bc5d909bf00417a28eb95dfe40865aceb844da",
+    "log": {
+      "body_hash": "b8b2b976e50f89339689c9d7486271bfa9d3754845bd5dce176d0e1928fa4dd0",
+      "body_length": 11182
+    },
+    "pages": {
+      "wiki/architecture/devweave-knowledge-workflow.md": {
+        "body_hash": "724637cda0e1fac60d351b2b7a63215e262010fb075b1125b867730981f8a40d",
+        "body_length": 18342,
+        "computed_source_fingerprint": "sha256:756e83612e73097b7b480a743d84847a6e11acb74cca01673f4f40052bd3bbcd",
+        "file_hash": "360bd2f06b9f7581f55ac148208fcef15d65e3f8466aff6e0057ae6251ffa41e",
+        "last_updated": "2026-08-16",
+        "parse_errors": [],
+        "path": "wiki/architecture/devweave-knowledge-workflow.md",
+        "relative": "architecture/devweave-knowledge-workflow.md",
+        "source_error": null,
+        "source_fingerprint": "sha256:ca96436e1eb19d64e39a489a78572bb8025cb362cda78898fffdfb13abba54a9",
+        "sources": [
+          ".agents/skills",
+          ".codex/hooks.json",
+          "AGENTS.md",
+          "README.md",
+          "docs/使用手冊.md"
+        ],
+        "status": "active",
+        "title": "DevWeave Knowledge Workflow",
+        "type": "architecture",
+        "verified_by": "20260814-233520-bug-guard-policy-engine-v2-side-effect-comma"
+      },
+      "wiki/index.md": {
+        "body_hash": "ac1779b3946c307feb22738fa8ee3179e76f211cf716e7e802fabb5c243bedb2",
+        "body_length": 1585,
+        "computed_source_fingerprint": "none",
+        "file_hash": "c07b7489c327f0e7cc3b8f01b42fad7e85f37e3b18248c1155d9c71b87e56478",
+        "last_updated": "2026-08-16",
+        "parse_errors": [],
+        "path": "wiki/index.md",
+        "relative": "index.md",
+        "source_error": null,
+        "source_fingerprint": "none",
+        "sources": [],
+        "status": "active",
+        "title": "Wiki Index",
+        "type": "index",
+        "verified_by": "20260814-233520-bug-guard-policy-engine-v2-side-effect-comma"
+      },
+      "wiki/log.md": {
+        "body_hash": "b8b2b976e50f89339689c9d7486271bfa9d3754845bd5dce176d0e1928fa4dd0",
+        "body_length": 11182,
+        "computed_source_fingerprint": "none",
+        "file_hash": "b8b1b314749eff8a13f44e4d434e38fafbd9ea2e35eefb879794aaab589c2731",
+        "last_updated": "2026-08-16",
+        "parse_errors": [],
+        "path": "wiki/log.md",
+        "relative": "log.md",
+        "source_error": null,
+        "source_fingerprint": "none",
+        "sources": [],
+        "status": "active",
+        "title": "Wiki Activity Log",
+        "type": "log",
+        "verified_by": "20260814-233520-bug-guard-policy-engine-v2-side-effect-comma"
+      },
+      "wiki/modules/command-policy-engine.md": {
+        "body_hash": "20f1b31c21591909ec6cb77118a191c4450bb3a27db82a9f3b977315bbe1a627",
+        "body_length": 2651,
+        "computed_source_fingerprint": "sha256:b925ce633c28d3a9c4d7b21ecf7fe85b2802b60263e3f6ad9de991f46daaa66b",
+        "file_hash": "34a9db485bfa97fb41caec414d0c45cb66bdf398ecbd072a9e4da1b8bafeb315",
+        "last_updated": "2026-08-16",
+        "parse_errors": [],
+        "path": "wiki/modules/command-policy-engine.md",
+        "relative": "modules/command-policy-engine.md",
+        "source_error": null,
+        "source_fingerprint": "sha256:0eb9465a22d650df0c938b595e14e7a238c0d7f6979e25b69dd3b08639074925",
+        "sources": [
+          ".agents/skills/devweave/scripts/command_policy.py",
+          ".agents/skills/devweave/scripts/devweave_core.py"
+        ],
+        "status": "active",
+        "title": "Command Policy Engine",
+        "type": "module",
+        "verified_by": "20260814-233520-bug-guard-policy-engine-v2-side-effect-comma"
+      },
+      "wiki/modules/knowledge-engine.md": {
+        "body_hash": "7d27606c814943461de9008905f5116734c1ff9d631b4a880a305f42d46d73d1",
+        "body_length": 19393,
+        "computed_source_fingerprint": "sha256:6aa5e856e2f452ccf7823e4ccf3e750fecfe1024d419c964f9e42542c2986963",
+        "file_hash": "e1f39617d3a351ad6858201b81b905dd29a7c09c14ae0c468f4fc020d41abf34",
+        "last_updated": "2026-08-16",
+        "parse_errors": [],
+        "path": "wiki/modules/knowledge-engine.md",
+        "relative": "modules/knowledge-engine.md",
+        "source_error": null,
+        "source_fingerprint": "sha256:76118c17cd763af07fa50378aca7123b6ba4cbde039270968318325a9f408f6d",
+        "sources": [
+          ".agents/skills/devweave/scripts",
+          "tests/devweave_test_support.py",
+          "tests/test_cli.py",
+          "tests/test_devweave_core.py",
+          "tests/test_repository_contract.py"
+        ],
+        "status": "active",
+        "title": "Knowledge Engine",
+        "type": "module",
+        "verified_by": "20260814-233520-bug-guard-policy-engine-v2-side-effect-comma"
+      },
+      "wiki/modules/vscode-extension.md": {
+        "body_hash": "7292b69c89838739e2caa99b9d315634ec233fb3ce7dabdf11230c91d9bb51b7",
+        "body_length": 9837,
+        "computed_source_fingerprint": "sha256:d56dc422ad185aaf0f795237434cca6e30b1b0a7eeda511faec84e204fa50905",
+        "file_hash": "ce8649847c0b7c8495d82bc98dd1ab5937b2df229f70f76153a337e34365e86b",
+        "last_updated": "2026-08-13",
+        "parse_errors": [],
+        "path": "wiki/modules/vscode-extension.md",
+        "relative": "modules/vscode-extension.md",
+        "source_error": null,
+        "source_fingerprint": "sha256:b372563f7cd467ebfbc2b09f8412d37738c07e352307da3c9d6a01610f6aa36f",
+        "sources": [
+          ".codex/hooks.json",
+          "vscode-extension"
+        ],
+        "status": "active",
+        "title": "DevWeave VS Code Extension",
+        "type": "module",
+        "verified_by": "20260813-142228-feature-devweave-vs-code-extension"
+      },
+      "wiki/overview.md": {
+        "body_hash": "939b25d0084f9dc588b746154c555c1945004767e81f887abfe40e2587d5e2e3",
+        "body_length": 16284,
+        "computed_source_fingerprint": "sha256:756e83612e73097b7b480a743d84847a6e11acb74cca01673f4f40052bd3bbcd",
+        "file_hash": "9b7b203314f2e35fdb54edaf0752f58795b116fcf9ad74f2810da66c1e673e15",
+        "last_updated": "2026-08-16",
+        "parse_errors": [],
+        "path": "wiki/overview.md",
+        "relative": "overview.md",
+        "source_error": null,
+        "source_fingerprint": "sha256:ca96436e1eb19d64e39a489a78572bb8025cb362cda78898fffdfb13abba54a9",
+        "sources": [
+          ".agents/skills",
+          ".codex/hooks.json",
+          "AGENTS.md",
+          "README.md",
+          "docs/使用手冊.md"
+        ],
+        "status": "active",
+        "title": "DevWeave Codebase Overview",
+        "type": "overview",
+        "verified_by": "20260814-233520-bug-guard-policy-engine-v2-side-effect-comma"
+      }
+    },
+    "root": "wiki"
+  },
+  "base_source": {
+    "branch": "master",
+    "dirty_paths": [],
+    "files": {},
+    "fingerprint": "1ee96813351c5fbc5ba22f0ae5de187c8c8f3e974a74e093e98cf12cd6d29572",
+    "head": "3662d8622b46a1cab6931da988db3c4280def783"
+  },
+  "baseline_updates": {
+    "rationale": "",
+    "recorded_at": null,
+    "targets": []
+  },
+  "blocker": null,
+  "created_at": "2026-08-25T08:39:15+00:00",
+  "evidence": {},
+  "gates": {
+    "acceptance": {
+      "approved_at": null,
+      "approved_by": null,
+      "fingerprint": null,
+      "status": "pending"
+    },
+    "build": {
+      "approved_at": null,
+      "approved_by": null,
+      "fingerprint": null,
+      "status": "pending"
+    },
+    "scope": {
+      "approved_at": "2026-08-25T08:58:36+00:00",
+      "approved_by": "user",
+      "fingerprint": "52f0ab2d5bb81655c1a10a7e57ca8a442c1ca76985475c26d0ccef263e3ac85b",
+      "status": "approved"
+    }
+  },
+  "id": "20260825-163914-feature-devweave-v2-app-server-harness",
+  "kind": "feature",
+  "knowledge_context": {
+    "gaps": [
+      "五個核心內容頁皆為 stale_source，且只描述 0.2.3 的唯讀 clipboard handoff、Wiki 與 v1 ledger；不足以證明 V2 app-server、MCP、單一 docs 真實來源、乾淨分支與風險自適應 Gate 的現況或介面，需以核准 baseline、manifest、測試與最小相關 source 補證。"
+    ],
+    "pages": [
+      "wiki/index.md",
+      "wiki/overview.md",
+      "wiki/architecture/devweave-knowledge-workflow.md",
+      "wiki/modules/command-policy-engine.md",
+      "wiki/modules/knowledge-engine.md",
+      "wiki/modules/vscode-extension.md"
+    ],
+    "recorded_at": "2026-08-25T08:40:16+00:00",
+    "records": [
+      {
+        "computed_source_fingerprint": "none",
+        "content_hash": "c07b7489c327f0e7cc3b8f01b42fad7e85f37e3b18248c1155d9c71b87e56478",
+        "path": "wiki/index.md",
+        "present": true,
+        "source_fingerprint": "none",
+        "status": "active"
+      },
+      {
+        "computed_source_fingerprint": "sha256:756e83612e73097b7b480a743d84847a6e11acb74cca01673f4f40052bd3bbcd",
+        "content_hash": "9b7b203314f2e35fdb54edaf0752f58795b116fcf9ad74f2810da66c1e673e15",
+        "path": "wiki/overview.md",
+        "present": true,
+        "source_fingerprint": "sha256:ca96436e1eb19d64e39a489a78572bb8025cb362cda78898fffdfb13abba54a9",
+        "status": "active"
+      },
+      {
+        "computed_source_fingerprint": "sha256:756e83612e73097b7b480a743d84847a6e11acb74cca01673f4f40052bd3bbcd",
+        "content_hash": "360bd2f06b9f7581f55ac148208fcef15d65e3f8466aff6e0057ae6251ffa41e",
+        "path": "wiki/architecture/devweave-knowledge-workflow.md",
+        "present": true,
+        "source_fingerprint": "sha256:ca96436e1eb19d64e39a489a78572bb8025cb362cda78898fffdfb13abba54a9",
+        "status": "active"
+      },
+      {
+        "computed_source_fingerprint": "sha256:b925ce633c28d3a9c4d7b21ecf7fe85b2802b60263e3f6ad9de991f46daaa66b",
+        "content_hash": "34a9db485bfa97fb41caec414d0c45cb66bdf398ecbd072a9e4da1b8bafeb315",
+        "path": "wiki/modules/command-policy-engine.md",
+        "present": true,
+        "source_fingerprint": "sha256:0eb9465a22d650df0c938b595e14e7a238c0d7f6979e25b69dd3b08639074925",
+        "status": "active"
+      },
+      {
+        "computed_source_fingerprint": "sha256:6aa5e856e2f452ccf7823e4ccf3e750fecfe1024d419c964f9e42542c2986963",
+        "content_hash": "e1f39617d3a351ad6858201b81b905dd29a7c09c14ae0c468f4fc020d41abf34",
+        "path": "wiki/modules/knowledge-engine.md",
+        "present": true,
+        "source_fingerprint": "sha256:76118c17cd763af07fa50378aca7123b6ba4cbde039270968318325a9f408f6d",
+        "status": "active"
+      },
+      {
+        "computed_source_fingerprint": "sha256:d56dc422ad185aaf0f795237434cca6e30b1b0a7eeda511faec84e204fa50905",
+        "content_hash": "ce8649847c0b7c8495d82bc98dd1ab5937b2df229f70f76153a337e34365e86b",
+        "path": "wiki/modules/vscode-extension.md",
+        "present": true,
+        "source_fingerprint": "sha256:b372563f7cd467ebfbc2b09f8412d37738c07e352307da3c9d6a01610f6aa36f",
+        "status": "active"
+      }
+    ]
+  },
+  "knowledge_review": {
+    "affected_pages": [],
+    "change_fingerprint": null,
+    "covered_changed_paths": [],
+    "disposition": null,
+    "invalidated_at": null,
+    "rationale": "",
+    "recorded_at": null,
+    "uncovered_changed_paths": []
+  },
+  "knowledge_review_required": true,
+  "knowledge_updates": {
+    "change_fingerprint": null,
+    "coupled": [],
+    "deletes": [],
+    "rationale": "",
+    "recorded_at": null,
+    "sealed": [],
+    "upserts": []
+  },
+  "last_verification": null,
+  "phase": "design",
+  "risk": {
+    "downgrade_rationale": null,
+    "level": "high",
+    "rationale": "Breaking-change V2 會替換 workflow lifecycle、CLI/MCP/app-server 介面、Git ownership、知識真實來源、VS Code 執行模型、舊資料保留方式與驗證 Gate；錯誤可能造成工作狀態遺失、未授權 mutation、審批繞過或 release 不可用，因此採 high-risk、完整驗證與隔離審查。"
+  },
+  "schema_version": 1,
+  "scope": {
+    "paths": [
+      ".agents",
+      ".codex",
+      ".devweave",
+      ".gitignore",
+      "AGENTS.md",
+      "ARCHITECTURE.md",
+      "README.md",
+      "docs",
+      "fixtures",
+      "skills-lock.json",
+      "tests",
+      "vscode-extension",
+      "wiki"
+    ],
+    "rationale": "V2 是整體 harness clean cutover：重組單一 Skill 與 Python engine、加入 project-scoped Codex/MCP 設定、更新 machine state/基線、壓縮根指引、建立架構與 docs 真實來源、遷移測試/fixtures、把 VS Code Extension 改為 app-server rich client、移除 Wiki 與 v1/VSIX tracked runtime artifacts，並同步 README、ignore 與 provenance。"
+  },
+  "status": "active",
+  "tasks": {},
+  "title": "DevWeave V2 app-server harness",
+  "updated_at": "2026-08-25T08:58:36+00:00",
+  "waivers": []
+}
