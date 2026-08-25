@@ -1,6 +1,6 @@
 interface:
   display_name: "DevWeave"
-  short_description: "以 Wiki-first 知識與三道品質關卡驅動可追溯開發"
-  default_prompt: "使用 $devweave 啟動一個 Wiki-first、完整且可追溯的軟體開發工作項。"
+  short_description: "以 Codex app-server、typed ExecPlan 與風險 Gate 驅動可追溯交付"
+  default_prompt: "使用 $devweave 啟動一個有範圍、可驗證且由人類核准的 DevWeave 工作流程。"
 policy:
   allow_implicit_invocation: true

@@ -104,10 +104,9 @@ class RepositoryContractTests(unittest.TestCase):
         bundle = (REPOSITORY_ROOT / "vscode-extension" / "esbuild.mjs").read_text(
             encoding="utf-8"
         )
-        self.assertIn(
-            'const companionSkills = ["codebase-design", "diagnosing-bugs", "grill-me", "grilling", "tdd"]',
-            bundle,
-        )
+        for name in sorted(COMPANION_SKILLS):
+            self.assertNotIn(name, bundle)
+        self.assertNotIn("bootstrap", bundle.lower())
         self.assertNotIn("writing-great-skills", bundle)
 
     def test_skill_frontmatter_metadata_and_invocation_policy_are_explicit(

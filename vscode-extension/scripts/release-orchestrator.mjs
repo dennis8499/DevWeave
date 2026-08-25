@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { rename, rm, stat, readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat } from "node:fs/promises";
 
 const execFileAsync = promisify(execFile);
 const scriptsRoot = fileURLToPath(new URL("./", import.meta.url));
@@ -93,7 +93,9 @@ export async function cleanupCandidate(candidatePath) {
 
 async function runProductionRelease() {
   const packageJson = JSON.parse(await readFile(join(extensionRoot, "package.json"), "utf8"));
-  const currentArtifact = join(extensionRoot, `devweave-control-center-${packageJson.version}.vsix`);
+  const releaseRoot = join(extensionRoot, ".release");
+  await mkdir(releaseRoot, { recursive: true });
+  const currentArtifact = join(releaseRoot, `devweave-control-center-${packageJson.version}.vsix`);
   const candidatePath = createCandidatePath(currentArtifact);
   const nodeExecutable = process.execPath;
 

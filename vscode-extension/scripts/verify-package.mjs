@@ -1,132 +1,124 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
-import { inflateRawSync } from "node:zlib";
-import { fileURLToPath } from "node:url";
 import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { inflateRawSync } from "node:zlib";
 
+const execFileAsync = promisify(execFile);
 const extensionRoot = fileURLToPath(new URL("../", import.meta.url));
+const repositoryRoot = resolve(extensionRoot, "..");
+const releaseRoot = join(extensionRoot, ".release");
 const artifactPath = parseArtifactPath(process.argv.slice(2));
 const packageJson = JSON.parse(await readFile(join(extensionRoot, "package.json"), "utf8"));
-const version = packageJson.version;
-const execFileAsync = promisify(execFile);
-assert.equal(version, "2.0.0", "package version must be 2.0.0");
+assert.equal(packageJson.version, "2.0.0", "package version must be 2.0.0");
 
-const bootstrapRoot = join(extensionRoot, "dist", "bootstrap");
-const manifest = JSON.parse(await readFile(join(bootstrapRoot, "manifest.json"), "utf8"));
-assert.equal(manifest.bundleVersion, version, "bundle and Extension versions must match");
-assert.equal(manifest.packageVersion, version, "manifest package version must match Extension version");
-assert.equal(manifest.files.length, 58, "bootstrap manifest must contain the certified 58 files");
-assert.equal(manifest.bootstrapFileCount, manifest.files.length, "manifest bootstrap file count must match entries");
-const sourceGitHead = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: join(extensionRoot, ".."), encoding: "utf8" })).stdout.trim();
-assert.equal(manifest.sourceGitHead, sourceGitHead, "manifest source Git HEAD must match the current source");
-const manifestPayload = { schemaVersion: manifest.schemaVersion, bundleVersion: manifest.bundleVersion, directories: manifest.directories, files: manifest.files };
-assert.equal(createHash("sha256").update(JSON.stringify(manifestPayload), "utf8").digest("hex"), manifest.manifestSha256, "manifest canonical hash mismatch");
-const bootstrapHook = JSON.parse(await readFile(join(bootstrapRoot, "hooks.json"), "utf8"));
-const repositoryHook = JSON.parse(await readFile(join(extensionRoot, "..", ".codex", "hooks.json"), "utf8"));
-assert.deepEqual(bootstrapHook, repositoryHook, "bootstrap hook must be source-derived from repository .codex/hooks.json");
-const hookGroups = repositoryHook.hooks?.PreToolUse;
-assert.ok(Array.isArray(hookGroups) && hookGroups.length === 1, "repository must contain one PreToolUse group");
-assert.equal(hookGroups[0].matcher, "^(Bash|apply_patch|Edit|Write)$", "PreToolUse matcher must stay exact");
-const hookHandlers = hookGroups[0].hooks;
-assert.ok(Array.isArray(hookHandlers) && hookHandlers.length === 1, "repository must contain one PreToolUse handler");
-const hookCommand = hookHandlers[0];
-assert.equal(hookCommand.type, "command", "PreToolUse handler must be a command hook");
-assert.equal(hookCommand.timeout, 30, "PreToolUse timeout must remain bounded");
-assert.equal(hookCommand.statusMessage, "Checking DevWeave gates");
-assert.match(hookCommand.command, /python3 -X utf8 -B/);
-assert.match(hookCommand.command, /\$\(git rev-parse --show-toplevel\)/);
-assert.match(hookCommand.commandWindows, /powershell\.exe -NoLogo -NoProfile -NonInteractive -Command/);
-assert.match(hookCommand.commandWindows, /py -3 -X utf8 -B/);
-assert.match(hookCommand.commandWindows, /Join-Path \(git rev-parse --show-toplevel\)/);
-assert.match(hookCommand.commandWindows, /\[Console\]::InputEncoding = \[System\.Text\.UTF8Encoding\]::new\(0\)/);
-assert.match(hookCommand.commandWindows, /\[Console\]::OutputEncoding = \[System\.Text\.UTF8Encoding\]::new\(0\)/);
-assert.doesNotMatch(hookCommand.commandWindows, /\$repo/);
-const destinations = new Set(manifest.files.map((file) => file.destination));
-const compatibleContracts = new Map([
-  [".devweave/project.json", "devweave-project-v1"],
-  [".devweave/baseline/product.md", "baseline-product-v1"],
-  [".devweave/baseline/architecture.md", "baseline-architecture-v1"],
-  [".devweave/baseline/quality.md", "baseline-quality-v1"],
-  ["wiki/index.md", "wiki-index-v1"],
-  ["wiki/overview.md", "wiki-overview-v1"],
-  ["wiki/log.md", "wiki-log-v1"]
+const artifactInfo = await stat(artifactPath);
+assert.ok(artifactInfo.isFile() && artifactInfo.size > 0, "candidate VSIX must be a non-empty regular file");
+const artifactBytes = await readFile(artifactPath);
+const entries = readZipEntries(artifactBytes);
+const expectedEntries = new Set([
+  "[Content_Types].xml",
+  "extension.vsixmanifest",
+  "extension/dist/extension.js",
+  "extension/dist/webview/main.js",
+  "extension/dist/webview/styles.css",
+  "extension/media/devweave.svg",
+  "extension/package.json",
+  "extension/readme.md",
+  "extension/release-provenance.json"
 ]);
-for (const required of [
-  "AGENTS.md",
-  "skills-lock.json",
-  ".codex/hooks.json",
-  ".devweave/project.json",
-  ".devweave/baseline/product.md",
-  ".devweave/baseline/architecture.md",
-  ".devweave/baseline/quality.md",
-  "wiki/index.md",
-  "wiki/overview.md",
-  ".agents/skills/devweave/SKILL.md",
-  ".agents/skills/devweave/references/native-question-contract.md",
-  ".agents/skills/codebase-design/SKILL.md",
-  ".agents/skills/diagnosing-bugs/SKILL.md",
-  ".agents/skills/grill-me/SKILL.md",
-  ".agents/skills/grilling/SKILL.md",
-  ".agents/skills/tdd/SKILL.md"
-]) {
-  assert.ok(destinations.has(required), `manifest is missing ${required}`);
+assert.deepEqual(new Set(entries.keys()), expectedEntries, "VSIX entry allowlist mismatch");
+
+const packagedMetadata = JSON.parse(requiredEntry(entries, "extension/package.json").toString("utf8"));
+assert.equal(packagedMetadata.version, packageJson.version, "VSIX package version mismatch");
+assert.equal(packagedMetadata.main, "./dist/extension.js", "VSIX entrypoint mismatch");
+assert.equal(packagedMetadata.icon, "./media/devweave.svg", "VSIX icon entry mismatch");
+const vsixManifest = requiredEntry(entries, "extension.vsixmanifest").toString("utf8");
+assert.match(vsixManifest, new RegExp(`Version="${packageJson.version.replaceAll(".", "\\.")}"`));
+
+const provenance = JSON.parse(requiredEntry(entries, "extension/release-provenance.json").toString("utf8"));
+assert.deepEqual(
+  Object.keys(provenance).sort(),
+  ["files", "manifest_sha256", "product_version", "schema_version", "source_git_head", "source_status_sha256", "source_tracked_clean"],
+  "release provenance fields drifted"
+);
+assert.equal(provenance.schema_version, 1);
+assert.equal(provenance.product_version, packageJson.version);
+assert.equal(provenance.source_tracked_clean, true, "release source must have no tracked modifications");
+
+const head = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot })).stdout.toString("utf8").trim();
+const statusBytes = Buffer.from((await execFileAsync(
+  "git",
+  ["status", "--porcelain=v1", "-z", "--untracked-files=no"],
+  { cwd: repositoryRoot }
+)).stdout);
+assert.equal(provenance.source_git_head, head, "release source Git HEAD mismatch");
+assert.equal(statusBytes.byteLength, 0, "release verification requires a clean tracked tree");
+assert.equal(provenance.source_status_sha256, digest(statusBytes), "release source status digest mismatch");
+
+const expectedSources = new Map([
+  ["extension/dist/extension.js", "dist/extension.js"],
+  ["extension/dist/webview/main.js", "dist/webview/main.js"],
+  ["extension/dist/webview/styles.css", "dist/webview/styles.css"],
+  ["extension/media/devweave.svg", "media/devweave.svg"],
+  ["extension/package.json", "package.json"],
+  ["extension/readme.md", "README.md"]
+]);
+assert.equal(provenance.files.length, expectedSources.size, "release provenance file count mismatch");
+for (const record of provenance.files) {
+  assert.deepEqual(Object.keys(record).sort(), ["byte_length", "entry", "sha256", "source"]);
+  assert.equal(expectedSources.get(record.entry), record.source, `unexpected source for ${record.entry}`);
+  const sourceBytes = await readFile(join(extensionRoot, record.source));
+  const entryBytes = requiredEntry(entries, record.entry);
+  assert.equal(record.byte_length, sourceBytes.byteLength, `source byte length mismatch for ${record.source}`);
+  assert.equal(record.sha256, digest(sourceBytes), `source SHA-256 mismatch for ${record.source}`);
+  assert.equal(digest(entryBytes), record.sha256, `packaged entry SHA-256 mismatch for ${record.entry}`);
 }
-for (const file of manifest.files) {
-  assert.ok(file.existingPolicy === "exact" || file.existingPolicy === "adopt-compatible", `invalid existing policy for ${file.destination}`);
-  if (compatibleContracts.has(file.destination)) {
-    assert.equal(file.existingPolicy, "adopt-compatible", `compatible policy missing for ${file.destination}`);
-    assert.equal(file.compatibility, compatibleContracts.get(file.destination), `compatibility kind mismatch for ${file.destination}`);
-  } else {
-    assert.equal(file.existingPolicy, "exact", `non-data bootstrap path must remain exact: ${file.destination}`);
-    assert.equal(file.compatibility, undefined, `exact bootstrap path must not declare compatibility: ${file.destination}`);
-  }
-  assert.doesNotMatch(file.destination, /(?:^|\/)(?:README|docs|tests?|fixtures|work-items|history)(?:\/|$)/i, `forbidden bootstrap destination ${file.destination}`);
-  const sourceBytes = await readFile(join(bootstrapRoot, file.source));
-  assert.equal(sourceBytes.byteLength, file.byteLength, `byte length mismatch for ${file.source}`);
-  assert.equal(createHash("sha256").update(sourceBytes).digest("hex"), file.sha256, `hash mismatch for ${file.source}`);
+const provenancePayload = {
+  schema_version: provenance.schema_version,
+  product_version: provenance.product_version,
+  source_git_head: provenance.source_git_head,
+  source_tracked_clean: provenance.source_tracked_clean,
+  source_status_sha256: provenance.source_status_sha256,
+  files: provenance.files
+};
+assert.equal(
+  provenance.manifest_sha256,
+  digest(Buffer.from(JSON.stringify(provenancePayload), "utf8")),
+  "release provenance manifest digest mismatch"
+);
+
+const extensionBundle = requiredEntry(entries, "extension/dist/extension.js").toString("utf8");
+for (const forbidden of [
+  "devweave.copyNextAction",
+  "devweave.wikiBootstrap",
+  "clipboard.writeText",
+  "Bootstrap Codebase Wiki",
+  "dist/bootstrap"
+]) {
+  assert.doesNotMatch(extensionBundle, new RegExp(escapeRegExp(forbidden), "i"), `legacy workflow surface found: ${forbidden}`);
 }
 
-const vsixInfo = await stat(artifactPath);
-assert.ok(vsixInfo.isFile(), "the candidate VSIX must be a regular file");
-assert.ok(vsixInfo.size > 0, "the candidate VSIX must be non-empty");
-const retainedVsixInfo = await stat(join(extensionRoot, "devweave-control-center-0.2.2.vsix"));
-assert.ok(retainedVsixInfo.isFile(), "the previous 0.2.2 VSIX must remain available");
-const vsixBytes = await readFile(artifactPath);
-const vsixSha256 = createHash("sha256").update(vsixBytes).digest("hex");
-const vsixEntries = readZipEntries(vsixBytes);
-assert.equal(vsixEntries.size, 119, "VSIX must contain the certified 119 entries");
-const packageEntry = JSON.parse(vsixEntries.get("extension/package.json").toString("utf8"));
-assert.equal(packageEntry.version, version, "VSIX package metadata version mismatch");
-const vsixManifest = vsixEntries.get("extension.vsixmanifest").toString("utf8");
-assert.match(vsixManifest, new RegExp(`Version="${version.replaceAll(".", "\\.")}"`));
-for (const required of [
-  "extension/dist/bootstrap/manifest.json",
-  "extension/dist/bootstrap/AGENTS.md",
-  "extension/dist/bootstrap/skills-lock.json",
-  "extension/dist/bootstrap/skill/SKILL.md",
-  "extension/dist/bootstrap/skill/references/native-question-contract.md",
-  "extension/dist/bootstrap/companions/codebase-design/SKILL.md",
-  "extension/dist/bootstrap/companions/diagnosing-bugs/SKILL.md",
-  "extension/dist/bootstrap/companions/grill-me/SKILL.md",
-  "extension/dist/bootstrap/companions/grilling/SKILL.md",
-  "extension/dist/bootstrap/companions/tdd/SKILL.md"
-]) {
-  assert.ok(vsixEntries.has(required), `VSIX is missing ${required}`);
-}
-console.log(`Verified ${artifactPath}: ${version}, ${manifest.files.length} bootstrap files and ${vsixEntries.size} VSIX entries. Manifest SHA-256: ${manifest.manifestSha256}. VSIX SHA-256: ${vsixSha256}`);
+console.log(JSON.stringify({
+  ok: true,
+  version: packageJson.version,
+  entries: entries.size,
+  source_git_head: head,
+  provenance_sha256: provenance.manifest_sha256,
+  vsix_sha256: digest(artifactBytes)
+}));
 
 function parseArtifactPath(args) {
   if (args.length !== 2 || args[0] !== "--artifact" || !args[1]) {
     throw new Error("Usage: node scripts/verify-package.mjs --artifact <candidate.vsix>");
   }
-
   const resolvedArtifact = resolve(extensionRoot, args[1]);
-  const suffix = relative(extensionRoot, resolvedArtifact);
+  const suffix = relative(resolve(releaseRoot), resolvedArtifact);
   if (suffix === "" || suffix === "." || isAbsolute(suffix) || suffix === ".." || suffix.startsWith(`..${sep}`)) {
-    throw new Error("--artifact must point to a file inside the extension root.");
+    throw new Error("--artifact must point to a file inside vscode-extension/.release/.");
   }
   if (extname(resolvedArtifact).toLowerCase() !== ".vsix") {
     throw new Error("--artifact must use the .vsix extension.");
@@ -135,7 +127,7 @@ function parseArtifactPath(args) {
 }
 
 function readZipEntries(bytes) {
-  const entries = new Map();
+  const result = new Map();
   let offset = 0;
   while (offset + 4 <= bytes.byteLength && bytes.readUInt32LE(offset) === 0x04034b50) {
     const method = bytes.readUInt16LE(offset + 8);
@@ -145,10 +137,27 @@ function readZipEntries(bytes) {
     const nameStart = offset + 30;
     const name = bytes.subarray(nameStart, nameStart + nameLength).toString("utf8");
     const dataStart = nameStart + nameLength + extraLength;
-    const data = bytes.subarray(dataStart, dataStart + compressedSize);
-    entries.set(name, method === 8 ? inflateRawSync(data) : Buffer.from(data));
-    offset = dataStart + compressedSize;
+    const dataEnd = dataStart + compressedSize;
+    assert.ok(dataEnd <= bytes.byteLength, `truncated VSIX entry ${name}`);
+    assert.ok(!result.has(name), `duplicate VSIX entry ${name}`);
+    const data = bytes.subarray(dataStart, dataEnd);
+    result.set(name, method === 8 ? inflateRawSync(data) : Buffer.from(data));
+    offset = dataEnd;
   }
-  assert.ok(entries.size > 0, "VSIX ZIP has no readable local entries");
-  return entries;
+  assert.ok(result.size > 0, "VSIX ZIP has no readable local entries");
+  return result;
+}
+
+function requiredEntry(entries, name) {
+  const value = entries.get(name);
+  assert.ok(value, `VSIX is missing ${name}`);
+  return value;
+}
+
+function digest(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

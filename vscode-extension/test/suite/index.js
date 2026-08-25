@@ -6,11 +6,18 @@ async function run() {
   assert.ok(extension, "DevWeave extension should be discoverable");
   await extension.activate();
   const commands = await vscode.commands.getCommands(true);
-  assert.ok(commands.includes("devweave.openDashboard"));
-  assert.ok(commands.includes("devweave.initialize"));
-  assert.ok(commands.includes("devweave.refresh"));
-  assert.ok(commands.includes("devweave.copyNextAction"));
-  assert.ok(commands.includes("devweave.wikiBootstrap"));
+  for (const command of [
+    "devweave.openControlCenter",
+    "devweave.startRun",
+    "devweave.resumeRun",
+    "devweave.steer",
+    "devweave.interrupt",
+    "devweave.cancel"
+  ]) {
+    assert.ok(commands.includes(command), `missing governed command ${command}`);
+  }
+  assert.ok(!commands.includes("devweave.copyNextAction"));
+  assert.ok(!commands.includes("devweave.wikiBootstrap"));
 }
 
 module.exports = { run };
