@@ -46,18 +46,20 @@ export function reduceAppServerEvent(
   const value = isRecord(params) ? params : {};
   switch (method) {
     case "thread/started":
-      state.threadId = stringField(value, "threadId", "thread_id") ?? state.threadId;
+      state.threadId = stringField(isRecord(value.thread) ? value.thread : value, "id", "threadId", "thread_id")
+        ?? state.threadId;
       state.threadStatus = "active";
       return state;
     case "thread/status/changed":
-      state.threadStatus = bounded(value.status ?? "unknown", 128);
+      state.threadStatus = bounded(isRecord(value.status) ? value.status.type ?? "unknown" : value.status ?? "unknown", 128);
       return state;
     case "turn/started":
-      state.turnId = stringField(value, "turnId", "turn_id") ?? state.turnId;
+      state.turnId = stringField(isRecord(value.turn) ? value.turn : value, "id", "turnId", "turn_id") ?? state.turnId;
       state.turnStatus = "active";
       return state;
     case "turn/completed":
-      state.turnStatus = bounded(value.status ?? "completed", 128);
+      state.turnId = stringField(isRecord(value.turn) ? value.turn : value, "id", "turnId", "turn_id") ?? state.turnId;
+      state.turnStatus = bounded(isRecord(value.turn) ? value.turn.status ?? "completed" : value.status ?? "completed", 128);
       return state;
     case "turn/plan/updated":
       state.plan = Array.isArray(value.plan) ? structuredClone(value.plan).slice(0, 256) : [];
@@ -155,7 +157,8 @@ function extractDisplayContent(item: Record<string, unknown>): string {
 }
 
 function projectUsage(value: Record<string, unknown>): AppServerProjection["usage"] {
-  const usage = isRecord(value.usage) ? value.usage : value;
+  const tokenUsage = isRecord(value.tokenUsage) ? value.tokenUsage : value;
+  const usage = isRecord(tokenUsage.total) ? tokenUsage.total : isRecord(value.usage) ? value.usage : value;
   const input = numberField(usage, "inputTokens", "input_tokens");
   const output = numberField(usage, "outputTokens", "output_tokens");
   const total = numberField(usage, "totalTokens", "total_tokens");

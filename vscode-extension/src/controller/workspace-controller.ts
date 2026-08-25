@@ -87,10 +87,10 @@ export class WorkspaceController {
       const codex = record(preflight.codex);
       if (typeof codex.path !== "string") throw new Error("Codex preflight did not return an executable path.");
       await this.appServer.connect(codex.path, this.repository);
-      await this.assertRequiredMcp();
       const thread = record(await this.appServer.request("thread/start", this.threadParams(run)));
       const threadId = extractId(record(thread.thread), "id") || extractId(thread, "threadId", "thread_id");
       if (!threadId) throw new Error("App-server did not return a thread id.");
+      await this.assertRequiredMcp(threadId);
       this.stateValue = { ...this.stateValue, status: "ready", run, preflight, threadId };
       this.publish();
       return this.state;
@@ -109,13 +109,13 @@ export class WorkspaceController {
       const codex = record(preflight.codex);
       if (typeof codex.path !== "string") throw new Error("Codex preflight did not return an executable path.");
       if (this.appServer.projection.connection !== "connected") await this.appServer.connect(codex.path, this.repository);
-      await this.assertRequiredMcp();
       let activeThread = threadId ?? "";
       if (activeThread) await this.appServer.request("thread/resume", { threadId: activeThread });
       else {
         const started = record(await this.appServer.request("thread/start", this.threadParams(run)));
         activeThread = extractId(record(started.thread), "id") || extractId(started, "threadId", "thread_id");
       }
+      await this.assertRequiredMcp(activeThread);
       this.stateValue = { ...this.stateValue, status: "ready", run, preflight, threadId: activeThread };
       this.publish();
       return this.state;
@@ -130,7 +130,7 @@ export class WorkspaceController {
     const response = record(await this.appServer.request("turn/start", {
       threadId: this.stateValue.threadId,
       input: [{ type: "text", text: input }],
-      ...this.sandboxParams(this.stateValue.run ?? {})
+      sandboxPolicy: this.turnSandboxPolicy(this.stateValue.run ?? {})
     }));
     this.stateValue = { ...this.stateValue, turnId: extractId(record(response.turn), "id") || extractId(response, "turnId", "turn_id") };
     this.publish();
@@ -141,7 +141,7 @@ export class WorkspaceController {
     this.assertReady();
     await this.appServer.request("turn/steer", {
       threadId: this.stateValue.threadId,
-      turnId: this.stateValue.turnId,
+      expectedTurnId: this.stateValue.turnId,
       input: [{ type: "text", text: input }]
     });
   }
@@ -242,26 +242,31 @@ export class WorkspaceController {
     }
   }
 
-  private async assertRequiredMcp(): Promise<void> {
-    const response = record(await this.appServer.request("mcpServerStatus/list", {}));
+  private async assertRequiredMcp(threadId: string): Promise<void> {
+    const response = record(await this.appServer.request("mcpServerStatus/list", {
+      threadId, detail: "full", limit: 100
+    }));
     const servers = Array.isArray(response.data) ? response.data : Array.isArray(response.servers) ? response.servers : [];
     const devweave = servers.map(record).find((server) => server.name === "devweave");
-    if (!devweave || !["ready", "connected"].includes(String(devweave.status))) throw new Error("Required DevWeave MCP server is not ready.");
-    const tools = Array.isArray(devweave.tools) ? devweave.tools.filter((item): item is string => typeof item === "string").sort() : [];
+    if (!devweave) throw new Error("Required DevWeave MCP server is not ready.");
+    const tools = Object.keys(record(devweave.tools)).sort();
     if (JSON.stringify(tools) !== JSON.stringify([...REQUIRED_AGENT_TOOLS].sort())) {
       throw new Error("Required DevWeave MCP tool set is not exact/current.");
     }
   }
 
   private threadParams(run: Record<string, unknown>): Record<string, unknown> {
-    return { cwd: this.repository, approvalPolicy: "on-request", ...this.sandboxParams(run) };
+    return { cwd: this.repository, approvalPolicy: "on-request", sandbox: this.isWritable(run) ? "workspace-write" : "read-only" };
   }
 
-  private sandboxParams(run: Record<string, unknown>): Record<string, unknown> {
-    const writable = run.phase === "implementation" || run.phase === "verification" || run.phase === "review";
-    return writable
-      ? { sandbox: { type: "workspaceWrite", writableRoots: [this.repository], networkAccess: false } }
-      : { sandbox: { type: "readOnly", networkAccess: false } };
+  private turnSandboxPolicy(run: Record<string, unknown>): Record<string, unknown> {
+    return this.isWritable(run)
+      ? { type: "workspaceWrite", writableRoots: [this.repository], networkAccess: false }
+      : { type: "readOnly", networkAccess: false };
+  }
+
+  private isWritable(run: Record<string, unknown>): boolean {
+    return run.phase === "implementation" || run.phase === "verification" || run.phase === "review";
   }
 
   private assertReady(): void {

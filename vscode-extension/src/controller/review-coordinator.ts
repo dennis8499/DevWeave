@@ -32,11 +32,12 @@ export class ReviewCoordinator {
       let response = await this.appServer.request("review/start", {
         threadId: implementationThreadId,
         delivery: "detached",
-        target: { type: "baseBranch", branch: baseBranch },
-        round
+        target: { type: "baseBranch", branch: baseBranch }
       });
       const initial = isRecord(response) ? response : {};
-      const reviewerId = typeof initial.threadId === "string" ? initial.threadId : typeof initial.thread_id === "string" ? initial.thread_id : "";
+      const reviewerId = typeof initial.reviewThreadId === "string"
+        ? initial.reviewThreadId
+        : typeof initial.threadId === "string" ? initial.threadId : typeof initial.thread_id === "string" ? initial.thread_id : "";
       if (!Array.isArray(initial.findings) && typeof initial.text !== "string" && reviewerId && this.appServer.waitForReviewResult) {
         const completed = await this.appServer.waitForReviewResult(reviewerId);
         response = { ...record(completed), threadId: reviewerId };
@@ -58,7 +59,9 @@ export function parseReviewResponse(value: unknown, round: number): ReviewOutcom
   const response = isRecord(value) ? value : {};
   const reviewerThreadId = typeof response.threadId === "string"
     ? bounded(response.threadId, 256)
-    : typeof response.thread_id === "string" ? bounded(response.thread_id, 256) : "";
+    : typeof response.reviewThreadId === "string"
+      ? bounded(response.reviewThreadId, 256)
+      : typeof response.thread_id === "string" ? bounded(response.thread_id, 256) : "";
   const findings = Array.isArray(response.findings)
     ? response.findings.slice(0, 128).map((item, index) => parseFinding(item, round, index))
     : parseFindingText(typeof response.text === "string" ? response.text : "", round);

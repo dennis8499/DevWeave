@@ -294,7 +294,9 @@ export class CodexAppServerSession {
       : typeof params.thread_id === "string" ? params.thread_id : "";
     if (!threadId) return;
     const result = {
-      text: typeof item.text === "string" ? bounded(item.text, 262_144) : "",
+      text: typeof item.review === "string"
+        ? bounded(item.review, 262_144)
+        : typeof item.text === "string" ? bounded(item.text, 262_144) : "",
       findings: Array.isArray(item.findings) ? structuredClone(item.findings).slice(0, 128) : undefined
     };
     const waiter = this.reviewWaiters.get(threadId);
@@ -318,9 +320,12 @@ export class CodexAppServerSession {
 
   private captureTurnResult(method: string, params: unknown): void {
     if (method !== "turn/completed" || !isRecord(params)) return;
-    const turnId = typeof params.turnId === "string" ? params.turnId : typeof params.turn_id === "string" ? params.turn_id : "";
+    const turn = isRecord(params.turn) ? params.turn : params;
+    const turnId = typeof turn.id === "string"
+      ? turn.id
+      : typeof params.turnId === "string" ? params.turnId : typeof params.turn_id === "string" ? params.turn_id : "";
     if (!turnId) return;
-    const result = { status: typeof params.status === "string" ? bounded(params.status, 128) : "completed" };
+    const result = { status: typeof turn.status === "string" ? bounded(turn.status, 128) : "completed" };
     const waiter = this.turnWaiters.get(turnId);
     if (waiter) {
       clearTimeout(waiter.timeout);

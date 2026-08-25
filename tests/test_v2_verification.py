@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,6 +34,7 @@ def command(
     dependencies: list[str] | None = None,
     release_only: bool = False,
     timeout_seconds: int = 5,
+    env_allowlist: list[str] | None = None,
 ) -> dict:
     return command_payload_with_digest({
         "command_id": command_id,
@@ -45,6 +48,7 @@ def command(
         "risk_profiles": ["low", "standard", "high"],
         "expected_exit_codes": [0],
         "release_only": release_only,
+        **({"env_allowlist": env_allowlist} if env_allowlist else {}),
     })
 
 
@@ -119,6 +123,16 @@ class VerificationEngineTests(unittest.TestCase):
         (self.repo / ".git" / "index").write_text("two", encoding="utf-8")
         (self.repo / ".devweave" / "runtime" / "events.jsonl").write_text("two", encoding="utf-8")
         self.assertEqual(before, snapshot_digest(snapshot_tree(self.repo)))
+
+    def test_only_declared_environment_names_reach_the_command(self) -> None:
+        definition = command(
+            "environment",
+            "import json, os; print(json.dumps({'visible': os.getenv('DEVWEAVE_VISIBLE'), 'hidden': os.getenv('DEVWEAVE_HIDDEN'), 'path': os.getenv('PATH')}))",
+            env_allowlist=["DEVWEAVE_VISIBLE"],
+        )
+        with mock.patch.dict(os.environ, {"DEVWEAVE_VISIBLE": "yes", "DEVWEAVE_HIDDEN": "no"}):
+            evidence = self.engine(definition).run(profile=RiskLevel.HIGH, plan_digest=PLAN_DIGEST)["evidence"][0]
+        self.assertEqual(json.loads(evidence["stdout"]), {"visible": "yes", "hidden": None, "path": None})
 
     def test_nonzero_timeout_and_undeclared_effect_are_ineligible(self) -> None:
         cases = (

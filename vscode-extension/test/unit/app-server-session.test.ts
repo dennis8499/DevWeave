@@ -49,15 +49,18 @@ test("stable requests correlate out-of-order responses and reject experimental m
 
 test("event reducer covers plan diff item usage warnings and authoritative completion", () => {
   let state = initialProjection();
-  state = reduceAppServerEvent(state, "thread/started", { threadId: "thread-1" });
-  state = reduceAppServerEvent(state, "turn/started", { turnId: "turn-1" });
+  state = reduceAppServerEvent(state, "thread/started", { thread: { id: "thread-1" } });
+  state = reduceAppServerEvent(state, "turn/started", { threadId: "thread-1", turn: { id: "turn-1" } });
   state = reduceAppServerEvent(state, "turn/plan/updated", { plan: [{ step: "one" }] });
   state = reduceAppServerEvent(state, "turn/diff/updated", { diff: "+line" });
   state = reduceAppServerEvent(state, "item/started", { item: { id: "msg-1", type: "agentMessage" } });
   state = reduceAppServerEvent(state, "item/agentMessage/delta", { itemId: "msg-1", delta: "projection" });
   assert.equal(state.items["msg-1"].authoritative, false);
   state = reduceAppServerEvent(state, "item/completed", { item: { id: "msg-1", type: "agentMessage", status: "completed", text: "authority" } });
-  state = reduceAppServerEvent(state, "thread/tokenUsage/updated", { inputTokens: 3, outputTokens: 4, totalTokens: 7 });
+  state = reduceAppServerEvent(state, "thread/tokenUsage/updated", {
+    threadId: "thread-1", turnId: "turn-1",
+    tokenUsage: { total: { inputTokens: 3, outputTokens: 4, totalTokens: 7 } }
+  });
   state = reduceAppServerEvent(state, "mcpServer/startupStatus/updated", { name: "devweave", status: "ready" });
   state = reduceAppServerEvent(state, "warning", { message: "bounded warning" });
   assert.equal(state.threadId, "thread-1");
@@ -123,10 +126,25 @@ test("turn completion can be awaited before or after the authoritative event arr
   const { session, transport, connect } = connectedHarness();
   await connect;
   const pending = session.waitForTurnCompleted("turn-before");
-  transport.receive({ method: "turn/completed", params: { turnId: "turn-before", status: "completed" } });
+  transport.receive({ method: "turn/completed", params: { threadId: "thread", turn: { id: "turn-before", status: "completed" } } });
   assert.deepEqual(await pending, { status: "completed" });
-  transport.receive({ method: "turn/completed", params: { turnId: "turn-after", status: "failed" } });
+  transport.receive({ method: "turn/completed", params: { threadId: "thread", turn: { id: "turn-after", status: "failed" } } });
   assert.deepEqual(await session.waitForTurnCompleted("turn-after"), { status: "failed" });
+  await session.close();
+});
+
+test("detached review completion reads the stable exitedReviewMode review field", async () => {
+  const { session, transport, connect } = connectedHarness();
+  await connect;
+  const pending = session.waitForReviewResult("review-thread");
+  transport.receive({
+    method: "item/completed",
+    params: {
+      threadId: "review-thread", turnId: "review-turn", completedAtMs: 1,
+      item: { id: "review-item", type: "exitedReviewMode", review: "WARNING [F-1] bounded finding" }
+    }
+  });
+  assert.deepEqual(await pending, { text: "WARNING [F-1] bounded finding", findings: undefined });
   await session.close();
 });
 

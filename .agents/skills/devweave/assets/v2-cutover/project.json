@@ -269,10 +269,20 @@
         ],
         "command_id": "app-server-e2e",
         "cwd": ".",
-        "definition_digest": "33e62dc59e4eec2cdfec82313b1864c01d53a6fd086f1c26e339f6d60ef5a915",
+        "definition_digest": "f6129adcd54a13972997a40412fd76f6907578500780fdb69c4924abd53fa06e",
         "dependencies": [
           "extension-tests",
           "python-v2"
+        ],
+        "env_allowlist": [
+          "DEVWEAVE_E2E_ALLOW_LIVE",
+          "DEVWEAVE_CODEX_PATH",
+          "USERPROFILE",
+          "HOME",
+          "APPDATA",
+          "LOCALAPPDATA",
+          "CODEX_HOME",
+          "PATH"
         ],
         "expected_exit_codes": [
           0

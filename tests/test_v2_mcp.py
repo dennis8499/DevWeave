@@ -60,9 +60,19 @@ class McpProtocolTests(unittest.TestCase):
     def test_initialize_list_and_call_transcript(self) -> None:
         harness = McpHarness()
         try:
-            listed = harness.session.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+            listed = harness.session.handle({
+                "jsonrpc": "2.0", "id": 2, "method": "tools/list",
+                "params": {"cursor": None, "_meta": {"progressToken": 1}},
+            })
             names = tuple(item["name"] for item in listed["result"]["tools"])
             self.assertEqual(names, AGENT_TOOLS)
+            for request_id, params in (
+                (20, {"cursor": "stale"}), (21, {"extra": True}), (22, []), (23, {"_meta": "invalid"}),
+            ):
+                rejected = harness.session.handle({
+                    "jsonrpc": "2.0", "id": request_id, "method": "tools/list", "params": params,
+                })
+                self.assertEqual(rejected["error"]["code"], -32602)
             inspected = harness.call("run_inspect", {"run_id": "run-fixture"})
             self.assertFalse(inspected["result"]["isError"])
             self.assertEqual(inspected["result"]["structuredContent"]["run_id"], "run-fixture")

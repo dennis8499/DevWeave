@@ -45,8 +45,14 @@ class McpSession:
             if method == "ping":
                 return rpc_result(request_id, {})
             if method == "tools/list":
-                if params not in ({}, None):
-                    return rpc_error(request_id, -32602, "tools/list does not accept parameters")
+                if params is None:
+                    params = {}
+                if not isinstance(params, dict) or set(params) - {"cursor", "_meta"}:
+                    return rpc_error(request_id, -32602, "tools/list parameters are invalid")
+                if params.get("cursor") is not None:
+                    return rpc_error(request_id, -32602, "tools/list cursor is invalid")
+                if "_meta" in params and params["_meta"] is not None and not isinstance(params["_meta"], dict):
+                    return rpc_error(request_id, -32602, "tools/list metadata is invalid")
                 return rpc_result(request_id, {"tools": list(TOOL_DEFINITIONS)})
             if method == "tools/call":
                 if not isinstance(params, dict) or set(params) != {"name", "arguments"} or not isinstance(params.get("name"), str):

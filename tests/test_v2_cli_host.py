@@ -17,7 +17,12 @@ SCRIPT_ROOT = ROOT / ".agents" / "skills" / "devweave" / "scripts"
 if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
-from devweave_v2.codex_doctor import CodexDoctor, REQUIRED_APP_SERVER_DESCRIPTORS
+from devweave_v2.codex_doctor import (
+    MAX_SCHEMA_FILES,
+    CodexDoctor,
+    REQUIRED_APP_SERVER_DESCRIPTORS,
+    validate_schema_bundle,
+)
 from devweave_v2.errors import DevWeaveError, ErrorCode
 from devweave_v2.git_port import GitAdapter
 from devweave_v2.git_transaction import GitTransaction
@@ -95,6 +100,25 @@ class CodexDoctorTests(unittest.TestCase):
                 with self.assertRaises(DevWeaveError) as failed:
                     CodexDoctor(runner=FakeCodexRunner(mode)).probe(repository=self.repo, configured_path=str(self.executable.resolve()))
                 self.assertEqual(failed.exception.code, ErrorCode.CODEX_UNAVAILABLE)
+
+    def test_schema_bundle_accepts_current_multi_file_shape_and_keeps_a_hard_cap(self) -> None:
+        bundle = self.repo / "schema"
+        bundle.mkdir()
+        for index, descriptor in enumerate(REQUIRED_APP_SERVER_DESCRIPTORS):
+            (bundle / f"descriptor-{index:03d}.json").write_text(
+                json.dumps({"method": descriptor}), encoding="utf-8",
+            )
+        for index in range(len(REQUIRED_APP_SERVER_DESCRIPTORS), 291):
+            (bundle / f"schema-{index:03d}.json").write_text("{}", encoding="utf-8")
+        digest, count = validate_schema_bundle(bundle)
+        self.assertEqual(count, 291)
+        self.assertEqual(len(digest), 64)
+
+        for index in range(291, MAX_SCHEMA_FILES + 1):
+            (bundle / f"schema-{index:03d}.json").write_text("{}", encoding="utf-8")
+        with self.assertRaises(DevWeaveError) as failed:
+            validate_schema_bundle(bundle)
+        self.assertEqual(failed.exception.code, ErrorCode.CODEX_UNAVAILABLE)
 
 
 class GitHostHarness:

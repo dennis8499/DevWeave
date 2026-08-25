@@ -20,6 +20,8 @@ REQUIRED_APP_SERVER_DESCRIPTORS = (
     "turn/steer", "turn/interrupt", "review/start", "mcpServerStatus/list",
     "config/mcpServer/reload", "item/completed",
 )
+MAX_SCHEMA_FILES = 512
+MAX_SCHEMA_BYTES = 10_000_000
 
 
 class CodexDoctor:
@@ -86,7 +88,7 @@ class CodexDoctor:
 
 def validate_schema_bundle(root: Path) -> tuple[str, int]:
     files = sorted(path for path in root.rglob("*.json") if path.is_file())
-    if not files or len(files) > 256:
+    if not files or len(files) > MAX_SCHEMA_FILES:
         raise DevWeaveError(ErrorCode.CODEX_UNAVAILABLE, "Codex schema bundle has an invalid file count.")
     combined = hashlib.sha256()
     searchable: list[str] = []
@@ -94,7 +96,7 @@ def validate_schema_bundle(root: Path) -> tuple[str, int]:
     for path in files:
         raw = path.read_bytes()
         total += len(raw)
-        if total > 10_000_000:
+        if total > MAX_SCHEMA_BYTES:
             raise DevWeaveError(ErrorCode.BOUND_EXCEEDED, "Codex schema bundle exceeds its byte limit.")
         try:
             json.loads(raw.decode("utf-8"))

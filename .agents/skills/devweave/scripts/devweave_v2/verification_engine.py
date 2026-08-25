@@ -40,17 +40,27 @@ class ProcessResult:
 
 
 class ProcessPort(Protocol):
-    def run(self, argv: Sequence[str], *, cwd: Path, timeout_seconds: int) -> ProcessResult: ...
+    def run(
+        self, argv: Sequence[str], *, cwd: Path, timeout_seconds: int,
+        env_allowlist: Sequence[str] = (),
+    ) -> ProcessResult: ...
 
 
 class SubprocessRunner:
     """Executes an argument vector directly; no shell command string exists."""
 
-    def run(self, argv: Sequence[str], *, cwd: Path, timeout_seconds: int) -> ProcessResult:
+    def run(
+        self, argv: Sequence[str], *, cwd: Path, timeout_seconds: int,
+        env_allowlist: Sequence[str] = (),
+    ) -> ProcessResult:
         started = time.monotonic()
+        allowed = {
+            "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATHEXT", "COMSPEC",
+            *(name.upper() for name in env_allowlist),
+        }
         environment = {
             key: value for key, value in os.environ.items()
-            if key.upper() in {"SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATHEXT", "COMSPEC"}
+            if key.upper() in allowed
         }
         try:
             result = subprocess.run(
@@ -196,7 +206,10 @@ class VerificationEngine:
             raise DevWeaveError(ErrorCode.NOT_FOUND, "Verification cwd is not a directory.")
         before = snapshot_tree(self.repository)
         input_digest = snapshot_digest(before)
-        result = self.runner.run((str(executable.path), *command.argv[1:]), cwd=cwd, timeout_seconds=command.timeout_seconds)
+        result = self.runner.run(
+            (str(executable.path), *command.argv[1:]), cwd=cwd,
+            timeout_seconds=command.timeout_seconds, env_allowlist=command.env_allowlist,
+        )
         after = snapshot_tree(self.repository)
         output_digest = snapshot_digest(after)
         effects = compare_paths(before, after)

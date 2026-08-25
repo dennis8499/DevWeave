@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+import re
 from typing import Any, Mapping
 
 from .contract_utils import (
@@ -52,6 +53,7 @@ class VerificationCommand:
     risk_profiles: tuple[RiskLevel, ...]
     expected_exit_codes: tuple[int, ...]
     release_only: bool
+    env_allowlist: tuple[str, ...]
     definition_digest: str
 
     @classmethod
@@ -64,6 +66,7 @@ class VerificationCommand:
                 "dependencies", "timeout_seconds", "risk_profiles", "expected_exit_codes",
                 "release_only", "definition_digest",
             ),
+            optional=("env_allowlist",),
         )
         argv = strings(data["argv"], "VerificationCommand.argv", minimum=1, maximum=64)
         profiles = tuple(
@@ -86,6 +89,7 @@ class VerificationCommand:
             risk_profiles=profiles,
             expected_exit_codes=exit_codes,
             release_only=boolean(data["release_only"], "VerificationCommand.release_only"),
+            env_allowlist=_environment_names(data.get("env_allowlist", [])),
             definition_digest=text(data["definition_digest"], "VerificationCommand.definition_digest", minimum=64, maximum=64),
         )
 
@@ -96,6 +100,17 @@ def _writes(value: Any) -> str:
         from .errors import ContractError, ErrorCode
         raise ContractError(ErrorCode.INVALID_VALUE, "VerificationCommand.writes must be none or declared.")
     return result
+
+
+def _environment_names(value: Any) -> tuple[str, ...]:
+    names = strings(value, "VerificationCommand.env_allowlist", maximum=32)
+    if any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in names):
+        from .errors import ContractError, ErrorCode
+        raise ContractError(ErrorCode.INVALID_VALUE, "Verification environment names are invalid.")
+    if len({name.upper() for name in names}) != len(names):
+        from .errors import ContractError, ErrorCode
+        raise ContractError(ErrorCode.INVALID_VALUE, "Verification environment names must be unique.")
+    return names
 
 
 @dataclass(frozen=True, slots=True)

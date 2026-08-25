@@ -69,7 +69,7 @@ class ProjectConfig:
 
 
 def command_definition_payload(command: VerificationCommand) -> dict[str, Any]:
-    return {
+    payload = {
         "command_id": command.command_id,
         "argv": list(command.argv),
         "cwd": command.cwd,
@@ -82,6 +82,9 @@ def command_definition_payload(command: VerificationCommand) -> dict[str, Any]:
         "expected_exit_codes": list(command.expected_exit_codes),
         "release_only": command.release_only,
     }
+    if command.env_allowlist:
+        payload["env_allowlist"] = list(command.env_allowlist)
+    return payload
 
 
 def command_definition_digest(command: VerificationCommand) -> str:

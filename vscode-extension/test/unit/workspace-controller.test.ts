@@ -47,7 +47,6 @@ class FakeApp implements AppServerPort {
   public readonly responses: Array<{ id: string | number; result: unknown }> = [];
   public connectCalls = 0;
   public mcpTools = [...TOOLS];
-  public mcpStatus = "ready";
   public reviewResponses: unknown[] = [];
   private projectionListener: ((state: AppServerProjection) => void) | undefined;
   private serverListener: ((request: ServerRequest) => void) | undefined;
@@ -61,7 +60,9 @@ class FakeApp implements AppServerPort {
 
   public async request(method: never, params: unknown): Promise<unknown> {
     this.requests.push({ method, params });
-    if (method === "mcpServerStatus/list") return { data: [{ name: "devweave", status: this.mcpStatus, tools: this.mcpTools }] };
+    if (method === "mcpServerStatus/list") {
+      return { data: [{ name: "devweave", tools: Object.fromEntries(this.mcpTools.map((name) => [name, { name }])) }] };
+    }
     if (method === "thread/start") return { thread: { id: "implement-thread" } };
     if (method === "thread/resume") return { thread: { id: "implement-thread" } };
     if (method === "turn/start") return { turn: { id: "turn-1" } };
@@ -88,26 +89,27 @@ class FakeApp implements AppServerPort {
   }
 }
 
-test("workspace start checks exact required MCP before creating a read-only thread", async () => {
+test("workspace start creates a read-only thread before checking its exact required MCP", async () => {
   const host = new FakeHost();
   const app = new FakeApp();
   const controller = new WorkspaceController("C:/repo", host, app);
   const state = await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
   assert.equal(state.status, "ready");
   assert.equal(state.threadId, "implement-thread");
-  assert.deepEqual(app.requests.map((item) => item.method), ["mcpServerStatus/list", "thread/start"]);
-  assert.deepEqual((app.requests[1].params as { sandbox: unknown }).sandbox, { type: "readOnly", networkAccess: false });
+  assert.deepEqual(app.requests.map((item) => item.method), ["thread/start", "mcpServerStatus/list"]);
+  assert.equal((app.requests[0].params as { sandbox: unknown }).sandbox, "read-only");
+  assert.deepEqual(app.requests[1].params, { threadId: "implement-thread", detail: "full", limit: 100 });
   assert.equal(host.calls[0].method, "run_start");
 });
 
-test("required MCP failure blocks without starting a thread", async () => {
+test("required MCP failure blocks after the thread-scoped inventory is available", async () => {
   const host = new FakeHost();
   const app = new FakeApp();
   app.mcpTools = TOOLS.slice(0, -1);
   const controller = new WorkspaceController("C:/repo", host, app);
   await assert.rejects(controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" }), /tool set/);
   assert.equal(controller.state.status, "blocked");
-  assert.deepEqual(app.requests.map((item) => item.method), ["mcpServerStatus/list"]);
+  assert.deepEqual(app.requests.map((item) => item.method), ["thread/start", "mcpServerStatus/list"]);
 });
 
 test("implementation thread uses workspace-write with network disabled and resume is idempotent", async () => {
@@ -116,12 +118,18 @@ test("implementation thread uses workspace-write with network disabled and resum
   const app = new FakeApp();
   const controller = new WorkspaceController("C:/repo", host, app);
   await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
-  assert.deepEqual((app.requests[1].params as { sandbox: unknown }).sandbox, {
+  assert.equal((app.requests[0].params as { sandbox: unknown }).sandbox, "workspace-write");
+  await controller.startTurn("continue");
+  assert.deepEqual((app.requests.at(-1)?.params as { sandboxPolicy: unknown }).sandboxPolicy, {
     type: "workspaceWrite", writableRoots: ["C:/repo"], networkAccess: false
+  });
+  await controller.steer("clarify");
+  assert.deepEqual(app.requests.at(-1)?.params, {
+    threadId: "implement-thread", expectedTurnId: "turn-1", input: [{ type: "text", text: "clarify" }]
   });
   await controller.resumeRun("run-1", undefined, "implement-thread");
   assert.equal(host.calls.at(-1)?.method, "run_resume");
-  assert.equal(app.requests.at(-1)?.method, "thread/resume");
+  assert.deepEqual(app.requests.slice(-2).map((item) => item.method), ["thread/resume", "mcpServerStatus/list"]);
 });
 
 test("approval broker auto-declines pre-gate, out-of-scope and destructive requests", async () => {
@@ -168,7 +176,7 @@ test("controller routes decisions, gates and cancellation only through host meth
 
 test("high review performs at most three detached fix/reverify rounds", async () => {
   const responses = [1, 2, 3].map((round) => ({
-    threadId: `review-${round}`,
+    reviewThreadId: `review-${round}`,
     findings: [{ id: `F-${round}`, severity: "critical", status: "open", summary: "critical" }]
   }));
   const port = {
@@ -184,10 +192,10 @@ test("high review performs at most three detached fix/reverify rounds", async ()
 });
 
 test("standard review rejects reused identity and parses exitedReviewMode text", async () => {
-  const reused = new ReviewCoordinator({ async request() { return { threadId: "implement-thread", findings: [] }; } });
+  const reused = new ReviewCoordinator({ async request() { return { reviewThreadId: "implement-thread", findings: [] }; } });
   assert.equal((await reused.run("standard", "implement-thread", "main", async () => undefined)).status, "blocked");
   const detached = new ReviewCoordinator({
-    async request() { return { threadId: "review-thread" }; },
+    async request() { return { reviewThreadId: "review-thread" }; },
     async waitForReviewResult() { return { text: "WARNING [F-1] bounded advisory" }; }
   });
   const outcome = await detached.run("standard", "implement-thread", "main", async () => undefined);
