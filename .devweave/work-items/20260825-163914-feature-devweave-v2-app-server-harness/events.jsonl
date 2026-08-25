@@ -6,3 +6,5 @@
 {"at": "2026-08-25T10:44:47+00:00", "data": {"actor": "user", "fingerprint": "238276ea2b1b3cc137fe8865e44643a3fe889eb42589ca9a3155aace3d695a8d", "gate": "build"}, "event": "gate_approved", "schema_version": 1}
 {"at": "2026-08-25T10:46:31+00:00", "data": {"evidence": [], "note": "", "task": "TASK-001"}, "event": "task_start", "schema_version": 1}
 {"at": "2026-08-25T10:54:11+00:00", "data": {"evidence": [], "note": "V2 package、五個strict schema、canonical JSON、stable errors、2.0.0版本一致性與公開CLI allowlist已完成；Python V2 8/8及Extension regression 88/88通過，git diff --check無錯。", "task": "TASK-001"}, "event": "task_complete", "schema_version": 1}
+{"at": "2026-08-25T10:54:28+00:00", "data": {"evidence": [], "note": "", "task": "TASK-002"}, "event": "task_start", "schema_version": 1}
+{"at": "2026-08-25T10:59:49+00:00", "data": {"evidence": [], "note": "Atomic PlanStore、RunService雙facade、risk matrix、Gate fingerprint、optimistic revision/idempotency、immutable tasks、PendingDecision與deterministic reducer已完成；17個V2 tests通過，涵蓋crash before/after replace與duplicate event。", "task": "TASK-002"}, "event": "task_complete", "schema_version": 1}
