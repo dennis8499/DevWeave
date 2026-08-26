@@ -394,6 +394,24 @@ class TransitionCompletionRecordTests(unittest.TestCase):
         self.assertEqual(["EVID-VERIFY", "EVID-REVIEW"], plan["verification"]["evidence_ids"])
         self.assertEqual(["FIND-1"], plan["review"]["finding_ids"])
 
+    def test_final_review_does_not_replace_transition_verification_evidence(self) -> None:
+        state_path = self.repository / WORK_ROOT / "state.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["last_verification"]["evidence_id"] = "EVID-REVIEW"
+        state_path.write_text(dumps(state), encoding="utf-8")
+        self._git("add", WORK_ROOT + "/state.json")
+        self._git("commit", "-qm", "record final review as latest evidence")
+
+        record_transition_completion(
+            self.repository,
+            work_id=TRANSITION_RUN_ID,
+            expected_source_head=self.source_head,
+        )
+
+        target = self.repository / TRANSITION_COMPLETION_PATH
+        plan = validate_exec_plan(json.loads(target.read_text(encoding="utf-8")))
+        self.assertEqual(["EVID-VERIFY", "EVID-REVIEW"], plan["verification"]["evidence_ids"])
+
     def _git(self, *args: str) -> str:
         result = subprocess.run(
             ["git", *args], cwd=self.repository, check=True, capture_output=True,

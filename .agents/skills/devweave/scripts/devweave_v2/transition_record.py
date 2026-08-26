@@ -191,21 +191,40 @@ def _validate_closed_state(state: Any) -> None:
 def _current_verification(
     state: dict[str, Any], expected_source_head: str, acceptance_ids: list[str]
 ) -> dict[str, Any]:
-    evidence_id = state.get("last_verification", {}).get("evidence_id")
-    evidence = state.get("evidence", {}).get(evidence_id)
-    if not isinstance(evidence, dict):
+    evidence_by_id = state.get("evidence", {})
+    if not isinstance(evidence_by_id, dict):
         raise DevWeaveError(ErrorCode.BLOCKED, "Current verification evidence is missing.")
-    if (
-        evidence.get("status") != "passed"
-        or evidence.get("observed_result") != "success"
-        or evidence.get("stale")
-        or not evidence.get("binds_current_source")
-        or not set(acceptance_ids).issubset(evidence.get("covers", []))
-    ):
-        raise DevWeaveError(ErrorCode.BLOCKED, "Transition verification evidence is not current and passing.")
-    if evidence.get("git_head") != expected_source_head:
-        raise DevWeaveError(ErrorCode.CONFLICT, "Expected source HEAD does not match verification evidence.")
-    return evidence
+
+    preferred_id = state.get("last_verification", {}).get("evidence_id")
+    ordered_ids = sorted(
+        (value for value in evidence_by_id if isinstance(value, str)),
+        key=lambda value: int(value.removeprefix("EVID-"))
+        if re.fullmatch(r"EVID-\d+", value)
+        else -1,
+        reverse=True,
+    )
+    if isinstance(preferred_id, str) and preferred_id in ordered_ids:
+        ordered_ids.remove(preferred_id)
+        ordered_ids.insert(0, preferred_id)
+
+    acceptance_set = set(acceptance_ids)
+    for evidence_id in ordered_ids:
+        evidence = evidence_by_id[evidence_id]
+        if not isinstance(evidence, dict) or evidence.get("kind") == "review":
+            continue
+        if (
+            evidence.get("status") == "passed"
+            and evidence.get("observed_result") == "success"
+            and not evidence.get("stale")
+            and evidence.get("binds_current_source")
+            and acceptance_set.issubset(evidence.get("covers", []))
+            and evidence.get("git_head") == expected_source_head
+        ):
+            return evidence
+    raise DevWeaveError(
+        ErrorCode.BLOCKED,
+        "Transition verification evidence is not current, passing, and distinct from review evidence.",
+    )
 
 
 def _single_current_review(
