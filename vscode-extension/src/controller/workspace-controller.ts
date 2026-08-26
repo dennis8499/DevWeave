@@ -110,7 +110,7 @@ export class WorkspaceController {
       if (typeof codex.path !== "string") throw new Error("Codex preflight did not return an executable path.");
       if (this.appServer.projection.connection !== "connected") await this.appServer.connect(codex.path, this.repository);
       let activeThread = threadId ?? "";
-      if (activeThread) await this.appServer.request("thread/resume", { threadId: activeThread });
+      if (activeThread) await this.appServer.request("thread/resume", { threadId: activeThread, ...this.threadParams(run) });
       else {
         const started = record(await this.appServer.request("thread/start", this.threadParams(run)));
         activeThread = extractId(record(started.thread), "id") || extractId(started, "threadId", "thread_id");
@@ -130,6 +130,8 @@ export class WorkspaceController {
     const response = record(await this.appServer.request("turn/start", {
       threadId: this.stateValue.threadId,
       input: [{ type: "text", text: input }],
+      approvalPolicy: "untrusted",
+      approvalsReviewer: "user",
       sandboxPolicy: this.turnSandboxPolicy(this.stateValue.run ?? {})
     }));
     this.stateValue = { ...this.stateValue, turnId: extractId(record(response.turn), "id") || extractId(response, "turnId", "turn_id") };
@@ -256,7 +258,12 @@ export class WorkspaceController {
   }
 
   private threadParams(run: Record<string, unknown>): Record<string, unknown> {
-    return { cwd: this.repository, approvalPolicy: "on-request", sandbox: this.isWritable(run) ? "workspace-write" : "read-only" };
+    return {
+      cwd: this.repository,
+      approvalPolicy: "untrusted",
+      approvalsReviewer: "user",
+      sandbox: this.isWritable(run) ? "workspace-write" : "read-only"
+    };
   }
 
   private turnSandboxPolicy(run: Record<string, unknown>): Record<string, unknown> {

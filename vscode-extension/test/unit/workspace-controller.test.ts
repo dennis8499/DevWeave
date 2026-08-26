@@ -97,7 +97,9 @@ test("workspace start creates a read-only thread before checking its exact requi
   assert.equal(state.status, "ready");
   assert.equal(state.threadId, "implement-thread");
   assert.deepEqual(app.requests.map((item) => item.method), ["thread/start", "mcpServerStatus/list"]);
-  assert.equal((app.requests[0].params as { sandbox: unknown }).sandbox, "read-only");
+  assert.deepEqual(app.requests[0].params, {
+    cwd: "C:/repo", approvalPolicy: "untrusted", approvalsReviewer: "user", sandbox: "read-only"
+  });
   assert.deepEqual(app.requests[1].params, { threadId: "implement-thread", detail: "full", limit: 100 });
   assert.equal(host.calls[0].method, "run_start");
 });
@@ -120,8 +122,12 @@ test("implementation thread uses workspace-write with network disabled and resum
   await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
   assert.equal((app.requests[0].params as { sandbox: unknown }).sandbox, "workspace-write");
   await controller.startTurn("continue");
-  assert.deepEqual((app.requests.at(-1)?.params as { sandboxPolicy: unknown }).sandboxPolicy, {
-    type: "workspaceWrite", writableRoots: ["C:/repo"], networkAccess: false
+  assert.deepEqual(app.requests.at(-1)?.params, {
+    threadId: "implement-thread",
+    input: [{ type: "text", text: "continue" }],
+    approvalPolicy: "untrusted",
+    approvalsReviewer: "user",
+    sandboxPolicy: { type: "workspaceWrite", writableRoots: ["C:/repo"], networkAccess: false }
   });
   await controller.steer("clarify");
   assert.deepEqual(app.requests.at(-1)?.params, {
@@ -130,6 +136,10 @@ test("implementation thread uses workspace-write with network disabled and resum
   await controller.resumeRun("run-1", undefined, "implement-thread");
   assert.equal(host.calls.at(-1)?.method, "run_resume");
   assert.deepEqual(app.requests.slice(-2).map((item) => item.method), ["thread/resume", "mcpServerStatus/list"]);
+  assert.deepEqual(app.requests.at(-2)?.params, {
+    threadId: "implement-thread", cwd: "C:/repo", approvalPolicy: "untrusted",
+    approvalsReviewer: "user", sandbox: "workspace-write"
+  });
 });
 
 test("approval broker auto-declines pre-gate, out-of-scope and destructive requests", async () => {

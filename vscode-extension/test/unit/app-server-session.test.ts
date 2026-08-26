@@ -167,7 +167,12 @@ test("process exit rejects calls and reconnect resumes the recorded thread", asy
   await assert.rejects(pending, /exited/);
   await session.reconnect("thread-1");
   assert.equal(transports.length, 2);
-  assert.equal((JSON.parse(transports[1].sent[2]) as { method: string }).method, "thread/resume");
+  const resume = JSON.parse(transports[1].sent[2]) as { method: string; params: unknown };
+  assert.equal(resume.method, "thread/resume");
+  assert.deepEqual(resume.params, {
+    threadId: "thread-1", cwd: "C:/repo", approvalPolicy: "untrusted",
+    approvalsReviewer: "user", sandbox: "read-only"
+  });
   await session.close();
 });
 

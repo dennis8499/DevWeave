@@ -223,6 +223,31 @@ def turn_completed(turn_id: str) -> Callable[[dict[str, Any]], bool]:
     return matches
 
 
+def protocol_diagnostic(messages: list[dict[str, Any]]) -> str:
+    methods: dict[str, int] = {}
+    item_types: dict[str, int] = {}
+    turn_statuses: list[str] = []
+    for message in messages:
+        method = message.get("method")
+        if isinstance(method, str):
+            methods[method] = methods.get(method, 0) + 1
+        params = message.get("params")
+        if not isinstance(params, dict):
+            continue
+        item = params.get("item")
+        if isinstance(item, dict) and isinstance(item.get("type"), str):
+            item_type = item["type"]
+            item_types[item_type] = item_types.get(item_type, 0) + 1
+        if method == "turn/completed" and isinstance(params.get("turn"), dict):
+            status = params["turn"].get("status")
+            if isinstance(status, str):
+                turn_statuses.append(status)
+    return json.dumps(
+        {"methods": methods, "item_types": item_types, "turn_statuses": turn_statuses[-8:]},
+        ensure_ascii=True, sort_keys=True, separators=(",", ":"),
+    )[:4_096]
+
+
 class RealCodexAppServerTests(unittest.TestCase):
     def test_real_stdio_mcp_lifecycle_approval_and_detached_review(self) -> None:
         if os.environ.get(LIVE_OPT_IN) != "1":
@@ -240,6 +265,9 @@ class RealCodexAppServerTests(unittest.TestCase):
         summary: dict[str, Any] | None = None
         failure: Exception | None = None
         cleanup_error: Exception | None = None
+        sentinel_cleanup_error: Exception | None = None
+        unsafe_write = ""
+        phase = "initialize"
         try:
             initialized = client.initialize()
             self.assertIsInstance(initialized.get("userAgent"), str)
@@ -255,14 +283,17 @@ class RealCodexAppServerTests(unittest.TestCase):
                     }
                 }
             }
+            phase = "thread_start"
             thread_result = client.request("thread/start", {
-                "cwd": str(ROOT), "approvalPolicy": "on-request", "sandbox": "read-only",
+                "cwd": str(ROOT), "approvalPolicy": "untrusted", "approvalsReviewer": "user",
+                "sandbox": "read-only",
                 "ephemeral": False,
                 "baseInstructions": "Run only bounded DevWeave protocol certification steps; never retain reasoning or secrets.",
                 "config": mcp_config,
             }, timeout=60)
             thread_id = nested_id(thread_result, "thread")
             self.assertTrue(thread_id)
+            phase = "mcp_status"
             status = client.request("mcpServerStatus/list", {
                 "threadId": thread_id, "detail": "full", "limit": 100,
             }, timeout=60)
@@ -273,40 +304,55 @@ class RealCodexAppServerTests(unittest.TestCase):
             self.assertEqual(tuple(sorted(devweave["tools"])), tuple(sorted(AGENT_TOOLS)))
 
             approval_start = len(client.messages)
+            phase = "approval_turn_start"
             approval_turn = client.request("turn/start", {
                 "threadId": thread_id,
                 "input": [{
                     "type": "text",
                     "text": (
-                        "For this approval transport test, attempt exactly one shell command that would create "
+                        "For this approval transport test, use the shell tool exactly once to attempt a command that would create "
                         "DEVWEAVE_E2E_MUST_NOT_EXIST.txt in the repository. Do not use apply_patch. "
+                        "Do not reply before making the tool call. "
                         "After the expected denial, reply exactly DEVWEAVE_APPROVAL_DECLINED."
                     ),
                 }],
+                "approvalPolicy": "untrusted",
+                "approvalsReviewer": "user",
                 "sandboxPolicy": {"type": "readOnly", "networkAccess": False},
             }, timeout=60)
             approval_turn_id = nested_id(approval_turn, "turn")
             self.assertTrue(approval_turn_id)
+            phase = "approval_wait"
             approval = client.wait_for(
-                lambda item: item.get("method") in APPROVAL_METHODS,
+                lambda item: item.get("method") in APPROVAL_METHODS or turn_completed(approval_turn_id)(item),
                 timeout=180, after=approval_start,
             )
+            if approval.get("method") not in APPROVAL_METHODS:
+                status = approval.get("params", {}).get("turn", {}).get("status", "unknown")
+                raise RuntimeError(f"approval turn completed without a native approval request (status={status})")
             self.assertIn(approval.get("method"), APPROVAL_METHODS)
+            phase = "approval_completion"
             client.wait_for(turn_completed(approval_turn_id), timeout=180, after=approval_start)
             self.assertFalse(sentinel.exists(), "declined approval created the sentinel")
 
+            phase = "thread_read"
             read = client.request("thread/read", {"threadId": thread_id, "includeTurns": True}, timeout=30)
             self.assertEqual(nested_id(read, "thread"), thread_id)
+            phase = "thread_resume"
             resumed = client.request("thread/resume", {
-                "threadId": thread_id, "cwd": str(ROOT), "approvalPolicy": "on-request",
+                "threadId": thread_id, "cwd": str(ROOT), "approvalPolicy": "untrusted",
+                "approvalsReviewer": "user",
                 "sandbox": "read-only", "config": mcp_config,
             }, timeout=60)
             self.assertEqual(nested_id(resumed, "thread"), thread_id)
 
             interrupt_start = len(client.messages)
+            phase = "interrupt_turn_start"
             interrupt_turn = client.request("turn/start", {
                 "threadId": thread_id,
                 "input": [{"type": "text", "text": "Begin a long analysis, wait for steering, and do not use tools."}],
+                "approvalPolicy": "untrusted",
+                "approvalsReviewer": "user",
                 "sandboxPolicy": {"type": "readOnly", "networkAccess": False},
             }, timeout=60)
             interrupt_turn_id = nested_id(interrupt_turn, "turn")
@@ -321,6 +367,7 @@ class RealCodexAppServerTests(unittest.TestCase):
             interrupted = client.wait_for(turn_completed(interrupt_turn_id), timeout=60, after=interrupt_start)
 
             review_start = len(client.messages)
+            phase = "detached_review"
             review = client.request("review/start", {
                 "threadId": thread_id,
                 "delivery": "detached",
@@ -366,10 +413,22 @@ class RealCodexAppServerTests(unittest.TestCase):
                 "detached_review": True,
                 "review_nonempty": True,
                 "messages_observed": len(client.messages),
+                "approval_policy": "untrusted",
+                "approvals_reviewer": "user",
             }
         except Exception as exc:
-            failure = exc
+            failure = RuntimeError(
+                f"{phase}: {exc}; protocol={protocol_diagnostic(client.messages)}; stderr_bytes={len(client.stderr)}"
+            )
         finally:
+            if sentinel.exists() or sentinel.is_symlink():
+                try:
+                    stat = sentinel.lstat()
+                    unsafe_write = f"sentinel_created bytes={stat.st_size} symlink={sentinel.is_symlink()}"
+                    if sentinel.is_file() or sentinel.is_symlink():
+                        sentinel.unlink()
+                except Exception as exc:
+                    sentinel_cleanup_error = exc
             if thread_id:
                 try:
                     client.request("thread/delete", {"threadId": thread_id}, timeout=30)
@@ -378,7 +437,13 @@ class RealCodexAppServerTests(unittest.TestCase):
             client.close()
         if failure is not None:
             cleanup = f"; synthetic thread cleanup failed: {cleanup_error}" if cleanup_error is not None else ""
-            self.fail(f"BLOCKED_LIVE_CODEX: {failure}{cleanup}")
+            sentinel_failure = f"; {unsafe_write}" if unsafe_write else ""
+            sentinel_cleanup = f"; sentinel cleanup failed: {sentinel_cleanup_error}" if sentinel_cleanup_error else ""
+            self.fail(f"BLOCKED_LIVE_CODEX: {failure}{sentinel_failure}{cleanup}{sentinel_cleanup}")
+        if unsafe_write:
+            self.fail(f"BLOCKED_LIVE_CODEX: native approval was bypassed; {unsafe_write}")
+        if sentinel_cleanup_error is not None:
+            self.fail(f"BLOCKED_LIVE_CODEX: sentinel cleanup failed: {sentinel_cleanup_error}")
         if cleanup_error is not None:
             self.fail(f"BLOCKED_LIVE_CODEX: synthetic thread cleanup failed: {cleanup_error}")
         if summary is None:

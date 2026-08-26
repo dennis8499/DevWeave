@@ -162,7 +162,15 @@ export class CodexAppServerSession {
     const cwd = this.cwd;
     await this.close();
     await this.connect(executable, cwd);
-    if (threadId) await this.request("thread/resume", { threadId });
+    if (threadId) {
+      await this.request("thread/resume", {
+        threadId,
+        cwd,
+        approvalPolicy: "untrusted",
+        approvalsReviewer: "user",
+        sandbox: "read-only"
+      });
+    }
   }
 
   public async close(): Promise<void> {
