@@ -75,6 +75,7 @@ class JsonlAppServer:
         self.inbox: queue.Queue[dict[str, Any] | BaseException | None] = queue.Queue()
         self.messages: list[dict[str, Any]] = []
         self.approvals: list[dict[str, Any]] = []
+        self.defer_approvals = False
         self.stderr = bytearray()
         self.total_bytes = 0
         self.next_id = 1
@@ -210,6 +211,8 @@ class JsonlAppServer:
             self.send({"id": item["id"], "error": {"code": -32601, "message": "Unsupported server request"}})
             raise RuntimeError(f"unexpected app-server request: {method}")
         self.approvals.append(item)
+        if self.defer_approvals:
+            return
         self.send({"id": item["id"], "result": {"decision": "decline"}})
 
 
@@ -374,17 +377,42 @@ class RealCodexAppServerTests(unittest.TestCase):
             }, timeout=60)
             self.assertEqual(nested_id(resumed, "thread"), thread_id)
 
-            interrupt_start = len(client.messages)
-            phase = "interrupt_turn_start"
-            interrupt_turn = client.request("turn/start", {
-                "threadId": thread_id,
-                "input": [{"type": "text", "text": "Begin a long analysis, wait for steering, and do not use tools."}],
-                "approvalPolicy": "untrusted",
-                "approvalsReviewer": "user",
-                "sandboxPolicy": {"type": "readOnly", "networkAccess": False},
-            }, timeout=60)
-            interrupt_turn_id = nested_id(interrupt_turn, "turn")
-            self.assertTrue(interrupt_turn_id)
+            client.defer_approvals = True
+            interrupt_start = 0
+            interrupt_turn_id = ""
+            interrupt_approval: dict[str, Any] | None = None
+            interrupt_attempts = 0
+            for attempt in range(1, 3):
+                interrupt_attempts = attempt
+                interrupt_start = len(client.messages)
+                phase = f"interrupt_turn_start_{attempt}"
+                interrupt_turn = client.request("turn/start", {
+                    "threadId": thread_id,
+                    "input": [{
+                        "type": "text",
+                        "text": (
+                            "This is a bounded interrupt transport probe. Use the shell tool exactly once to run the exact "
+                            "harmless command: python -c \"print('DEVWEAVE_INTERRUPT_TRANSPORT_PROBE')\". "
+                            "Do not use another tool and do not reply before making the tool call."
+                        ),
+                    }],
+                    "approvalPolicy": "untrusted",
+                    "approvalsReviewer": "user",
+                    "sandboxPolicy": {"type": "readOnly", "networkAccess": False},
+                }, timeout=60)
+                interrupt_turn_id = nested_id(interrupt_turn, "turn")
+                self.assertTrue(interrupt_turn_id)
+                phase = f"interrupt_approval_wait_{attempt}"
+                outcome = client.wait_for(
+                    lambda item: item.get("method") in APPROVAL_METHODS or turn_completed(interrupt_turn_id)(item),
+                    timeout=180, after=interrupt_start,
+                )
+                if outcome.get("method") in APPROVAL_METHODS:
+                    interrupt_approval = outcome
+                    break
+            if interrupt_approval is None:
+                raise RuntimeError("bounded interrupt probe attempts completed without a pending approval")
+            self.assertEqual(interrupt_approval.get("method"), "item/commandExecution/requestApproval")
             phase = "steer_interrupt"
             steer_request_id = client.begin_request("turn/steer", {
                 "threadId": thread_id, "expectedTurnId": interrupt_turn_id,
@@ -396,6 +424,7 @@ class RealCodexAppServerTests(unittest.TestCase):
             client.complete_request(steer_request_id, "turn/steer", timeout=30)
             client.complete_request(interrupt_request_id, "turn/interrupt", timeout=30)
             interrupted = client.wait_for(turn_completed(interrupt_turn_id), timeout=60, after=interrupt_start)
+            client.defer_approvals = False
             self.assertEqual(interrupted["params"]["turn"].get("status"), "interrupted")
 
             review_start = len(client.messages)
@@ -448,6 +477,7 @@ class RealCodexAppServerTests(unittest.TestCase):
                 "approval_policy": "untrusted",
                 "approvals_reviewer": "user",
                 "approval_attempts": approval_attempts,
+                "interrupt_attempts": interrupt_attempts,
             }
         except Exception as exc:
             failure = RuntimeError(
