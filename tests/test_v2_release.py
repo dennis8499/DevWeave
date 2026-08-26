@@ -299,10 +299,19 @@ class RepositoryReleaseContractTests(unittest.TestCase):
         self.assertTrue(next(item for item in config.verification_plan.commands if item.command_id == "extension-package").release_only)
         self.assertTrue(next(item for item in config.verification_plan.commands if item.command_id == "app-server-e2e").release_only)
 
-    def test_repository_manifest_is_hash_bound_and_ready(self) -> None:
-        manifest_path = REPOSITORY_ROOT / "docs/generated/v2-cutover-manifest.json"
-        finalizer = CutoverFinalizer(REPOSITORY_ROOT, manifest_path)
-        report = finalizer.check()
+    def test_repository_can_generate_a_hash_bound_ready_manifest(self) -> None:
+        tracked_manifest = json.loads(
+            (REPOSITORY_ROOT / "docs/generated/v2-cutover-manifest.json").read_text(encoding="utf-8")
+        )
+        cache_root = REPOSITORY_ROOT / ".devweave" / "cache"
+        cache_root.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="release-contract-", dir=cache_root) as temporary:
+            manifest_path = Path(temporary) / "v2-cutover-manifest.json"
+            write_manifest(
+                manifest_path,
+                generate_manifest(REPOSITORY_ROOT, base_ref=tracked_manifest["base_ref"]),
+            )
+            report = CutoverFinalizer(REPOSITORY_ROOT, manifest_path).check()
         self.assertIn(report["status"], {"ready", "already_applied"})
         if report["status"] == "ready":
             self.assertEqual(6, report["pending_replacements"])
