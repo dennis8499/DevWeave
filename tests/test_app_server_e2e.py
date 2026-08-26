@@ -32,6 +32,7 @@ MAX_TRANSCRIPT_BYTES = 10_000_000
 MAX_STDERR_BYTES = 262_144
 LIVE_OPT_IN = "DEVWEAVE_E2E_ALLOW_LIVE"
 CODEX_PATH_SETTING = "DEVWEAVE_CODEX_PATH"
+APPROVAL_PROBE = "DEVWEAVE_APPROVAL_TRANSPORT_PROBE"
 
 
 def require_codex_path() -> Path:
@@ -310,36 +311,56 @@ class RealCodexAppServerTests(unittest.TestCase):
             self.assertIsInstance(devweave, dict)
             self.assertEqual(tuple(sorted(devweave["tools"])), tuple(sorted(AGENT_TOOLS)))
 
-            approval_start = len(client.messages)
-            phase = "approval_turn_start"
-            approval_turn = client.request("turn/start", {
-                "threadId": thread_id,
-                "input": [{
-                    "type": "text",
-                    "text": (
-                        "For this approval transport test, use the shell tool exactly once to attempt a command that would create "
-                        "DEVWEAVE_E2E_MUST_NOT_EXIST.txt in the repository. Do not use apply_patch. "
-                        "Do not reply before making the tool call. "
-                        "After the expected denial, reply exactly DEVWEAVE_APPROVAL_DECLINED."
-                    ),
-                }],
-                "approvalPolicy": "untrusted",
-                "approvalsReviewer": "user",
-                "sandboxPolicy": {"type": "readOnly", "networkAccess": False},
-            }, timeout=60)
-            approval_turn_id = nested_id(approval_turn, "turn")
-            self.assertTrue(approval_turn_id)
-            phase = "approval_wait"
-            approval = client.wait_for(
-                lambda item: item.get("method") in APPROVAL_METHODS or turn_completed(approval_turn_id)(item),
-                timeout=180, after=approval_start,
-            )
-            if approval.get("method") not in APPROVAL_METHODS:
-                status = approval.get("params", {}).get("turn", {}).get("status", "unknown")
-                raise RuntimeError(f"approval turn completed without a native approval request (status={status})")
-            self.assertIn(approval.get("method"), APPROVAL_METHODS)
+            approval: dict[str, Any] | None = None
+            approval_turn_id = ""
+            approval_start = 0
+            approval_attempts = 0
+            for attempt in range(1, 3):
+                approval_attempts = attempt
+                approval_start = len(client.messages)
+                phase = f"approval_turn_start_{attempt}"
+                approval_turn = client.request("turn/start", {
+                    "threadId": thread_id,
+                    "input": [{
+                        "type": "text",
+                        "text": (
+                            "This is a bounded approval transport probe. Use the shell tool exactly once to run the exact "
+                            f"harmless command: python -c \"print('{APPROVAL_PROBE}')\". "
+                            "Do not use another tool and do not reply before making the tool call. "
+                            "After the expected denial, reply exactly DEVWEAVE_APPROVAL_DECLINED."
+                        ),
+                    }],
+                    "approvalPolicy": "untrusted",
+                    "approvalsReviewer": "user",
+                    "sandboxPolicy": {"type": "readOnly", "networkAccess": False},
+                }, timeout=60)
+                approval_turn_id = nested_id(approval_turn, "turn")
+                self.assertTrue(approval_turn_id)
+                phase = f"approval_wait_{attempt}"
+                outcome = client.wait_for(
+                    lambda item: item.get("method") in APPROVAL_METHODS or turn_completed(approval_turn_id)(item),
+                    timeout=180, after=approval_start,
+                )
+                if outcome.get("method") in APPROVAL_METHODS:
+                    approval = outcome
+                    break
+            if approval is None:
+                raise RuntimeError("bounded approval probe attempts completed without a native approval request")
+            self.assertEqual(approval.get("method"), "item/commandExecution/requestApproval")
             phase = "approval_completion"
             client.wait_for(turn_completed(approval_turn_id), timeout=180, after=approval_start)
+            declined_command = False
+            for message in client.messages[approval_start:]:
+                params = message.get("params")
+                item = params.get("item") if isinstance(params, dict) else None
+                if (
+                    message.get("method") == "item/completed"
+                    and isinstance(item, dict)
+                    and item.get("type") == "commandExecution"
+                    and item.get("status") == "declined"
+                ):
+                    declined_command = True
+            self.assertTrue(declined_command, "declined approval did not produce a declined command item")
             self.assertFalse(sentinel.exists(), "declined approval created the sentinel")
 
             phase = "thread_read"
@@ -426,6 +447,7 @@ class RealCodexAppServerTests(unittest.TestCase):
                 "messages_observed": len(client.messages),
                 "approval_policy": "untrusted",
                 "approvals_reviewer": "user",
+                "approval_attempts": approval_attempts,
             }
         except Exception as exc:
             failure = RuntimeError(
