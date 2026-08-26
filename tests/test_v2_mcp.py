@@ -18,6 +18,7 @@ from devweave_v2.mcp_server import MAX_MESSAGE_BYTES, McpSession, run_stdio
 from devweave_v2.mcp_tools import AGENT_TOOLS, HOST_ONLY_OPERATIONS, McpToolAdapter, TOOL_DEFINITIONS
 from devweave_v2.project_config import ProjectConfig, command_payload_with_digest
 from devweave_v2.run_service import RunService
+from devweave_v2.service_factory import build_run_service
 from devweave_v2.verification_engine import ExecutableResolver, VerificationEngine
 
 
@@ -184,7 +185,7 @@ class McpProtocolTests(unittest.TestCase):
             project_path = harness.repo / ".devweave" / "project.json"
             project_path.parent.mkdir(parents=True, exist_ok=True)
             project_path.write_text(json.dumps(project), encoding="utf-8")
-            (harness.repo / ".gitignore").write_text(".devweave/runtime/\ndocs/exec-plans/active/\n", encoding="utf-8")
+            (harness.repo / ".gitignore").write_text(".devweave/runtime/\n", encoding="utf-8")
             for arguments in (
                 ("init", "-b", "main"),
                 ("config", "user.name", "DevWeave Test"),
@@ -202,6 +203,7 @@ class McpProtocolTests(unittest.TestCase):
                 check=True, capture_output=True, shell=False,
             )
             harness.service.store.path_for("run-fixture").unlink()
+            harness.service = build_run_service(harness.repo)
             draft = json.loads((ROOT / "fixtures" / "devweave_v2" / "run-plan-draft.json").read_text(encoding="utf-8"))
             harness.service.host().run_start(
                 draft, base_branch="main", base_ref=base_ref, run_branch="devweave/run-fixture-slice"

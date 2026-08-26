@@ -21,7 +21,7 @@ Planning is read-only. Implementation/review use workspace-write limited to the 
 
 ## Path and Git policy
 
-Every workflow path is normalized repository-relative and checked again after resolution. Traversal, absolute paths, symlink escape, undeclared scope, dirty start, detached HEAD, branch collision, and destructive/remote Git commands fail before mutation.
+Every workflow path is normalized repository-relative and checked again after resolution. Writable task declarations fail closed when their subtree equals, enters, or contains `.git`, `.devweave`, `.codex`, the DevWeave host skill, or `docs/exec-plans`; the same physical resolver governs both sandbox roots and file approvals. Traversal, absolute paths, symlink/junction escape, undeclared scope, dirty start, detached HEAD, branch collision, and destructive/remote Git commands fail before mutation.
 
 ## Secrets and privacy
 

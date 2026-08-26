@@ -16,6 +16,17 @@ MAX_PATH = 512
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 TEnum = TypeVar("TEnum", bound=Enum)
 
+# Implementation-task authority must never overlap repository control, runtime
+# authority, Codex composition, or canonical ExecPlan storage. Ancestors are
+# protected too because a directory/** sandbox root cannot subtract a child.
+PROTECTED_TASK_AUTHORITY_PATHS = (
+    ".git",
+    ".devweave",
+    ".codex",
+    ".agents/skills/devweave",
+    "docs/exec-plans",
+)
+
 
 def strict_object(
     value: Any,
@@ -157,3 +168,33 @@ def relative_paths(value: Any, field: str, *, minimum: int = 0) -> tuple[str, ..
     if len(set(result)) != len(result):
         raise ContractError(ErrorCode.INVALID_VALUE, f"{field} must not contain duplicates.", {"field": field})
     return result
+
+
+def task_declared_paths(value: Any, field: str, *, minimum: int = 0) -> tuple[str, ...]:
+    result = relative_paths(value, field, minimum=minimum)
+    for index, declaration in enumerate(result):
+        if _intersects_task_authority(declaration):
+            raise ContractError(
+                ErrorCode.FORBIDDEN,
+                f"{field}[{index}] intersects a host-authority path.",
+                {"field": f"{field}[{index}]", "path": declaration},
+            )
+    return result
+
+
+def _intersects_task_authority(declaration: str) -> bool:
+    parts = declaration.casefold().split("/")
+    static_parts: list[str] = []
+    for part in parts:
+        if any(character in part for character in "*?["):
+            break
+        static_parts.append(part)
+    # A pattern without a fixed directory prefix can match every protected root.
+    if not static_parts:
+        return True
+    static = "/".join(static_parts)
+    for protected in PROTECTED_TASK_AUTHORITY_PATHS:
+        folded = protected.casefold()
+        if static == folded or static.startswith(f"{folded}/") or folded.startswith(f"{static}/"):
+            return True
+    return False

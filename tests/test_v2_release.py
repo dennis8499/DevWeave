@@ -102,6 +102,15 @@ class CutoverFinalizerTests(unittest.TestCase):
             CutoverFinalizer(self.repository, self.manifest_path)
         self.assertEqual(ErrorCode.CONFLICT, tampered.exception.code)
 
+    def test_manifest_prepare_rejects_unresolvable_completion_checkpoint(self) -> None:
+        completion = self.repository / TRANSITION_COMPLETION_PATH
+        plan = json.loads(completion.read_text(encoding="utf-8"))
+        next(iter(plan["tasks"].values()))["commit_ref"] = "f" * 40
+        completion.write_text(dumps(validate_exec_plan(plan)), encoding="utf-8")
+        with self.assertRaises(DevWeaveError) as rejected:
+            generate_manifest(self.repository, base_ref=self.base_ref)
+        self.assertEqual(ErrorCode.CONFLICT, rejected.exception.code)
+
     def test_new_legacy_path_after_manifest_is_rejected(self) -> None:
         added = self.repository / "wiki" / "late.md"
         added.write_text("late legacy truth\n", encoding="utf-8")

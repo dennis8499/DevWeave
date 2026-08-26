@@ -13,7 +13,6 @@ from .canonical import sha256
 from .codex_doctor import CodexDoctor
 from .errors import DevWeaveError, ErrorCode
 from .git_port import GitAdapter
-from .plan_store import PlanStore
 from .project_config import ProjectConfig
 from .service_factory import build_run_service, load_project_config
 from .v1_export import V1Exporter
@@ -95,12 +94,12 @@ def _dispatch(args: argparse.Namespace, repository: Path) -> Any:
     if args.command == "doctor":
         return CodexDoctor().probe(repository=repository, configured_path=args.codex_path)
     if args.command == "inspect":
-        store = PlanStore(repository)
+        service = build_run_service(repository)
         if args.run:
-            return store.load(args.run)
-        if not store.active_root.is_dir():
+            return service.inspect(args.run)
+        if not service.store.active_root.is_dir():
             return {"runs": []}
-        return {"runs": [store.load(path.stem) for path in sorted(store.active_root.glob("*.json"))]}
+        return {"runs": [service.inspect(path.stem) for path in sorted(service.store.active_root.glob("*.json"))]}
     if args.command == "check":
         config = load_project_config(repository)
         mcp = repository / ".codex" / "config.toml"

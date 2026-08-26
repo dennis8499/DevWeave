@@ -76,7 +76,7 @@ PYTHON_LAYERS = {
     "risk": 2, "run_state": 2, "schemas": 2, "snapshot_contracts": 2,
     "verification_contracts": 2,
     "architecture_check": 3, "cutover": 3, "cutover_git": 3, "cutover_hashing": 3,
-    "cutover_provenance": 3, "git_port": 3,
+    "checkpoint_proof": 3, "cutover_provenance": 3, "git_port": 3,
     "plan_store": 3, "reducer": 3, "run_start_journal": 3,
     "v1_export": 3, "verification_engine": 3, "verification_store": 3,
     "codex_doctor": 4, "git_transaction": 4, "host_facade": 4,

@@ -7,21 +7,35 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence, TYPE_CHECKING
 
 from .canonical import dumps
+from .checkpoint_proof import CheckpointProof
 from .contract_utils import identifier
 from .errors import DevWeaveError, ErrorCode
 from .git_port import GitStatusEntry, path_matches
 from .git_transaction import GitTransaction
 
+if TYPE_CHECKING:
+    from .plan_store import PlanStore
+
+FaultHook = Callable[[str, Path], None]
+
 
 class RunGitCoordinator:
-    def __init__(self, repository: Path, transaction: GitTransaction) -> None:
+    def __init__(
+        self,
+        repository: Path,
+        transaction: GitTransaction,
+        *,
+        fault_hook: FaultHook | None = None,
+    ) -> None:
         self.repository = repository.resolve()
         self.transaction = transaction
         self.git = transaction.git
+        self.proof = CheckpointProof(self.git)
         self.runtime_root = self.repository / ".devweave" / "runtime"
+        self._fault_hook = fault_hook
 
     def assert_run(
         self,
@@ -78,6 +92,95 @@ class RunGitCoordinator:
             raise DevWeaveError(ErrorCode.CONFLICT, "Run recovery journals disagree about the owned branch.")
         if branches and self.git.branch() not in branches:
             raise DevWeaveError(ErrorCode.CONFLICT, "Current checkout is not owned by the requested run.")
+
+    def recover_run(self, run_id: str, store: "PlanStore") -> dict[str, Any]:
+        """Reconcile every durable intent before returning or mutating authority state."""
+        safe_run = identifier(run_id, "run_id")
+        self.assert_resume_target(safe_run)
+        journals = self._journal_items(safe_run)
+        try:
+            plan = store.load(safe_run)
+        except DevWeaveError as exc:
+            if exc.code != ErrorCode.NOT_FOUND:
+                raise
+            candidates: list[dict[str, Any]] = []
+            for _, item in journals:
+                if item.get("status") == "aborted":
+                    continue
+                commit = self.proof.existing_commit(item)
+                if commit is not None:
+                    candidates.append(self.proof.snapshot(item, commit)[0])
+            if not candidates:
+                raise
+            plan = store.restore_missing(self._latest_snapshot(candidates))
+        for path, journal in journals:
+            status = journal.get("status")
+            if status == "aborted":
+                if journal.get("mutation_id") in plan["applied_mutations"]:
+                    raise DevWeaveError(ErrorCode.CONFLICT, "An aborted checkpoint mutation is authoritative.")
+                continue
+            commit = self.proof.existing_commit(journal)
+            if status == "intent" and commit is None and journal.get("mutation_id") not in plan["applied_mutations"]:
+                journal["status"] = "aborted"
+                self._write_journal(path, journal)
+                continue
+            if status == "intent":
+                control_path = self._completed_plan_path(plan) if plan["status"] == "completed" else self._active_plan_path(plan)
+                checkpoint_ref = self._commit_checkpoint(plan, journal, control_path=control_path)
+                self._finalize(safe_run, journal["kind"], journal["mutation_id"], checkpoint_ref)
+            elif status == "committed":
+                self.proof.validate_committed(journal)
+                self._finalize(safe_run, journal["kind"], journal["mutation_id"], journal["checkpoint_ref"])
+            elif status == "finalized":
+                self.proof.validate_committed(journal)
+            else:
+                raise DevWeaveError(ErrorCode.INVALID_JSON, "Checkpoint journal status is invalid.")
+            plan = store.load(safe_run)
+        self.assert_run(plan)
+        self.validate_plan_checkpoints(plan)
+        return plan
+
+    def validate_plan_checkpoints(self, plan: dict[str, Any]) -> None:
+        journals = [item for _, item in self._journal_items(plan["run_id"])]
+        by_ref: dict[str, dict[str, Any]] = {}
+        snapshots: list[dict[str, Any]] = []
+        for journal in journals:
+            if journal.get("status") == "aborted":
+                continue
+            if journal.get("status") != "finalized":
+                raise DevWeaveError(ErrorCode.CONFLICT, "Run has an unreconciled checkpoint journal.")
+            self.proof.validate_committed(journal)
+            snapshots.append(self.proof.snapshot(journal, journal["commit_sha"])[0])
+            by_ref[journal["checkpoint_ref"]] = journal
+        for task_id, task in plan["tasks"].items():
+            if task["status"] == "completed":
+                journal = by_ref.get(task["commit_ref"])
+                if journal is None or (journal["kind"], journal["subject_id"]) != ("task", task_id):
+                    raise DevWeaveError(ErrorCode.CONFLICT, "Completed task lacks finalized checkpoint proof.")
+        for gate_id, gate in plan["gates"].items():
+            if gate["status"] != "pending":
+                journal = by_ref.get(gate["commit_ref"])
+                if journal is None or (journal["kind"], journal["subject_id"]) != ("gate", gate_id):
+                    raise DevWeaveError(ErrorCode.CONFLICT, "Decided gate lacks finalized checkpoint proof.")
+        if plan["status"] == "completed":
+            archive = by_ref.get(plan["archive_ref"])
+            if archive is None or (archive["kind"], archive["subject_id"]) != ("gate", "acceptance"):
+                raise DevWeaveError(ErrorCode.CONFLICT, "Completed run lacks finalized archive proof.")
+        if snapshots:
+            latest = self._latest_snapshot(snapshots)
+            if plan["revision"] < latest["revision"] or (
+                plan["revision"] == latest["revision"] and dumps(plan) != dumps(latest)
+            ):
+                raise DevWeaveError(ErrorCode.CONFLICT, "Working ExecPlan is older than or differs from its latest checkpoint.")
+
+    @staticmethod
+    def _latest_snapshot(candidates: Sequence[dict[str, Any]]) -> dict[str, Any]:
+        revision = max(item["revision"] for item in candidates)
+        latest = [item for item in candidates if item["revision"] == revision]
+        canonical = {dumps(item) for item in latest}
+        if len(canonical) != 1:
+            raise DevWeaveError(ErrorCode.CONFLICT, "Latest checkpoint snapshots disagree at one revision.")
+        return latest[0]
 
     def prepare_task(
         self,
@@ -208,6 +311,8 @@ class RunGitCoordinator:
         journal = self._load_journal(journal_path)
         if journal is None:
             self._write_journal(journal_path, expected)
+        elif journal.get("status") == "aborted":
+            self._write_journal(journal_path, expected)
         else:
             self._assert_journal(journal, plan, kind, subject_id, safe_mutation, expected_revision)
             for field in ("message", "allowed_paths", "checkpoint_ref"):
@@ -218,23 +323,19 @@ class RunGitCoordinator:
     def _commit_checkpoint(self, plan: dict[str, Any], journal: dict[str, Any], *, control_path: str) -> str:
         checkpoint_ref = journal["checkpoint_ref"]
         if journal.get("status") in {"committed", "finalized"}:
-            commit_sha = journal.get("commit_sha")
-            if not isinstance(commit_sha, str) or not self.git.is_ancestor(commit_sha, self.git.head()):
-                raise DevWeaveError(ErrorCode.CONFLICT, "Committed checkpoint is not in current run history.")
-            if self.git.resolve_ref(checkpoint_ref) != commit_sha:
-                raise DevWeaveError(ErrorCode.CONFLICT, "Checkpoint ref no longer matches its journal.")
-            stored_path = journal.get("control_path")
-            stored_digest = journal.get("plan_digest")
-            if not isinstance(stored_path, str) or not isinstance(stored_digest, str):
-                raise DevWeaveError(ErrorCode.INVALID_JSON, "Committed checkpoint journal lacks its plan binding.")
-            self._assert_checkpoint_digest(commit_sha, stored_path, stored_digest)
+            self.proof.validate_committed(journal)
             return checkpoint_ref
 
-        before_head = journal.get("before_head")
-        if not isinstance(before_head, str):
-            raise DevWeaveError(ErrorCode.INVALID_JSON, "Checkpoint journal has no valid starting HEAD.")
-        current_head = self.git.head()
-        if current_head == before_head:
+        commit_sha = self.proof.existing_commit(journal)
+        if commit_sha is None:
+            before_head = journal.get("before_head")
+            if not isinstance(before_head, str) or self.git.head() != before_head:
+                raise DevWeaveError(ErrorCode.CONFLICT, "Checkpoint journal cannot reconcile the current HEAD.")
+            if (
+                journal["mutation_id"] not in plan["applied_mutations"]
+                or plan["revision"] != journal["expected_revision"] + 1
+            ):
+                raise DevWeaveError(ErrorCode.CONFLICT, "Checkpoint intent has no exact post-transition state.")
             commit_sha = self.transaction.commit_checkpoint(
                 run_id=plan["run_id"],
                 run_branch=plan["run_branch"],
@@ -243,47 +344,26 @@ class RunGitCoordinator:
                 allowed_paths=tuple(journal["allowed_paths"]),
                 message=journal["message"],
             )
-        elif self.git.parent(current_head) == before_head and self.git.commit_message(current_head) == journal["message"]:
-            commit_sha = current_head
-        else:
-            raise DevWeaveError(ErrorCode.CONFLICT, "Checkpoint journal cannot reconcile the current HEAD.")
+            self._fault("after_checkpoint_commit", self._journal_path(plan["run_id"], journal["kind"], journal["mutation_id"]))
+        snapshot, stored_path, stored_digest = self.proof.snapshot(journal, commit_sha)
+        if plan["revision"] < snapshot["revision"] or journal["mutation_id"] not in plan["applied_mutations"]:
+            raise DevWeaveError(ErrorCode.CONFLICT, "Working ExecPlan does not contain the checkpoint mutation.")
+        if plan["revision"] == snapshot["revision"] and dumps(plan) != dumps(snapshot):
+            raise DevWeaveError(ErrorCode.CONFLICT, "Working ExecPlan differs from its checkpoint state.")
         self.git.update_ref(checkpoint_ref, commit_sha)
-        self._assert_checkpoint_content(plan, commit_sha, control_path)
+        self._fault("after_checkpoint_ref", self._journal_path(plan["run_id"], journal["kind"], journal["mutation_id"]))
+        if stored_path != control_path and plan["revision"] == snapshot["revision"]:
+            raise DevWeaveError(ErrorCode.CONFLICT, "Checkpoint control path differs from the lifecycle transition.")
         journal.update({
             "status": "committed",
             "commit_sha": commit_sha,
-            "control_path": control_path,
-            "plan_digest": hashlib.sha256(dumps(plan).encode("utf-8")).hexdigest(),
+            "control_path": stored_path,
+            "plan_digest": stored_digest,
         })
-        self._write_journal(self._journal_path(plan["run_id"], journal["kind"], journal["mutation_id"]), journal)
+        journal_path = self._journal_path(plan["run_id"], journal["kind"], journal["mutation_id"])
+        self._write_journal(journal_path, journal)
+        self._fault("after_checkpoint_journal", journal_path)
         return checkpoint_ref
-
-    def _assert_checkpoint_content(self, plan: dict[str, Any], commit_sha: str, control_path: str) -> None:
-        expected = dumps(plan).encode("utf-8")
-        try:
-            actual = self.git.read_tree_file(commit_sha, control_path)
-        except DevWeaveError as exc:
-            raise DevWeaveError(
-                ErrorCode.CONFLICT,
-                "Checkpoint commit does not contain the post-transition canonical ExecPlan.",
-                {"path": control_path},
-            ) from exc
-        if actual != expected:
-            raise DevWeaveError(
-                ErrorCode.CONFLICT,
-                "Checkpoint ExecPlan bytes differ from authoritative post-transition state.",
-                {"path": control_path},
-            )
-
-    def _assert_checkpoint_digest(self, commit_sha: str, control_path: str, expected_digest: str) -> None:
-        if len(expected_digest) != 64 or any(character not in "0123456789abcdef" for character in expected_digest):
-            raise DevWeaveError(ErrorCode.INVALID_JSON, "Checkpoint journal plan digest is invalid.")
-        try:
-            actual = self.git.read_tree_file(commit_sha, control_path)
-        except DevWeaveError as exc:
-            raise DevWeaveError(ErrorCode.CONFLICT, "Checkpoint commit lost its canonical ExecPlan.") from exc
-        if hashlib.sha256(actual).hexdigest() != expected_digest:
-            raise DevWeaveError(ErrorCode.CONFLICT, "Checkpoint commit no longer matches its journal plan digest.")
 
     def _finalize(self, run_id: str, kind: str, mutation_id: str, checkpoint_ref: str) -> None:
         path = self._journal_path(run_id, kind, mutation_id)
@@ -316,7 +396,7 @@ class RunGitCoordinator:
         }
         if any(journal.get(field) != value for field, value in expected.items()):
             raise DevWeaveError(ErrorCode.CONFLICT, "Checkpoint journal does not match the lifecycle mutation.")
-        if journal.get("status") not in {"intent", "committed", "finalized"}:
+        if journal.get("status") not in {"intent", "committed", "finalized", "aborted"}:
             raise DevWeaveError(ErrorCode.INVALID_JSON, "Checkpoint journal status is invalid.")
 
     def _required_journal(self, run_id: str, kind: str, mutation_id: str) -> dict[str, Any]:
@@ -366,6 +446,20 @@ class RunGitCoordinator:
     def _journal_path(self, run_id: str, kind: str, mutation_id: str) -> Path:
         folder = "task-commits" if kind == "task" else "gate-commits"
         return self.runtime_root / identifier(run_id, "run_id") / folder / f"{identifier(mutation_id, 'mutation_id')}.json"
+
+    def _journal_items(self, run_id: str) -> tuple[tuple[Path, dict[str, Any]], ...]:
+        run_root = self.runtime_root / identifier(run_id, "run_id")
+        result: list[tuple[Path, dict[str, Any]]] = []
+        for folder in ("task-commits", "gate-commits"):
+            for path in (run_root / folder).glob("*.json"):
+                journal = self._load_journal(path)
+                if journal is not None:
+                    result.append((path, journal))
+        return tuple(sorted(result, key=lambda item: (item[1].get("expected_revision", -1), item[0].as_posix())))
+
+    def _fault(self, stage: str, path: Path) -> None:
+        if self._fault_hook is not None:
+            self._fault_hook(stage, path)
 
     @staticmethod
     def _load_journal(path: Path) -> dict[str, Any] | None:

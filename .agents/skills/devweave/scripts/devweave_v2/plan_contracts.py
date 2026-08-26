@@ -15,6 +15,7 @@ from .contract_utils import (
     sequence,
     strict_object,
     strings,
+    task_declared_paths,
     text,
 )
 from .verification_contracts import RiskLevel, VerificationPlan
@@ -47,7 +48,7 @@ class TaskDefinition:
             text(data["title"], "TaskDefinition.title", maximum=512),
             strings(data["requirement_ids"], "TaskDefinition.requirement_ids", minimum=1),
             strings(data["acceptance_ids"], "TaskDefinition.acceptance_ids", minimum=1),
-            relative_paths(data["declared_paths"], "TaskDefinition.declared_paths", minimum=1),
+            task_declared_paths(data["declared_paths"], "TaskDefinition.declared_paths", minimum=1),
             strings(data["dependencies"], "TaskDefinition.dependencies"),
         )
 

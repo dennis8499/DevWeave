@@ -65,6 +65,24 @@ class PublicContractTests(unittest.TestCase):
         self.assertEqual(left, right)
         self.assertTrue(left.endswith("\n"))
 
+    def test_task_declarations_cannot_cover_host_authority(self) -> None:
+        original = json.loads((self.fixtures / "run-plan-draft.json").read_text(encoding="utf-8"))
+        for declaration in (
+            ".git/**", ".devweave/**", ".codex/**", ".agents/**",
+            "docs/exec-plans/**", "docs/**", "*/**",
+        ):
+            raw = json.loads(json.dumps(original))
+            raw["tasks"][0]["declared_paths"] = [declaration]
+            with self.subTest(declaration=declaration), self.assertRaises(ContractError) as rejected:
+                parse_public_schema("RunPlanDraft", raw)
+            self.assertEqual(rejected.exception.code, ErrorCode.FORBIDDEN)
+
+        for declaration in ("src/**", "docs/product/**", ".gitignore"):
+            raw = json.loads(json.dumps(original))
+            raw["tasks"][0]["declared_paths"] = [declaration]
+            with self.subTest(allowed=declaration):
+                parse_public_schema("RunPlanDraft", raw)
+
 
 class PackageContractTests(unittest.TestCase):
     def test_product_versions_are_2_0_0(self) -> None:

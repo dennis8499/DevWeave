@@ -37,6 +37,7 @@ def manifest_provenance(
                 raise DevWeaveError(ErrorCode.CONFLICT, f"Transition completion {field} is stale.")
         if plan["run_branch"] != prepared_from_branch or plan["base_ref"] != resolved_base:
             raise DevWeaveError(ErrorCode.CONFLICT, "Transition completion Git anchors do not match the manifest checkout.")
+        validate_checkpoint_refs(repository, plan, prepared_from_head)
         source_fingerprint = report["source_fingerprint"]
         base_branch = plan["base_branch"]
     else:
@@ -108,9 +109,25 @@ def git_anchor_issues(
             merge_base = git(repository, "merge-base", resolved_source, manifest["prepared_from_head"]).strip()
             if merge_base != resolved_source:
                 issues.append({"path": completion_relative, "reason": "reviewed source is not an ancestor of prepared HEAD"})
+            validate_checkpoint_refs(repository, plan, manifest["prepared_from_head"])
         except DevWeaveError:
             issues.append({"path": completion_relative, "reason": "completion provenance is invalid"})
     return issues
+
+
+def validate_checkpoint_refs(repository: Path, plan: dict[str, Any], prepared_head: str) -> None:
+    """Require every completion checkpoint to resolve inside prepared run history."""
+    refs = [task["commit_ref"] for task in plan["tasks"].values()]
+    refs.extend(gate["commit_ref"] for gate in plan["gates"].values())
+    refs.append(plan["archive_ref"])
+    for checkpoint_ref in sorted(set(refs)):
+        try:
+            resolved = git(repository, "rev-parse", "--verify", f"{checkpoint_ref}^{{commit}}").strip()
+            merge_base = git(repository, "merge-base", resolved, prepared_head).strip()
+        except DevWeaveError as exc:
+            raise DevWeaveError(ErrorCode.CONFLICT, "Transition checkpoint ref is unavailable.") from exc
+        if merge_base != resolved:
+            raise DevWeaveError(ErrorCode.CONFLICT, "Transition checkpoint is not an ancestor of prepared HEAD.")
 
 
 def validate_completion_record(path: Path, *, transition_run_id: str) -> dict[str, Any]:

@@ -21,7 +21,7 @@ The reducer reconstructs the RunSnapshot from the ExecPlan and ordered events. I
 
 ## Git recovery
 
-Every run records its immutable base ref and run branch. Each decided Gate, completed task slice, and completed-plan archive is committed together with the authoritative post-transition ExecPlan. The plan records a deterministic local `refs/devweave/checkpoints/...` name; a retry-safe journal binds that ref to the exact commit only after the commit contains matching canonical bytes. On interruption, inspect rather than reset: resolve the recorded checkpoint ref and compare its plan, HEAD ancestry, current revision, task state, verification report, and export index. DevWeave does not move the base, merge, push, or restore another branch.
+Every run records its immutable base ref and run branch. Each decided Gate, completed task slice, and completed-plan archive is committed together with the authoritative post-transition ExecPlan. The plan records a deterministic local `refs/devweave/checkpoints/...` name; a retry-safe journal binds that ref to the exact commit only after the commit contains matching canonical bytes. Before inspect, resume, or mutation exposes authority state, one interprocess authority lock reconciles every intent across commit, ref, journal, and archive-move interruption points. Recovery follows the first-parent run history after HEAD advances, verifies the journaled tree slice, deterministic ref, canonical plan bytes and digest, finalizes every durable journal or fails closed, and atomically restores a missing active/completed plan from the latest valid checkpoint. DevWeave does not move the base, merge, push, reset, or restore another branch.
 
 ## Release recovery
 

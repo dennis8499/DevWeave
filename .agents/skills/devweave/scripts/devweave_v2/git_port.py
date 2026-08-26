@@ -27,6 +27,7 @@ class GitPort(Protocol):
     def head(self) -> str: ...
     def branch(self) -> str: ...
     def resolve_ref(self, ref: str) -> str: ...
+    def ref_exists(self, ref: str) -> bool: ...
     def status(self) -> tuple[GitStatusEntry, ...]: ...
     def branch_exists(self, branch: str) -> bool: ...
     def switch_new_branch(self, branch: str) -> None: ...
@@ -91,6 +92,13 @@ class GitAdapter:
             raise DevWeaveError(ErrorCode.COMMAND_FAILED, "Git returned an invalid object id.")
         return resolved.lower()
 
+    def ref_exists(self, ref: str) -> bool:
+        safe = validate_git_ref(ref)
+        result = self._run(("show-ref", "--verify", "--quiet", safe), check=False)
+        if result.returncode not in {0, 1}:
+            raise DevWeaveError(ErrorCode.COMMAND_FAILED, "Git ref lookup failed.")
+        return result.returncode == 0
+
     def status(self) -> tuple[GitStatusEntry, ...]:
         output = self._run(("status", "--porcelain=v1", "-z", "--untracked-files=all")).stdout
         records = output.split("\0")
@@ -140,13 +148,10 @@ class GitAdapter:
         if not safe_ref.startswith("refs/devweave/checkpoints/"):
             raise DevWeaveError(ErrorCode.FORBIDDEN, "Only DevWeave checkpoint refs may be updated.")
         target_oid = self.resolve_ref(target)
-        present = self._run(("show-ref", "--verify", "--quiet", safe_ref), check=False)
-        if present.returncode == 0:
+        if self.ref_exists(safe_ref):
             if self.resolve_ref(safe_ref) != target_oid:
                 raise DevWeaveError(ErrorCode.CONFLICT, "Checkpoint ref already names a different commit.")
             return
-        if present.returncode != 1:
-            raise DevWeaveError(ErrorCode.COMMAND_FAILED, "Checkpoint ref lookup failed.")
         self._run(("update-ref", safe_ref, target_oid, "0" * len(target_oid)))
 
     def commit_message(self, ref: str = "HEAD") -> str:

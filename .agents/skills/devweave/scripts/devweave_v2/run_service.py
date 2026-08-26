@@ -64,6 +64,16 @@ class RunService:
         return HostFacade(self)
 
     def inspect(self, run_id: str) -> dict[str, Any]:
+        return self.recover(run_id)
+
+    def recover(self, run_id: str) -> dict[str, Any]:
+        """Reconcile checkpoint authority before exposing canonical run state."""
+        with self.authority_transaction():
+            return self._recover_locked(run_id)
+
+    def _recover_locked(self, run_id: str) -> dict[str, Any]:
+        if self.git_coordinator is not None:
+            return self.git_coordinator.recover_run(run_id, self.store)
         return self.store.load(run_id)
 
     def mutate(
@@ -75,6 +85,7 @@ class RunService:
         allowed_dirty_paths: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         with self.authority_transaction():
+            self._recover_locked(run_id)
             return self._mutate_locked(
                 run_id,
                 expected_revision,
@@ -290,7 +301,7 @@ class AgentFacade:
         if status != "completed" or coordinator is None:
             return self._service.mutate(run_id, expected_revision, mutation_id, mutation)
         with self._service.authority_transaction():
-            current = self._service.store.load(run_id)
+            current = self._service._recover_locked(run_id)
             if mutation_id in current["applied_mutations"]:
                 committed_ref = coordinator.checkpoint_task(
                     current,

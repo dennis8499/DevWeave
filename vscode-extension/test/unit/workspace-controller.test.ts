@@ -20,6 +20,9 @@ const SOURCE_FINGERPRINT = "a".repeat(64);
 const TEST_ROOT = mkdtempSync(join(tmpdir(), "devweave-controller-"));
 const TEST_REPOSITORY = join(TEST_ROOT, "repository");
 mkdirSync(join(TEST_REPOSITORY, "src"), { recursive: true });
+for (const protectedPath of [".git", ".devweave", ".codex", ".agents/skills/devweave", "docs/exec-plans"]) {
+  mkdirSync(join(TEST_REPOSITORY, ...protectedPath.split("/")), { recursive: true });
+}
 after(() => rmSync(TEST_ROOT, { recursive: true, force: true }));
 
 function run(phase = "planning", risk = "high", declaredPaths: string[] = ["src/**"]): Record<string, unknown> {
@@ -184,7 +187,11 @@ test("zero or multiple active tasks and non-implementation phases remain read-on
 });
 
 test("task write scope fails closed for widened globs, traversal, siblings, and reparse escapes", async () => {
-  for (const declaredPaths of [["src/foo*.ts"], ["src/*"], ["src/app.ts"], ["../src/**"]]) {
+  for (const declaredPaths of [
+    ["src/foo*.ts"], ["src/*"], ["src/app.ts"], ["../src/**"],
+    [".git/**"], [".devweave/**"], [".codex/**"], [".agents/**"],
+    ["docs/exec-plans/**"], ["docs/**"]
+  ]) {
     const host = new FakeHost();
     host.currentRun = run("implementation", "high", declaredPaths);
     const app = new FakeApp();
@@ -195,6 +202,23 @@ test("task write scope fails closed for widened globs, traversal, siblings, and 
       type: "readOnly", networkAccess: false
     });
     app.emitApproval({ id: declaredPaths[0], method: "item/fileChange/requestApproval", params: { path: "src/app.ts" } });
+    assert.deepEqual(app.responses.at(-1)?.result, { decision: "decline" });
+  }
+
+  for (const [declaration, candidate] of [
+    [".git/**", ".git/config"],
+    [".devweave/**", ".devweave/runtime/authority.lock"],
+    [".codex/**", ".codex/config.toml"],
+    [".agents/**", ".agents/skills/devweave/scripts/host.py"],
+    ["docs/exec-plans/**", "docs/exec-plans/active/run.json"],
+    ["docs/**", "docs/exec-plans/active/run.json"]
+  ]) {
+    const host = new FakeHost();
+    host.currentRun = run("implementation", "high", [declaration]);
+    const app = new FakeApp();
+    const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
+    await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
+    app.emitApproval({ id: declaration, method: "item/fileChange/requestApproval", params: { path: candidate } });
     assert.deepEqual(app.responses.at(-1)?.result, { decision: "decline" });
   }
 

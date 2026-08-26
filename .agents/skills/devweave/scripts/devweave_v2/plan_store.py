@@ -53,6 +53,17 @@ class PlanStore:
         with self._lock, InterProcessLock(self._process_lock_path):
             return self._load_unlocked(run_id)
 
+    def restore_missing(self, plan: dict[str, Any]) -> dict[str, Any]:
+        """Atomically restore a canonical plan only when both working copies are absent."""
+        validated = validate_exec_plan(copy.deepcopy(plan))
+        run_id = validated["run_id"]
+        with self._lock, InterProcessLock(self._process_lock_path):
+            if self._exists_unlocked(run_id):
+                raise DevWeaveError(ErrorCode.CONFLICT, "Canonical ExecPlan already exists during recovery.")
+            target = self.path_for(run_id, completed=validated["status"] == "completed")
+            self._atomic_replace(target, validated)
+        return copy.deepcopy(validated)
+
     def _load_unlocked(self, run_id: str) -> dict[str, Any]:
         path = self.path_for(run_id)
         if not path.is_file():
@@ -114,9 +125,13 @@ class PlanStore:
             if target.exists():
                 if target.read_bytes() == source.read_bytes():
                     source.unlink()
+                    if self._fault_hook:
+                        self._fault_hook("after_complete_move", target)
                     return target
                 raise DevWeaveError(ErrorCode.CONFLICT, "Completed run archive already exists.")
             os.replace(source, target)
+            if self._fault_hook:
+                self._fault_hook("after_complete_move", target)
             return target
 
     def _exists_unlocked(self, run_id: str) -> bool:

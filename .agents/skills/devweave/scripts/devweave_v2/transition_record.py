@@ -22,12 +22,14 @@ WORK_ROOT = f".devweave/work-items/{TRANSITION_RUN_ID}"
 MAX_TRANSITION_JSON_BYTES = 2_000_000
 MAX_TRANSITION_MARKDOWN_BYTES = 1_000_000
 TASK_PATHS: dict[str, tuple[str, ...]] = {
-    "TASK-001": (".agents/skills/devweave/scripts/devweave_v2", "fixtures/devweave_v2", "vscode-extension/package.json"),
-    "TASK-002": (".agents/skills/devweave/scripts/devweave_v2", "tests/test_v2_run_service.py"),
-    "TASK-003": (".agents/skills/devweave/scripts/devweave_v2", "docs/generated"),
-    "TASK-004": (".agents/skills/devweave/scripts/devweave_v2", "tests/test_v2_verification.py"),
-    "TASK-005": (".codex/config.toml", ".agents/skills/devweave/scripts/devweave_v2", "tests/test_v2_mcp.py"),
-    "TASK-006": (".agents/skills/devweave/scripts/devweave.py", ".agents/skills/devweave/scripts/devweave_v2"),
+    # The closed V1 projection retains representative source slices but never
+    # reissues historical authority over protected host/runtime roots.
+    "TASK-001": ("fixtures/devweave_v2", "vscode-extension/package.json"),
+    "TASK-002": ("tests/test_v2_run_service.py",),
+    "TASK-003": ("docs/generated",),
+    "TASK-004": ("tests/test_v2_verification.py",),
+    "TASK-005": ("tests/test_v2_mcp.py",),
+    "TASK-006": ("tests/test_v2_cli_host.py",),
     "TASK-007": ("vscode-extension/src/app-server/session.ts", "vscode-extension/test/unit/app-server-session.test.ts"),
     "TASK-008": (
         "vscode-extension/src/controller/approval-broker.ts",
@@ -37,9 +39,9 @@ TASK_PATHS: dict[str, tuple[str, ...]] = {
         "vscode-extension/test/unit/workspace-controller.test.ts",
     ),
     "TASK-009": ("vscode-extension/src", "vscode-extension/webview", "vscode-extension/test"),
-    "TASK-010": ("AGENTS.md", "ARCHITECTURE.md", "docs", ".agents/skills/devweave/assets/v2-skill"),
-    "TASK-011": (".agents/skills/devweave/scripts/devweave_v2/cutover.py", "docs/generated/v2-cutover-manifest.json", "vscode-extension"),
-    "TASK-012": ("tests", "vscode-extension/test", "docs", WORK_ROOT),
+    "TASK-010": ("AGENTS.md", "ARCHITECTURE.md"),
+    "TASK-011": ("docs/generated/v2-cutover-manifest.json", "vscode-extension"),
+    "TASK-012": ("tests", "vscode-extension/test"),
 }
 
 

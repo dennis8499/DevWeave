@@ -39,9 +39,7 @@ class HostFacade:
         return self._service.store.create(plan)
 
     def run_resume(self, run_id: str) -> dict[str, Any]:
-        if self._service.git_coordinator is not None:
-            self._service.git_coordinator.assert_resume_target(run_id)
-        plan = self._service.inspect(run_id)
+        plan = self._service.recover(run_id)
         self._service.assert_run_context(plan)
         return plan
 
@@ -132,7 +130,7 @@ class HostFacade:
 
         coordinator = self._service.git_coordinator
         with self._service.authority_transaction():
-            current = self._service.store.load(run_id)
+            current = self._service._recover_locked(run_id)
             if mutation_id in current["applied_mutations"]:
                 updated = current
             else:

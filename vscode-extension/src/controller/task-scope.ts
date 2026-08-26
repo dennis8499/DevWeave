@@ -7,6 +7,14 @@ interface CompiledTaskScope {
   readonly writableRoots: string[];
 }
 
+const PROTECTED_AUTHORITY_ROOTS = [
+  ".git",
+  ".devweave",
+  ".codex",
+  ".agents/skills/devweave",
+  "docs/exec-plans"
+] as const;
+
 /**
  * Return declarations only when exactly one task owns the implementation turn.
  * An empty result is deliberately ambiguous between no owner and malformed state;
@@ -70,6 +78,7 @@ function compileTaskScope(repository: string, run: Record<string, unknown>): Com
     if (!normalized?.endsWith("/**")) return null;
     const declaration = normalized.slice(0, -3);
     if (!declaration || /[*?[\]]/.test(declaration)) return null;
+    if (intersectsProtectedAuthority(declaration)) return null;
     const lexicalRoot = resolve(lexicalRepository, ...declaration.split("/"));
     if (!contained(lexicalRepository, lexicalRoot) || !hasSafeExistingComponents(lexicalRepository, lexicalRoot)) return null;
     try {
@@ -84,6 +93,14 @@ function compileTaskScope(repository: string, run: Record<string, unknown>): Com
   }
   const writableRoots = [...new Set(compiled.map((item) => item.root))];
   return { repository: physicalRepository, declarations: compiled, writableRoots };
+}
+
+function intersectsProtectedAuthority(declaration: string): boolean {
+  const candidate = declaration.toLocaleLowerCase("en-US");
+  return PROTECTED_AUTHORITY_ROOTS.some((protectedPath) => {
+    const root = protectedPath.toLocaleLowerCase("en-US");
+    return candidate === root || candidate.startsWith(`${root}/`) || root.startsWith(`${candidate}/`);
+  });
 }
 
 function normalizeRelative(value: string): string | null {
