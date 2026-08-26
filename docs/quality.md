@@ -7,6 +7,8 @@ From the repository root, run the V2 Python suite and public repository check. F
 
 The Windows certification runner is explicitly opt-in. It may use the operator's existing Codex login/network and send bounded workspace-related context to the Codex service; without that authorization, the report must remain `blocked` rather than substituting mocks or treating a local protocol-only probe as certification.
 
+The runner process needs outbound access to the OpenAI service, while every certified Codex turn still uses a read-only tool sandbox with network disabled and explicit client-side approval decline. The live harness emits only bounded phase names and redacted protocol diagnostics; its 135-second operation budget plus 20-second cleanup reserve remains below the legacy controlled executor's 180-second timeout so cleanup and a machine-readable failure can finish before the outer process boundary.
+
 The current Windows x64 certification passed against Codex `0.149.0-alpha.4.3` (executable SHA-256 `21f44f04e70d41d011268863d5109f5d7fc2862c14f390083e39ca3398b5ca47`). The read-only run observed the exact eight MCP tools, a native approval request and client decline, an interrupted turn, stored-thread resume/delete, and detached review completion; no write approval was granted. Other operating systems remain unverified.
 
 The architecture checker reports stable codes including `ROOT_INSTRUCTIONS_TOO_LARGE`, `MODULE_TOO_LARGE`, `REVERSE_DEPENDENCY`, `PUBLIC_SCHEMA_DRIFT`, `BROKEN_DOC_LINK`, `UNTRACED_ACCEPTANCE`, `DUPLICATE_CANONICAL_TOPIC`, and `NAVIGATION_TOO_DEEP`. A waiver is valid only for the exact code/path recorded in [architecture exceptions](architecture-exceptions.json), with owner, rationale, and unexpired date.

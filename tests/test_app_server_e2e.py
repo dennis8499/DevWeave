@@ -21,6 +21,7 @@ if str(SCRIPT_ROOT) not in sys.path:
 
 from devweave_v2.codex_doctor import CodexDoctor
 from devweave_v2.mcp_tools import AGENT_TOOLS
+from devweave_v2.redaction import bounded_text
 
 
 APPROVAL_METHODS = {
@@ -33,6 +34,8 @@ MAX_STDERR_BYTES = 262_144
 LIVE_OPT_IN = "DEVWEAVE_E2E_ALLOW_LIVE"
 CODEX_PATH_SETTING = "DEVWEAVE_CODEX_PATH"
 APPROVAL_PROBE = "DEVWEAVE_APPROVAL_TRANSPORT_PROBE"
+LIVE_OPERATION_BUDGET_SECONDS = 135
+LIVE_CLEANUP_TIMEOUT_SECONDS = 20
 
 
 def require_codex_path() -> Path:
@@ -85,11 +88,11 @@ class JsonlAppServer:
         self.stdout_thread.start()
         self.stderr_thread.start()
 
-    def initialize(self) -> dict[str, Any]:
+    def initialize(self, *, timeout: float = 30) -> dict[str, Any]:
         result = self.request("initialize", {
             "clientInfo": {"name": "devweave_e2e", "title": "DevWeave E2E", "version": "2.0.0"},
             "capabilities": {"experimentalApi": False},
-        }, timeout=30)
+        }, timeout=timeout)
         self.send({"method": "initialized", "params": {}})
         return result
 
@@ -238,6 +241,7 @@ def protocol_diagnostic(messages: list[dict[str, Any]]) -> str:
     methods: dict[str, int] = {}
     item_types: dict[str, int] = {}
     turn_statuses: list[str] = []
+    errors: list[dict[str, Any]] = []
     for message in messages:
         method = message.get("method")
         if isinstance(method, str):
@@ -253,10 +257,44 @@ def protocol_diagnostic(messages: list[dict[str, Any]]) -> str:
             status = params["turn"].get("status")
             if isinstance(status, str):
                 turn_statuses.append(status)
+        if method in {"error", "warning", "configWarning"} and len(errors) < 12:
+            diagnostic: dict[str, Any] = {"method": method}
+            containers = (("", params), ("error_", params.get("error")))
+            for prefix, container in containers:
+                if not isinstance(container, dict):
+                    continue
+                for key in ("code", "message", "willRetry", "retryAfterMs"):
+                    value = container.get(key)
+                    if isinstance(value, str):
+                        diagnostic[prefix + key] = bounded_text(value, max_bytes=512)[0]
+                    elif isinstance(value, (bool, int, float)):
+                        diagnostic[prefix + key] = value
+            errors.append(diagnostic)
     return json.dumps(
-        {"methods": methods, "item_types": item_types, "turn_statuses": turn_statuses[-8:]},
+        {
+            "methods": methods,
+            "item_types": item_types,
+            "turn_statuses": turn_statuses[-8:],
+            "errors": errors,
+        },
         ensure_ascii=True, sort_keys=True, separators=(",", ":"),
     )[:4_096]
+
+
+def report_phase(phase: str) -> str:
+    print(
+        json.dumps({"live_e2e_phase": phase}, sort_keys=True, separators=(",", ":")),
+        file=sys.stderr,
+        flush=True,
+    )
+    return phase
+
+
+def operation_timeout(deadline: float, requested: float) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("live E2E global operation deadline exhausted")
+    return min(requested, remaining)
 
 
 class RealCodexAppServerTests(unittest.TestCase):
@@ -270,6 +308,7 @@ class RealCodexAppServerTests(unittest.TestCase):
         source_head = git_output("rev-parse", "HEAD").strip()
         sentinel = ROOT / "DEVWEAVE_E2E_MUST_NOT_EXIST.txt"
         self.assertFalse(sentinel.exists(), "E2E sentinel already exists")
+        deadline = time.monotonic() + LIVE_OPERATION_BUDGET_SECONDS
         doctor = CodexDoctor().probe(repository=ROOT, configured_path=str(codex))
         client = JsonlAppServer(codex)
         thread_id = ""
@@ -278,9 +317,9 @@ class RealCodexAppServerTests(unittest.TestCase):
         cleanup_error: Exception | None = None
         sentinel_cleanup_error: Exception | None = None
         unsafe_write = ""
-        phase = "initialize"
+        phase = report_phase("initialize")
         try:
-            initialized = client.initialize()
+            initialized = client.initialize(timeout=operation_timeout(deadline, 30))
             self.assertIsInstance(initialized.get("userAgent"), str)
             mcp_config = {
                 "mcp_servers": {
@@ -294,20 +333,20 @@ class RealCodexAppServerTests(unittest.TestCase):
                     }
                 }
             }
-            phase = "thread_start"
+            phase = report_phase("thread_start")
             thread_result = client.request("thread/start", {
                 "cwd": str(ROOT), "approvalPolicy": "untrusted", "approvalsReviewer": "user",
                 "sandbox": "read-only",
                 "ephemeral": False,
                 "baseInstructions": "Run only bounded DevWeave protocol certification steps; never retain reasoning or secrets.",
                 "config": mcp_config,
-            }, timeout=60)
+            }, timeout=operation_timeout(deadline, 60))
             thread_id = nested_id(thread_result, "thread")
             self.assertTrue(thread_id)
-            phase = "mcp_status"
+            phase = report_phase("mcp_status")
             status = client.request("mcpServerStatus/list", {
                 "threadId": thread_id, "detail": "full", "limit": 100,
-            }, timeout=60)
+            }, timeout=operation_timeout(deadline, 60))
             servers = status.get("data")
             self.assertIsInstance(servers, list)
             devweave = next((item for item in servers if isinstance(item, dict) and item.get("name") == "devweave"), None)
@@ -321,7 +360,7 @@ class RealCodexAppServerTests(unittest.TestCase):
             for attempt in range(1, 3):
                 approval_attempts = attempt
                 approval_start = len(client.messages)
-                phase = f"approval_turn_start_{attempt}"
+                phase = report_phase(f"approval_turn_start_{attempt}")
                 approval_turn = client.request("turn/start", {
                     "threadId": thread_id,
                     "input": [{
@@ -336,13 +375,13 @@ class RealCodexAppServerTests(unittest.TestCase):
                     "approvalPolicy": "untrusted",
                     "approvalsReviewer": "user",
                     "sandboxPolicy": {"type": "readOnly", "networkAccess": False},
-                }, timeout=60)
+                }, timeout=operation_timeout(deadline, 60))
                 approval_turn_id = nested_id(approval_turn, "turn")
                 self.assertTrue(approval_turn_id)
-                phase = f"approval_wait_{attempt}"
+                phase = report_phase(f"approval_wait_{attempt}")
                 outcome = client.wait_for(
                     lambda item: item.get("method") in APPROVAL_METHODS or turn_completed(approval_turn_id)(item),
-                    timeout=180, after=approval_start,
+                    timeout=operation_timeout(deadline, 180), after=approval_start,
                 )
                 if outcome.get("method") in APPROVAL_METHODS:
                     approval = outcome
@@ -350,8 +389,12 @@ class RealCodexAppServerTests(unittest.TestCase):
             if approval is None:
                 raise RuntimeError("bounded approval probe attempts completed without a native approval request")
             self.assertEqual(approval.get("method"), "item/commandExecution/requestApproval")
-            phase = "approval_completion"
-            client.wait_for(turn_completed(approval_turn_id), timeout=180, after=approval_start)
+            phase = report_phase("approval_completion")
+            client.wait_for(
+                turn_completed(approval_turn_id),
+                timeout=operation_timeout(deadline, 180),
+                after=approval_start,
+            )
             declined_command = False
             for message in client.messages[approval_start:]:
                 params = message.get("params")
@@ -366,15 +409,19 @@ class RealCodexAppServerTests(unittest.TestCase):
             self.assertTrue(declined_command, "declined approval did not produce a declined command item")
             self.assertFalse(sentinel.exists(), "declined approval created the sentinel")
 
-            phase = "thread_read"
-            read = client.request("thread/read", {"threadId": thread_id, "includeTurns": True}, timeout=30)
+            phase = report_phase("thread_read")
+            read = client.request(
+                "thread/read",
+                {"threadId": thread_id, "includeTurns": True},
+                timeout=operation_timeout(deadline, 30),
+            )
             self.assertEqual(nested_id(read, "thread"), thread_id)
-            phase = "thread_resume"
+            phase = report_phase("thread_resume")
             resumed = client.request("thread/resume", {
                 "threadId": thread_id, "cwd": str(ROOT), "approvalPolicy": "untrusted",
                 "approvalsReviewer": "user",
                 "sandbox": "read-only", "config": mcp_config,
-            }, timeout=60)
+            }, timeout=operation_timeout(deadline, 60))
             self.assertEqual(nested_id(resumed, "thread"), thread_id)
 
             client.defer_approvals = True
@@ -385,7 +432,7 @@ class RealCodexAppServerTests(unittest.TestCase):
             for attempt in range(1, 3):
                 interrupt_attempts = attempt
                 interrupt_start = len(client.messages)
-                phase = f"interrupt_turn_start_{attempt}"
+                phase = report_phase(f"interrupt_turn_start_{attempt}")
                 interrupt_turn = client.request("turn/start", {
                     "threadId": thread_id,
                     "input": [{
@@ -399,13 +446,13 @@ class RealCodexAppServerTests(unittest.TestCase):
                     "approvalPolicy": "untrusted",
                     "approvalsReviewer": "user",
                     "sandboxPolicy": {"type": "readOnly", "networkAccess": False},
-                }, timeout=60)
+                }, timeout=operation_timeout(deadline, 60))
                 interrupt_turn_id = nested_id(interrupt_turn, "turn")
                 self.assertTrue(interrupt_turn_id)
-                phase = f"interrupt_approval_wait_{attempt}"
+                phase = report_phase(f"interrupt_approval_wait_{attempt}")
                 outcome = client.wait_for(
                     lambda item: item.get("method") in APPROVAL_METHODS or turn_completed(interrupt_turn_id)(item),
-                    timeout=180, after=interrupt_start,
+                    timeout=operation_timeout(deadline, 180), after=interrupt_start,
                 )
                 if outcome.get("method") in APPROVAL_METHODS:
                     interrupt_approval = outcome
@@ -413,7 +460,7 @@ class RealCodexAppServerTests(unittest.TestCase):
             if interrupt_approval is None:
                 raise RuntimeError("bounded interrupt probe attempts completed without a pending approval")
             self.assertEqual(interrupt_approval.get("method"), "item/commandExecution/requestApproval")
-            phase = "steer_interrupt"
+            phase = report_phase("steer_interrupt")
             steer_request_id = client.begin_request("turn/steer", {
                 "threadId": thread_id, "expectedTurnId": interrupt_turn_id,
                 "input": [{"type": "text", "text": "Acknowledge steering, but keep the response pending."}],
@@ -421,14 +468,26 @@ class RealCodexAppServerTests(unittest.TestCase):
             interrupt_request_id = client.begin_request("turn/interrupt", {
                 "threadId": thread_id, "turnId": interrupt_turn_id,
             })
-            client.complete_request(steer_request_id, "turn/steer", timeout=30)
-            client.complete_request(interrupt_request_id, "turn/interrupt", timeout=30)
-            interrupted = client.wait_for(turn_completed(interrupt_turn_id), timeout=60, after=interrupt_start)
+            client.complete_request(
+                steer_request_id,
+                "turn/steer",
+                timeout=operation_timeout(deadline, 30),
+            )
+            client.complete_request(
+                interrupt_request_id,
+                "turn/interrupt",
+                timeout=operation_timeout(deadline, 30),
+            )
+            interrupted = client.wait_for(
+                turn_completed(interrupt_turn_id),
+                timeout=operation_timeout(deadline, 60),
+                after=interrupt_start,
+            )
             client.defer_approvals = False
             self.assertEqual(interrupted["params"]["turn"].get("status"), "interrupted")
 
             review_start = len(client.messages)
-            phase = "detached_review"
+            phase = report_phase("detached_review")
             review = client.request("review/start", {
                 "threadId": thread_id,
                 "delivery": "detached",
@@ -439,7 +498,7 @@ class RealCodexAppServerTests(unittest.TestCase):
                         "Return exactly: ADVISORY [DEVWEAVE-E2E] DEVWEAVE_REVIEW_OK"
                     ),
                 },
-            }, timeout=60)
+            }, timeout=operation_timeout(deadline, 60))
             reviewer_thread_id = review.get("reviewThreadId")
             self.assertIsInstance(reviewer_thread_id, str)
             self.assertNotEqual(reviewer_thread_id, thread_id)
@@ -456,12 +515,16 @@ class RealCodexAppServerTests(unittest.TestCase):
                     )
                     or turn_completed(review_turn_id)(item)
                 ),
-                timeout=240, after=review_start,
+                timeout=operation_timeout(deadline, 240), after=review_start,
             )
             review_completion = "exitedReviewMode"
             if review_event.get("method") == "item/completed":
                 review_text = review_event["params"]["item"].get("review")
-                client.wait_for(turn_completed(review_turn_id), timeout=60, after=review_start)
+                client.wait_for(
+                    turn_completed(review_turn_id),
+                    timeout=operation_timeout(deadline, 60),
+                    after=review_start,
+                )
             else:
                 self.assertEqual(review_event["params"]["turn"].get("status"), "completed")
                 review_completion = "authoritative_agent_message"
@@ -520,7 +583,11 @@ class RealCodexAppServerTests(unittest.TestCase):
                     sentinel_cleanup_error = exc
             if thread_id:
                 try:
-                    client.request("thread/delete", {"threadId": thread_id}, timeout=30)
+                    client.request(
+                        "thread/delete",
+                        {"threadId": thread_id},
+                        timeout=LIVE_CLEANUP_TIMEOUT_SECONDS,
+                    )
                 except Exception as exc:
                     cleanup_error = exc
             client.close()
