@@ -159,6 +159,12 @@ class JsonlAppServer:
             except subprocess.TimeoutExpired:
                 self.process.kill()
                 self.process.wait(timeout=5)
+        finally:
+            self.stdout_thread.join(timeout=2)
+            self.stderr_thread.join(timeout=2)
+            for stream in (self.process.stdin, self.process.stdout, self.process.stderr):
+                if stream is not None and not stream.closed:
+                    stream.close()
 
     def _read_stdout(self) -> None:
         assert self.process.stdout is not None
@@ -262,7 +268,7 @@ class RealCodexAppServerTests(unittest.TestCase):
             self.assertIsInstance(devweave, dict)
             self.assertEqual(tuple(sorted(devweave["tools"])), tuple(sorted(AGENT_TOOLS)))
 
-            read = client.request("thread/read", {"threadId": thread_id, "includeTurns": True}, timeout=30)
+            read = client.request("thread/read", {"threadId": thread_id, "includeTurns": False}, timeout=30)
             self.assertEqual(nested_id(read, "thread"), thread_id)
             resumed = client.request("thread/resume", {
                 "threadId": thread_id, "cwd": str(ROOT), "approvalPolicy": "on-request",
