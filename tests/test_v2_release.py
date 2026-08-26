@@ -19,6 +19,7 @@ from devweave_v2.cutover import (  # noqa: E402
     TRANSITION_RUN_ID,
     _git_files,
     _is_legacy,
+    canonical_file_sha256,
     generate_manifest,
     write_manifest,
 )
@@ -108,6 +109,25 @@ class CutoverFinalizerTests(unittest.TestCase):
         self.assertEqual(ErrorCode.CONFLICT, caught.exception.code)
         self.assertTrue(added.exists())
 
+    def test_only_exact_managed_knowledge_deletions_may_precede_manifest(self) -> None:
+        overview = self.repository / "wiki/overview.md"
+        overview_hash = canonical_file_sha256(overview)
+        overview.unlink()
+
+        manifest = generate_manifest(self.repository, base_ref=self.base_ref)
+        deletion = next(
+            item for item in manifest["deletions"] if item["path"] == "wiki/overview.md"
+        )
+        self.assertEqual(overview_hash, deletion["sha256"])
+        write_manifest(self.manifest_path, manifest)
+        report = CutoverFinalizer(self.repository, self.manifest_path).check()
+        self.assertEqual(1, report["completed_deletions"])
+
+        (self.repository / "wiki/index.md").unlink()
+        with self.assertRaises(DevWeaveError) as caught:
+            generate_manifest(self.repository, base_ref=self.base_ref)
+        self.assertEqual(ErrorCode.NOT_FOUND, caught.exception.code)
+
     def test_apply_requires_hash_bound_completed_transition_record(self) -> None:
         (self.repository / TRANSITION_COMPLETION_PATH).unlink()
         write_manifest(self.manifest_path, generate_manifest(self.repository, base_ref=self.base_ref))
@@ -134,6 +154,7 @@ class CutoverFinalizerTests(unittest.TestCase):
             ".devweave/baseline/product.md": "old baseline\n",
             ".devweave/work-items/old/state.json": "{}\n",
             "wiki/index.md": "old wiki\n",
+            "wiki/overview.md": "old overview\n",
             ".agents/skills/devweave/SKILL.md": "old skill\n",
             ".agents/skills/devweave/references/contracts.md": "old reference\n",
             ".agents/skills/devweave/scripts/devweave.py": "# old launcher\n",
