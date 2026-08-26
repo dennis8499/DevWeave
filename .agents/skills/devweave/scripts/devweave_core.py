@@ -5,6 +5,7 @@ import getpass
 import hashlib
 import json
 import math
+import math
 import os
 import re
 import shutil
@@ -3678,6 +3679,45 @@ def update_task(
                 for item in state["tasks"].values()
             ):
                 state["phase"] = "verification"
+        elif action == "snapshot":
+            if task["status"] != "completed":
+                raise ValidationError(
+                    "Only a completed task can receive a completion snapshot.",
+                    {"task": task_id, "status": task["status"]},
+                )
+            if not evidence:
+                raise ValidationError("A completion snapshot requires current evidence.")
+            if not note.strip():
+                raise ValidationError("A completion snapshot requires an audit note.")
+            unknown = [item for item in evidence if item not in state.get("evidence", {})]
+            if unknown:
+                raise ValidationError("Unknown evidence IDs.", {"evidence": unknown})
+            source = git_snapshot(repo)
+            invalid = [
+                item
+                for item in evidence
+                if state["evidence"][item].get("status") != "passed"
+                or state["evidence"][item].get("stale")
+                or not state["evidence"][item].get("binds_current_source")
+                or state["evidence"][item].get("source_fingerprint") != source["fingerprint"]
+                or task_id not in state["evidence"][item].get("tasks", [])
+            ]
+            if invalid:
+                raise ValidationError(
+                    "Completion snapshots accept only passing evidence bound to the current source.",
+                    {"evidence": invalid},
+                )
+            snapshots = task.setdefault("completion_snapshots", [])
+            if not isinstance(snapshots, list) or len(snapshots) >= 32:
+                raise ValidationError("Task completion snapshot history is invalid or full.")
+            snapshot = {
+                "at": utc_now(),
+                "evidence": sorted(set(evidence)),
+                "note": _redact(note.strip()),
+                "git_head": source["head"],
+                "source_fingerprint": source["fingerprint"],
+            }
+            snapshots.append(snapshot)
         elif action == "block":
             if not note.strip():
                 raise ValidationError("Blocking a task requires a reason.")
@@ -3717,6 +3757,32 @@ def _redact(text: str) -> str:
         r"(?i)\b(api[_-]?key|token|password|secret)\b(\s*[:=]\s*)([^\s]+)"
     )
     return pattern.sub(r"\1\2[REDACTED]", text)
+
+
+def _sanitize_machine_report(value: Any, *, depth: int = 0, budget: list[int] | None = None) -> Any:
+    if depth > 32:
+        raise ValidationError("Evidence report nesting exceeds the safety bound.")
+    remaining = [10_000] if budget is None else budget
+    remaining[0] -= 1
+    if remaining[0] < 0:
+        raise ValidationError("Evidence report contains too many values.")
+    if isinstance(value, dict):
+        result: dict[str, Any] = {}
+        for key, item in value.items():
+            if re.fullmatch(r"(?i)(?:api[_-]?key|token|password|secret)", key):
+                result[key] = "[REDACTED]"
+            else:
+                result[key] = _sanitize_machine_report(item, depth=depth + 1, budget=remaining)
+        return result
+    if isinstance(value, list):
+        return [_sanitize_machine_report(item, depth=depth + 1, budget=remaining) for item in value]
+    if isinstance(value, str):
+        return _redact(value)
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValidationError("Evidence report contains a non-finite number.")
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    raise ValidationError("Evidence report contains an unsupported JSON value.")
 
 
 def _review_report_path(repo: Path, work_id: str, report_file: str | Path) -> Path:
@@ -3920,6 +3986,34 @@ def _load_review_report(
     return sanitized, stored
 
 
+def _load_evidence_report(
+    repo: Path,
+    state: dict[str, Any],
+    report_file: str | Path,
+) -> bytes:
+    path = _review_report_path(repo, state["id"], report_file)
+    project = load_project(repo)
+    try:
+        limit = int(project.get("evidence", {}).get("raw_log_limit_bytes", MAX_RAW_LOG_BYTES))
+        raw = path.read_bytes()
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("Project evidence raw_log_limit_bytes must be an integer.") from exc
+    except OSError as exc:
+        raise ValidationError("Evidence report file could not be read.", {"path": str(path)}) from exc
+    if limit <= 0 or len(raw) > limit:
+        raise ValidationError("Evidence report exceeds the configured raw log limit.", {"bytes": len(raw), "limit": limit})
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValidationError("Evidence report must be valid UTF-8 JSON.") from exc
+    if not isinstance(value, dict):
+        raise ValidationError("Evidence report must be a JSON object.")
+    stored = canonical_json(_sanitize_machine_report(value))
+    if len(stored) > limit:
+        raise ValidationError("Redacted evidence report exceeds the configured raw log limit.")
+    return stored
+
+
 def _write_evidence_unlocked(
     repo: Path,
     state: dict[str, Any],
@@ -4031,6 +4125,7 @@ def add_evidence(
     observed_result: str = "neutral",
     binds_current_source: bool | None = None,
     metrics: dict[str, Any] | None = None,
+    report_file: str | Path | None = None,
 ) -> dict[str, Any]:
     if kind == "review":
         raise ValidationError(
@@ -4051,6 +4146,7 @@ def add_evidence(
         sync_state_unlocked(repo, state)
         evidence_id = _next_evidence_id(state)
         source = git_snapshot(repo)
+        stored_report = _load_evidence_report(repo, state, report_file) if report_file is not None else None
         evidence = {
             "schema_version": SCHEMA_VERSION,
             "id": evidence_id,
@@ -4089,6 +4185,11 @@ def add_evidence(
         }
         if normalized_metrics is not None:
             evidence["metrics"] = normalized_metrics
+        if stored_report is not None:
+            log_path = _review_log_path(repo, work_id, evidence_id)
+            atomic_write_bytes(log_path, stored_report)
+            evidence["raw_log"] = normalize_relpath(log_path.relative_to(repo))
+            evidence["report_sha256"] = sha256_bytes(stored_report)
         _write_evidence_unlocked(repo, state, evidence)
         if evidence["gate_eligible"] and evidence["binds_current_source"]:
             state["last_verification"] = {

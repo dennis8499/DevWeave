@@ -843,6 +843,53 @@ class ValidationAndPersistenceTests(unittest.TestCase):
                         note="不允許的轉移。",
                     )
 
+    def test_completed_task_accepts_only_current_source_bound_audit_snapshots(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.prepare_g2()
+            work_id = state["id"]
+            core.update_task(harness.repo, work_id, "TASK-001", "start")
+            core.update_task(harness.repo, work_id, "TASK-001", "complete", note="完成。")
+            current = core.add_evidence(
+                harness.repo,
+                work_id,
+                kind="regression",
+                status="passed",
+                summary="Current completion audit proof.",
+                covers=["AC-001"],
+                tasks=["TASK-001"],
+                observed_result="success",
+            )
+            task = core.update_task(
+                harness.repo,
+                work_id,
+                "TASK-001",
+                "snapshot",
+                evidence=[current["id"]],
+                note="Refreshed after final verification.",
+            )
+            snapshot = task["completion_snapshots"][-1]
+            self.assertEqual([current["id"]], snapshot["evidence"])
+            self.assertEqual(current["source_fingerprint"], snapshot["source_fingerprint"])
+
+            unrelated = core.add_evidence(
+                harness.repo,
+                work_id,
+                kind="diagnostic",
+                status="passed",
+                summary="Not linked to the task.",
+                covers=["AC-001"],
+                tasks=[],
+            )
+            with self.assertRaises(core.ValidationError):
+                core.update_task(
+                    harness.repo,
+                    work_id,
+                    "TASK-001",
+                    "snapshot",
+                    evidence=[unrelated["id"]],
+                    note="Must fail.",
+                )
+
     def test_risk_downgrade_requires_reason(self) -> None:
         with RepositoryHarness() as harness:
             state = harness.start(risk="high")
@@ -1569,6 +1616,50 @@ class IndependentReviewTests(unittest.TestCase):
                     status="passed",
                     summary="Invalid metrics.",
                     metrics={"usage": {"status": "available", "cost": float("nan")}},
+                )
+
+    def test_manual_evidence_can_retain_a_bounded_redacted_machine_report(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            incoming = harness.repo / ".devweave" / "cache" / "incoming" / state["id"]
+            incoming.mkdir(parents=True, exist_ok=True)
+            report = incoming / "attestation.json"
+            report.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "artifact_sha256": "a" * 64,
+                        "token": "top-secret",
+                        "details": {"message": "password=hidden"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            evidence = core.add_evidence(
+                harness.repo,
+                state["id"],
+                kind="diagnostic",
+                status="passed",
+                summary="Machine attestation retained.",
+                report_file=report.relative_to(harness.repo),
+            )
+            stored_path = harness.repo / evidence["raw_log"]
+            stored = json.loads(stored_path.read_text(encoding="utf-8"))
+            self.assertEqual("a" * 64, stored["artifact_sha256"])
+            self.assertEqual("[REDACTED]", stored["token"])
+            self.assertNotIn("hidden", stored["details"]["message"])
+            self.assertEqual(evidence["report_sha256"], core.sha256_bytes(stored_path.read_bytes()))
+
+            outside = harness.repo / "outside.json"
+            outside.write_text("{}", encoding="utf-8")
+            with self.assertRaises(core.ValidationError):
+                core.add_evidence(
+                    harness.repo,
+                    state["id"],
+                    kind="diagnostic",
+                    status="passed",
+                    summary="Outside report rejected.",
+                    report_file=outside.relative_to(harness.repo),
                 )
 
     def test_missing_executable_is_failed_evidence_not_an_internal_crash(self) -> None:

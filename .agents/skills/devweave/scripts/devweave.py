@@ -360,6 +360,7 @@ def command_evidence(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
         observed_result=args.observed_result,
         binds_current_source=args.binds_current_source,
         metrics=parse_metrics_json(args.metrics),
+        report_file=args.report_file,
     )
     return {"ok": True, "work": state["id"], "evidence": evidence}
 
@@ -737,7 +738,7 @@ def build_parser() -> argparse.ArgumentParser:
     knowledge_seal_parser.set_defaults(handler=command_knowledge)
 
     task_parser = subparsers.add_parser("task")
-    task_parser.add_argument("action", choices=("start", "complete", "block"))
+    task_parser.add_argument("action", choices=("start", "complete", "snapshot", "block"))
     task_parser.add_argument("--work")
     task_parser.add_argument("--task", required=True)
     task_parser.add_argument("--evidence", action="append", default=[])
@@ -752,6 +753,10 @@ def build_parser() -> argparse.ArgumentParser:
     evidence_parser.add_argument("--summary", required=True)
     evidence_parser.add_argument("--covers", action="append", default=[])
     evidence_parser.add_argument("--task", action="append", default=[])
+    evidence_parser.add_argument(
+        "--report-file",
+        help="Optional repo-relative JSON file inside .devweave/cache/incoming/<work-id> to retain as bounded evidence.",
+    )
     evidence_parser.add_argument(
         "--observed-result",
         choices=("success", "failure", "neutral"),

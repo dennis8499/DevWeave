@@ -464,6 +464,33 @@ class CliContractTests(unittest.TestCase):
             self.assertEqual("review", payload["evidence"]["kind"])
             self.assertEqual("passed", payload["evidence"]["review"]["result"])
 
+    def test_evidence_add_cli_retains_machine_report(self) -> None:
+        with RepositoryHarness() as harness:
+            state = harness.start()
+            incoming = harness.repo / ".devweave" / "cache" / "incoming" / state["id"]
+            incoming.mkdir(parents=True, exist_ok=True)
+            report = incoming / "attestation.json"
+            report.write_text(json.dumps({"schema_version": 1, "vsix_sha256": "a" * 64}), encoding="utf-8")
+            result, payload = invoke(
+                harness.repo,
+                "evidence",
+                "add",
+                "--work",
+                state["id"],
+                "--kind",
+                "diagnostic",
+                "--status",
+                "passed",
+                "--summary",
+                "Machine report retained.",
+                "--report-file",
+                report.relative_to(harness.repo).as_posix(),
+            )
+            self.assertEqual(0, result.returncode, payload)
+            evidence = payload["evidence"]
+            self.assertRegex(evidence["report_sha256"], r"^[0-9a-f]{64}$")
+            self.assertTrue((harness.repo / evidence["raw_log"]).is_file())
+
     def test_command_set_preserves_argv_array(self) -> None:
         with RepositoryHarness() as harness:
             harness.init()
