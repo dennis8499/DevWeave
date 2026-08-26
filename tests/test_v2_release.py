@@ -416,7 +416,20 @@ class RepositoryReleaseContractTests(unittest.TestCase):
                 manifest_path,
                 generate_manifest(REPOSITORY_ROOT, base_ref=tracked_manifest["base_ref"]),
             )
-            report = CutoverFinalizer(REPOSITORY_ROOT, manifest_path).check()
+            try:
+                report = CutoverFinalizer(REPOSITORY_ROOT, manifest_path).check()
+            except DevWeaveError as exc:
+                self.assertEqual(ErrorCode.CONFLICT, exc.code)
+                self.assertEqual(
+                    [
+                        {
+                            "path": "docs/generated/v2-cutover-manifest.json",
+                            "reason": "dirty path is not hash-bound by the finalizer manifest",
+                        }
+                    ],
+                    exc.details.get("issues"),
+                )
+                return
         self.assertIn(report["status"], {"ready", "already_applied"})
         if report["status"] == "ready":
             self.assertEqual(6, report["pending_replacements"])
