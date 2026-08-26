@@ -7,7 +7,7 @@ DevWeave 2.0.0 embeds Codex inside a governed software-delivery workflow. Users 
 
 - The Control Center shows connection/preflight, run/thread/turn, plan/diff, tool approval, pending decision, Gate, verification, review, usage, and diagnostic state.
 - Projection/stale state is visibly distinct from authoritative/current state.
-- Missing Codex is a hard, machine-readable blocker; there is no download or clipboard fallback.
+- Missing Codex or its same-distribution code-mode host companion is a hard, machine-readable blocker; there is no download, isolated-binary, or clipboard fallback.
 - Risk can escalate automatically and determines human Gate/review depth.
 - A run can restart from its canonical plan without treating conversation history as workflow truth.
 - V1 recovery uses a deterministic read-only index and the recorded Git base ref, never a dual runtime.
@@ -22,7 +22,7 @@ The public CLI verbs are `doctor`, `inspect`, `check`, `verify`, `export-v1`, an
 Initialize app-server and exercise thread/turn start, resume, steering, interruption, and event reduction without a clipboard path.
 
 ### AC-002: CLI preflight fail-closed
-Resolve PATH or an absolute Codex path with provenance; reject unavailable or invalid executables before run, branch, or process mutation.
+Resolve PATH or an absolute Codex path with executable and same-directory code-mode host provenance; reject unavailable, incomplete, or invalid installations before run, branch, network session, or process mutation.
 
 ### AC-003: MCP allowlist and guard
 Expose exactly eight tools and reject unknown, stale, malformed, traversal, or out-of-scope calls without state mutation.

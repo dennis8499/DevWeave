@@ -44,7 +44,16 @@ class LiveE2EContractTests(unittest.TestCase):
                         "willRetry": True,
                         "prompt": "must not be copied",
                     },
-                }
+                },
+                {
+                    "method": "item/completed",
+                    "params": {
+                        "item": {
+                            "type": "agentMessage",
+                            "text": f"authorization={secret}",
+                        },
+                    },
+                },
             ]
         )
         self.assertLessEqual(len(diagnostic), 4_096)
@@ -53,6 +62,7 @@ class LiveE2EContractTests(unittest.TestCase):
         parsed = json.loads(diagnostic)
         self.assertEqual("transport", parsed["errors"][0]["error_code"])
         self.assertTrue(parsed["errors"][0]["willRetry"])
+        self.assertEqual("authorization=<redacted>", parsed["agent_messages"][0])
 
 
 if __name__ == "__main__":

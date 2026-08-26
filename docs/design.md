@@ -3,7 +3,7 @@
 
 ## Codex integration
 
-App-server is the interactive execution plane because the agent is part of the product experience and DevWeave needs persistent threads, streamed events, interruption, tools, and approval handling. The SDK/one-shot CLI layers were rejected for this rich lifecycle. Only stable protocol methods are allowlisted; startup probes the locally installed schema bundle before a run exists.
+App-server is the interactive execution plane because the agent is part of the product experience and DevWeave needs persistent threads, streamed events, interruption, tools, and approval handling. The SDK/one-shot CLI layers were rejected for this rich lifecycle. Only stable protocol methods are allowlisted; startup verifies the selected executable and its same-directory code-mode host companion, hashes both, then probes the locally installed schema bundle before a run exists.
 
 The product owns the Control Center, canonical plan, workflow tools, approvals, and business constraints. Codex owns the reusable agent loop and configured sandboxed execution.
 

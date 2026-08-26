@@ -11,7 +11,7 @@ The reducer reconstructs the RunSnapshot from the ExecPlan and ordered events. I
 
 ## Verification execution
 
-- Executables resolve at runtime from approved portable candidates.
+- Executables resolve at runtime from approved portable candidates; Codex additionally requires and hashes the platform-specific code-mode host beside the selected executable before any process or network session starts.
 - Processes receive argv tokens with `shell=False`, a repository-bounded cwd, timeout, bounded stdout/stderr, and denied network by default.
 - Child environments contain only the fixed operating-system baseline plus variables named by that command's `env_allowlist`; an unlisted parent variable cannot influence execution.
 - Dependency closure and stage ordering are deterministic.

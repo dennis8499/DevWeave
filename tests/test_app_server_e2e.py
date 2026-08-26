@@ -574,6 +574,7 @@ class RealCodexAppServerTests(unittest.TestCase):
                 "source_git_head": source_head,
                 "codex_version": doctor["codex"]["version"],
                 "codex_sha256": hashlib.sha256(codex.read_bytes()).hexdigest(),
+                "code_mode_host_sha256": doctor["codex"]["code_mode_host"]["sha256"],
                 "schema_files": doctor["app_server"]["schema_files"],
                 "mcp_tools": list(sorted(AGENT_TOOLS)),
                 "approval_method": approval.get("method"),

@@ -22,6 +22,7 @@ REQUIRED_APP_SERVER_DESCRIPTORS = (
 )
 MAX_SCHEMA_FILES = 512
 MAX_SCHEMA_BYTES = 10_000_000
+CODE_MODE_HOST_NAME = "codex-code-mode-host.exe" if os.name == "nt" else "codex-code-mode-host"
 
 
 class CodexDoctor:
@@ -31,6 +32,7 @@ class CodexDoctor:
 
     def probe(self, *, repository: Path, configured_path: str | None = None) -> dict:
         executable, source = self.resolve(configured_path)
+        code_mode_host = self.resolve_code_mode_host(executable)
         version_result = self.runner.run((str(executable), "--version"), cwd=repository.resolve(), timeout_seconds=10)
         if version_result.timed_out or version_result.exit_code != 0:
             raise DevWeaveError(ErrorCode.CODEX_UNAVAILABLE, "Codex version probe failed.")
@@ -55,6 +57,10 @@ class CodexDoctor:
                 "source": source,
                 "sha256": hash_file(executable),
                 "version": version.strip()[:512],
+                "code_mode_host": {
+                    "path": str(code_mode_host),
+                    "sha256": hash_file(code_mode_host),
+                },
             },
             "app_server": {
                 "transport": "stdio-jsonl",
@@ -84,6 +90,18 @@ class CodexDoctor:
         if os.name != "nt" and not os.access(path, os.X_OK):
             raise DevWeaveError(ErrorCode.CODEX_UNAVAILABLE, "Resolved Codex file is not executable.")
         return path, source
+
+    def resolve_code_mode_host(self, executable: Path) -> Path:
+        companion = (executable.parent / CODE_MODE_HOST_NAME).resolve()
+        if not companion.is_file():
+            raise DevWeaveError(
+                ErrorCode.CODEX_UNAVAILABLE,
+                "Codex code-mode host companion is unavailable.",
+                {"required_companion": CODE_MODE_HOST_NAME},
+            )
+        if os.name != "nt" and not os.access(companion, os.X_OK):
+            raise DevWeaveError(ErrorCode.CODEX_UNAVAILABLE, "Codex code-mode host is not executable.")
+        return companion
 
 
 def validate_schema_bundle(root: Path) -> tuple[str, int]:

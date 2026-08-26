@@ -18,6 +18,7 @@ if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
 from devweave_v2.codex_doctor import (
+    CODE_MODE_HOST_NAME,
     MAX_SCHEMA_FILES,
     CodexDoctor,
     REQUIRED_APP_SERVER_DESCRIPTORS,
@@ -71,6 +72,8 @@ class CodexDoctorTests(unittest.TestCase):
         self.repo = Path(self.temp.name)
         self.executable = self.repo / "codex.exe"
         self.executable.write_bytes(b"fake-codex-binary")
+        self.code_mode_host = self.repo / CODE_MODE_HOST_NAME
+        self.code_mode_host.write_bytes(b"fake-code-mode-host")
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -82,6 +85,10 @@ class CodexDoctorTests(unittest.TestCase):
         self.assertEqual(from_path["codex"]["source"], "path")
         self.assertEqual(configured["codex"]["source"], "configured")
         self.assertEqual(configured["codex"]["sha256"], hashlib.sha256(b"fake-codex-binary").hexdigest())
+        self.assertEqual(
+            configured["codex"]["code_mode_host"]["sha256"],
+            hashlib.sha256(b"fake-code-mode-host").hexdigest(),
+        )
         self.assertFalse(configured["app_server"]["experimental_api"])
         self.assertTrue(all(call[0] == str(self.executable.resolve()) for call in runner.calls))
         self.assertFalse(any("download" in token or "http" in token for call in runner.calls for token in call))
@@ -101,6 +108,18 @@ class CodexDoctorTests(unittest.TestCase):
                 with self.assertRaises(DevWeaveError) as failed:
                     CodexDoctor(runner=FakeCodexRunner(mode)).probe(repository=self.repo, configured_path=str(self.executable.resolve()))
                 self.assertEqual(failed.exception.code, ErrorCode.CODEX_UNAVAILABLE)
+
+    def test_missing_code_mode_host_fails_before_any_process_probe(self) -> None:
+        self.code_mode_host.unlink()
+        runner = FakeCodexRunner()
+        with self.assertRaises(DevWeaveError) as failed:
+            CodexDoctor(runner=runner).probe(
+                repository=self.repo,
+                configured_path=str(self.executable.resolve()),
+            )
+        self.assertEqual(failed.exception.code, ErrorCode.CODEX_UNAVAILABLE)
+        self.assertEqual(failed.exception.details["required_companion"], CODE_MODE_HOST_NAME)
+        self.assertEqual(runner.calls, [])
 
     def test_schema_bundle_accepts_current_multi_file_shape_and_keeps_a_hard_cap(self) -> None:
         bundle = self.repo / "schema"
