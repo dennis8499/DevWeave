@@ -92,9 +92,16 @@ class JsonlAppServer:
         return result
 
     def request(self, method: str, params: Any, *, timeout: float = 120) -> dict[str, Any]:
+        request_id = self.begin_request(method, params)
+        return self.complete_request(request_id, method, timeout=timeout)
+
+    def begin_request(self, method: str, params: Any) -> int:
         request_id = self.next_id
         self.next_id += 1
         self.send({"id": request_id, "method": method, "params": params})
+        return request_id
+
+    def complete_request(self, request_id: int, method: str, *, timeout: float = 120) -> dict[str, Any]:
         response = self.wait_for(
             lambda item: item.get("id") == request_id and "method" not in item,
             timeout=timeout,
@@ -357,14 +364,18 @@ class RealCodexAppServerTests(unittest.TestCase):
             }, timeout=60)
             interrupt_turn_id = nested_id(interrupt_turn, "turn")
             self.assertTrue(interrupt_turn_id)
-            client.request("turn/steer", {
+            phase = "steer_interrupt"
+            steer_request_id = client.begin_request("turn/steer", {
                 "threadId": thread_id, "expectedTurnId": interrupt_turn_id,
                 "input": [{"type": "text", "text": "Acknowledge steering, but keep the response pending."}],
-            }, timeout=30)
-            client.request("turn/interrupt", {
+            })
+            interrupt_request_id = client.begin_request("turn/interrupt", {
                 "threadId": thread_id, "turnId": interrupt_turn_id,
-            }, timeout=30)
+            })
+            client.complete_request(steer_request_id, "turn/steer", timeout=30)
+            client.complete_request(interrupt_request_id, "turn/interrupt", timeout=30)
             interrupted = client.wait_for(turn_completed(interrupt_turn_id), timeout=60, after=interrupt_start)
+            self.assertEqual(interrupted["params"]["turn"].get("status"), "interrupted")
 
             review_start = len(client.messages)
             phase = "detached_review"
