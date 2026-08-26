@@ -17,7 +17,7 @@ Agent identity never grants host identity. MCP cannot discover or forward start/
 
 ## Sandbox and process policy
 
-Planning is read-only. Implementation/review use workspace-write limited to the repository and network disabled. Process transports set `shell:false`, hide Windows child windows, bound individual frames and aggregate output, and never concatenate a command string. Codex and its same-distribution code-mode host are resolved and hash-attested locally, never downloaded or silently substituted with an isolated executable.
+Planning is read-only. Implementation/review use workspace-write limited to the repository and network disabled. Process transports set `shell:false`, hide Windows child windows, bound individual frames and aggregate output, and never concatenate a command string. Codex is resolved locally and never downloaded; its same-distribution code-mode host is also resolved and hash-attested locally, never silently substituted with an isolated executable.
 
 ## Path and Git policy
 

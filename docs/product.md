@@ -7,7 +7,7 @@ DevWeave 2.0.0 embeds Codex inside a governed software-delivery workflow. Users 
 
 - The Control Center shows connection/preflight, run/thread/turn, plan/diff, tool approval, pending decision, Gate, verification, review, usage, and diagnostic state.
 - Projection/stale state is visibly distinct from authoritative/current state.
-- Missing Codex or its same-distribution code-mode host companion is a hard, machine-readable blocker; there is no download, isolated-binary, or clipboard fallback.
+- Missing Codex is a hard, machine-readable blocker; a missing same-distribution code-mode host companion is treated identically, with no download, isolated-binary, or clipboard fallback.
 - Risk can escalate automatically and determines human Gate/review depth.
 - A run can restart from its canonical plan without treating conversation history as workflow truth.
 - V1 recovery uses a deterministic read-only index and the recorded Git base ref, never a dual runtime.
