@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import io
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,7 @@ if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
 from devweave_v2.codex_doctor import (
+    CODEX_BINARY_NAME,
     CODE_MODE_HOST_NAME,
     MAX_SCHEMA_FILES,
     CodexDoctor,
@@ -92,6 +94,42 @@ class CodexDoctorTests(unittest.TestCase):
         self.assertFalse(configured["app_server"]["experimental_api"])
         self.assertTrue(all(call[0] == str(self.executable.resolve()) for call in runner.calls))
         self.assertFalse(any("download" in token or "http" in token for call in runner.calls for token in call))
+
+    def test_official_npm_wrapper_resolves_the_native_bundle(self) -> None:
+        npm_root = self.repo / "npm"
+        npm_root.mkdir()
+        wrapper = npm_root / ("codex.cmd" if os.name == "nt" else "codex")
+        wrapper.write_text("official npm wrapper fixture\n", encoding="utf-8")
+        bundle = (
+            npm_root
+            / "node_modules/@openai/codex/node_modules/@openai/codex-fixture"
+            / "vendor/fixture-target/bin"
+        )
+        bundle.mkdir(parents=True)
+        native = bundle / CODEX_BINARY_NAME
+        native.write_bytes(b"npm-native-codex")
+        companion = bundle / CODE_MODE_HOST_NAME
+        companion.write_bytes(b"npm-native-code-mode-host")
+        if os.name != "nt":
+            wrapper.chmod(0o755)
+            native.chmod(0o755)
+            companion.chmod(0o755)
+
+        runner = FakeCodexRunner()
+        report = CodexDoctor(runner=runner, which=lambda _: str(wrapper)).probe(
+            repository=self.repo
+        )
+
+        self.assertEqual(str(native.resolve()), report["codex"]["path"])
+        self.assertEqual(
+            hashlib.sha256(b"npm-native-codex").hexdigest(),
+            report["codex"]["sha256"],
+        )
+        self.assertEqual(
+            hashlib.sha256(b"npm-native-code-mode-host").hexdigest(),
+            report["codex"]["code_mode_host"]["sha256"],
+        )
+        self.assertTrue(all(call[0] == str(native.resolve()) for call in runner.calls))
 
     def test_missing_nonfile_relative_version_and_schema_fail_closed(self) -> None:
         with self.assertRaises(DevWeaveError) as missing:

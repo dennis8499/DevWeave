@@ -23,6 +23,9 @@ REQUIRED_APP_SERVER_DESCRIPTORS = (
 MAX_SCHEMA_FILES = 512
 MAX_SCHEMA_BYTES = 10_000_000
 CODE_MODE_HOST_NAME = "codex-code-mode-host.exe" if os.name == "nt" else "codex-code-mode-host"
+CODEX_BINARY_NAME = "codex.exe" if os.name == "nt" else "codex"
+NPM_WRAPPER_NAMES = frozenset({"codex", "codex.cmd", "codex.ps1"})
+MAX_NPM_NATIVE_CANDIDATES = 8
 
 
 class CodexDoctor:
@@ -87,9 +90,40 @@ class CodexDoctor:
             source = "path"
         if not path.is_file():
             raise DevWeaveError(ErrorCode.CODEX_UNAVAILABLE, "Resolved Codex path is not a file.")
+        path = self.resolve_npm_native(path)
         if os.name != "nt" and not os.access(path, os.X_OK):
             raise DevWeaveError(ErrorCode.CODEX_UNAVAILABLE, "Resolved Codex file is not executable.")
         return path, source
+
+    def resolve_npm_native(self, executable: Path) -> Path:
+        if executable.name.casefold() not in NPM_WRAPPER_NAMES:
+            return executable
+        package_root = executable.parent / "node_modules" / "@openai" / "codex"
+        if not package_root.is_dir():
+            return executable
+        matches = list(
+            package_root.glob(
+                f"node_modules/@openai/codex-*/vendor/*/bin/{CODEX_BINARY_NAME}"
+            )
+        )
+        if len(matches) > MAX_NPM_NATIVE_CANDIDATES:
+            raise DevWeaveError(
+                ErrorCode.CODEX_UNAVAILABLE,
+                "Codex npm installation contains too many native candidates.",
+            )
+        candidates: set[Path] = set()
+        for match in matches:
+            native = match.resolve()
+            companion = (native.parent / CODE_MODE_HOST_NAME).resolve()
+            if native.is_file() and companion.is_file():
+                candidates.add(native)
+        if len(candidates) > 1:
+            raise DevWeaveError(
+                ErrorCode.CODEX_UNAVAILABLE,
+                "Codex npm wrapper resolves to multiple native bundles.",
+                {"candidate_count": len(candidates)},
+            )
+        return next(iter(candidates), executable)
 
     def resolve_code_mode_host(self, executable: Path) -> Path:
         companion = (executable.parent / CODE_MODE_HOST_NAME).resolve()
