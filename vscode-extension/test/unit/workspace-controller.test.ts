@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { resolve } from "node:path";
-import test from "node:test";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import test, { after } from "node:test";
 
 import { initialProjection, type AppServerProjection } from "../../src/app-server/event-reducer";
 import type { ServerRequest } from "../../src/app-server/session";
@@ -15,15 +17,19 @@ const TOOLS = [
   "verification_run", "verification_read", "completion_request"
 ];
 const SOURCE_FINGERPRINT = "a".repeat(64);
+const TEST_ROOT = mkdtempSync(join(tmpdir(), "devweave-controller-"));
+const TEST_REPOSITORY = join(TEST_ROOT, "repository");
+mkdirSync(join(TEST_REPOSITORY, "src"), { recursive: true });
+after(() => rmSync(TEST_ROOT, { recursive: true, force: true }));
 
-function run(phase = "planning", risk = "high"): Record<string, unknown> {
+function run(phase = "planning", risk = "high", declaredPaths: string[] = ["src/**"]): Record<string, unknown> {
   return {
     run_id: "run-1", revision: 1, phase, risk, base_branch: "main", status: phase === "planning" ? "awaiting_gate" : "implementing",
     plan: { scope: ["src/**"] },
     tasks: {
       "TASK-001": {
         status: "in_progress",
-        definition: { task_id: "TASK-001", declared_paths: ["src/**"] }
+        definition: { task_id: "TASK-001", declared_paths: declaredPaths }
       }
     },
     verification: {
@@ -103,13 +109,13 @@ class FakeApp implements AppServerPort {
 test("workspace start creates a read-only thread before checking its exact required MCP", async () => {
   const host = new FakeHost();
   const app = new FakeApp();
-  const controller = new WorkspaceController("C:/repo", host, app);
+  const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
   const state = await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
   assert.equal(state.status, "ready");
   assert.equal(state.threadId, "implement-thread");
   assert.deepEqual(app.requests.map((item) => item.method), ["thread/start", "mcpServerStatus/list"]);
   assert.deepEqual(app.requests[0].params, {
-    cwd: "C:/repo", approvalPolicy: "untrusted", approvalsReviewer: "user", sandbox: "read-only"
+    cwd: TEST_REPOSITORY, approvalPolicy: "untrusted", approvalsReviewer: "user", sandbox: "read-only"
   });
   assert.deepEqual(app.requests[1].params, { threadId: "implement-thread", detail: "full", limit: 100 });
   assert.equal(host.calls[0].method, "run_start");
@@ -119,7 +125,7 @@ test("required MCP failure blocks after the thread-scoped inventory is available
   const host = new FakeHost();
   const app = new FakeApp();
   app.mcpTools = TOOLS.slice(0, -1);
-  const controller = new WorkspaceController("C:/repo", host, app);
+  const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
   await assert.rejects(controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" }), /tool set/);
   assert.equal(controller.state.status, "blocked");
   assert.deepEqual(app.requests.map((item) => item.method), ["thread/start", "mcpServerStatus/list"]);
@@ -129,7 +135,7 @@ test("implementation thread stays read-only while the turn receives exact task r
   const host = new FakeHost();
   host.currentRun = run("implementation");
   const app = new FakeApp();
-  const controller = new WorkspaceController("C:/repo", host, app);
+  const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
   await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
   assert.equal((app.requests[0].params as { sandbox: unknown }).sandbox, "read-only");
   await controller.startTurn("continue");
@@ -138,7 +144,7 @@ test("implementation thread stays read-only while the turn receives exact task r
     input: [{ type: "text", text: "continue" }],
     approvalPolicy: "untrusted",
     approvalsReviewer: "user",
-    sandboxPolicy: { type: "workspaceWrite", writableRoots: [resolve("C:/repo", "src")], networkAccess: false }
+    sandboxPolicy: { type: "workspaceWrite", writableRoots: [resolve(TEST_REPOSITORY, "src")], networkAccess: false }
   });
   await controller.steer("clarify");
   assert.deepEqual(app.requests.at(-1)?.params, {
@@ -148,7 +154,7 @@ test("implementation thread stays read-only while the turn receives exact task r
   assert.equal(host.calls.at(-1)?.method, "run_resume");
   assert.deepEqual(app.requests.slice(-2).map((item) => item.method), ["thread/resume", "mcpServerStatus/list"]);
   assert.deepEqual(app.requests.at(-2)?.params, {
-    threadId: "implement-thread", cwd: "C:/repo", approvalPolicy: "untrusted",
+    threadId: "implement-thread", cwd: TEST_REPOSITORY, approvalPolicy: "untrusted",
     approvalsReviewer: "user", sandbox: "read-only"
   });
 });
@@ -168,7 +174,7 @@ test("zero or multiple active tasks and non-implementation phases remain read-on
     const host = new FakeHost();
     host.currentRun = current;
     const app = new FakeApp();
-    const controller = new WorkspaceController("C:/repo", host, app);
+    const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
     await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
     await controller.startTurn("inspect");
     assert.deepEqual((app.requests.at(-1)?.params as { sandboxPolicy: unknown }).sandboxPolicy, {
@@ -177,11 +183,54 @@ test("zero or multiple active tasks and non-implementation phases remain read-on
   }
 });
 
+test("task write scope fails closed for widened globs, traversal, siblings, and reparse escapes", async () => {
+  for (const declaredPaths of [["src/foo*.ts"], ["src/*"], ["src/app.ts"], ["../src/**"]]) {
+    const host = new FakeHost();
+    host.currentRun = run("implementation", "high", declaredPaths);
+    const app = new FakeApp();
+    const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
+    await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
+    await controller.startTurn("inspect");
+    assert.deepEqual((app.requests.at(-1)?.params as { sandboxPolicy: unknown }).sandboxPolicy, {
+      type: "readOnly", networkAccess: false
+    });
+    app.emitApproval({ id: declaredPaths[0], method: "item/fileChange/requestApproval", params: { path: "src/app.ts" } });
+    assert.deepEqual(app.responses.at(-1)?.result, { decision: "decline" });
+  }
+
+  const host = new FakeHost();
+  host.currentRun = run("implementation");
+  const app = new FakeApp();
+  const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
+  await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
+  for (const path of ["src2/app.ts", "src/../outside.ts", "../src/app.ts", "src/app.ts:stream", "src/NUL.txt"]) {
+    app.emitApproval({ id: path, method: "item/fileChange/requestApproval", params: { path } });
+    assert.deepEqual(app.responses.at(-1)?.result, { decision: "decline" });
+  }
+
+  const outside = join(TEST_ROOT, "outside");
+  mkdirSync(outside);
+  const link = join(TEST_REPOSITORY, "src", "linked");
+  symlinkSync(outside, link, process.platform === "win32" ? "junction" : "dir");
+  app.emitApproval({ id: "reparse", method: "item/fileChange/requestApproval", params: { path: "src/linked/escape.ts" } });
+  assert.deepEqual(app.responses.at(-1)?.result, { decision: "decline" });
+
+  const linkedHost = new FakeHost();
+  linkedHost.currentRun = run("implementation", "high", ["src/linked/**"]);
+  const linkedApp = new FakeApp();
+  const linkedController = new WorkspaceController(TEST_REPOSITORY, linkedHost, linkedApp);
+  await linkedController.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
+  await linkedController.startTurn("inspect");
+  assert.deepEqual((linkedApp.requests.at(-1)?.params as { sandboxPolicy: unknown }).sandboxPolicy, {
+    type: "readOnly", networkAccess: false
+  });
+});
+
 test("approval broker auto-declines pre-gate, out-of-scope and destructive requests", async () => {
   const host = new FakeHost();
   host.currentRun = run("implementation");
   const app = new FakeApp();
-  const controller = new WorkspaceController("C:/repo", host, app);
+  const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
   await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
   app.emitApproval({ id: "outside", method: "item/fileChange/requestApproval", params: { path: "other/file.ts" } });
   app.emitApproval({ id: "danger", method: "item/commandExecution/requestApproval", params: { command: ["git", "push"] } });
@@ -196,7 +245,7 @@ test("eligible approvals require explicit accept, decline, or cancel", async () 
   const host = new FakeHost();
   host.currentRun = run("implementation");
   const app = new FakeApp();
-  const controller = new WorkspaceController("C:/repo", host, app);
+  const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
   await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
   app.emitApproval({ id: "read", method: "item/commandExecution/requestApproval", params: { command: ["git", "status"] } });
   assert.equal(controller.state.pendingApprovals.length, 1);
@@ -209,7 +258,7 @@ test("eligible approvals require explicit accept, decline, or cancel", async () 
 test("controller routes decisions, gates and cancellation only through host methods", async () => {
   const host = new FakeHost();
   const app = new FakeApp();
-  const controller = new WorkspaceController("C:/repo", host, app);
+  const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
   await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
   await controller.decide({
     schema_version: 2, decision_id: "D-1", run_id: "run-1", question: "Q?",
@@ -226,7 +275,7 @@ test("active-turn cancellation interrupts and awaits terminal state before host 
   const host = new FakeHost();
   host.currentRun = run("implementation");
   const app = new FakeApp();
-  const controller = new WorkspaceController("C:/repo", host, app);
+  const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
   await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
   await controller.startTurn("work");
   await controller.cancel();
@@ -237,7 +286,7 @@ test("active-turn cancellation interrupts and awaits terminal state before host 
   blockedHost.currentRun = run("implementation");
   const blockedApp = new FakeApp();
   blockedApp.turnCompletionStatus = "completed";
-  const blocked = new WorkspaceController("C:/repo", blockedHost, blockedApp);
+  const blocked = new WorkspaceController(TEST_REPOSITORY, blockedHost, blockedApp);
   await blocked.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
   await blocked.startTurn("work");
   await assert.rejects(blocked.cancel(), /interrupted turn/);

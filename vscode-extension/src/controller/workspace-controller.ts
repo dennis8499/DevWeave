@@ -1,12 +1,12 @@
 import { EventEmitter } from "node:events";
-import { isAbsolute, resolve } from "node:path";
 
 import type { AppServerProjection } from "../app-server/event-reducer";
 import type { ServerRequest } from "../app-server/session";
 import type { PendingDecision, ReviewFinding, RiskLevel } from "../v2/contracts";
-import { ApprovalBroker, currentDeclarations, type ApprovalAssessment, type ApprovalDecision } from "./approval-broker";
+import { ApprovalBroker, type ApprovalAssessment, type ApprovalDecision } from "./approval-broker";
 import type { HostMethod } from "./host-bridge-client";
 import { ReviewCoordinator, type ReviewOutcome } from "./review-coordinator";
+import { writableTaskRoots } from "./task-scope";
 
 const REQUIRED_AGENT_TOOLS = [
   "run_inspect", "context_read", "plan_save", "decision_request", "task_update",
@@ -296,7 +296,7 @@ export class WorkspaceController {
   }
 
   private turnSandboxPolicy(run: Record<string, unknown>): Record<string, unknown> {
-    const roots = run.phase === "implementation" ? writableRoots(this.repository, run) : [];
+    const roots = run.phase === "implementation" ? writableTaskRoots(this.repository, run) : [];
     return roots.length > 0
       ? { type: "workspaceWrite", writableRoots: roots, networkAccess: false }
       : { type: "readOnly", networkAccess: false };
@@ -344,21 +344,6 @@ function record(value: unknown): Record<string, unknown> {
 function extractId(value: Record<string, unknown>, ...keys: string[]): string {
   for (const key of keys) if (typeof value[key] === "string") return value[key];
   return "";
-}
-
-function writableRoots(repository: string, run: Record<string, unknown>): string[] {
-  const roots: string[] = [];
-  for (const declaration of currentDeclarations(run)) {
-    const normalized = declaration.replaceAll("\\", "/");
-    if (!normalized || normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized) || normalized.split("/").includes("..")) return [];
-    const wildcard = normalized.search(/[?*[]/);
-    const prefix = (wildcard < 0 ? normalized : normalized.slice(0, wildcard)).replace(/\/+$/, "");
-    if (!prefix) return [];
-    const absolute = resolve(repository, prefix);
-    if (!absolute || !isAbsolute(absolute)) return [];
-    roots.push(absolute);
-  }
-  return [...new Set(roots)];
 }
 
 function currentVerificationFingerprint(run: Record<string, unknown>): string {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from .canonical import primitive, sha256
@@ -16,8 +17,11 @@ EXEC_PLAN_FIELDS = {
     "schema_version", "run_id", "revision", "status", "phase", "risk", "risk_rationale",
     "base_branch", "base_ref", "run_branch", "plan", "definition_fingerprint", "required_gates",
     "gates", "tasks", "pending_decision", "decision_history", "verification", "review",
-    "completion_requested", "blockers", "applied_mutations", "created_at", "updated_at",
+    "completion_requested", "archive_ref", "blockers", "applied_mutations", "created_at", "updated_at",
 }
+
+GIT_OBJECT_ID = re.compile(r"^[0-9a-f]{40,64}$")
+CHECKPOINT_REF = re.compile(r"^refs/devweave/checkpoints/[0-9a-f]{16}/[0-9a-f]{16}$")
 
 
 def plan_definition_payload(plan: dict[str, Any]) -> dict[str, Any]:
@@ -68,7 +72,10 @@ def new_exec_plan(
         "definition_fingerprint": "",
         "required_gates": list(policy.required_gates),
         "gates": {
-            gate: {"status": "pending", "fingerprint": "", "approved_revision": 0, "decided_at": ""}
+            gate: {
+                "status": "pending", "fingerprint": "", "approved_revision": 0,
+                "decided_at": "", "commit_ref": "",
+            }
             for gate in policy.required_gates
         },
         "tasks": tasks,
@@ -86,6 +93,7 @@ def new_exec_plan(
             "review_turn_id": "",
         },
         "completion_requested": False,
+        "archive_ref": "",
         "blockers": [],
         "applied_mutations": ["run-start"],
         "created_at": now,
@@ -119,6 +127,20 @@ def validate_exec_plan(raw: Any) -> dict[str, Any]:
     required = list(policy_for(risk).required_gates)
     if data["required_gates"] != required or set(data["gates"]) != set(required):
         raise ContractError(ErrorCode.INVALID_VALUE, "ExecPlan gate set does not match risk policy.")
+    for gate_id, gate in data["gates"].items():
+        strict_object(
+            gate,
+            name=f"ExecPlan.gates.{gate_id}",
+            required=("status", "fingerprint", "approved_revision", "decided_at", "commit_ref"),
+        )
+        if gate["status"] not in {"pending", "approved", "rejected"}:
+            raise ContractError(ErrorCode.INVALID_VALUE, "ExecPlan gate status is invalid.")
+        fingerprint = text(gate["fingerprint"], f"ExecPlan.gates.{gate_id}.fingerprint", minimum=0, maximum=64)
+        if fingerprint and (len(fingerprint) != 64 or any(character not in "0123456789abcdef" for character in fingerprint)):
+            raise ContractError(ErrorCode.INVALID_VALUE, "ExecPlan gate fingerprint is invalid.")
+        integer(gate["approved_revision"], f"ExecPlan.gates.{gate_id}.approved_revision", minimum=0)
+        text(gate["decided_at"], f"ExecPlan.gates.{gate_id}.decided_at", minimum=0, maximum=64)
+        validate_commit_ref(gate["commit_ref"], f"ExecPlan.gates.{gate_id}.commit_ref")
     if set(data["tasks"]) != {task.task_id for task in draft.tasks}:
         raise ContractError(ErrorCode.INVALID_VALUE, "ExecPlan task state differs from immutable definitions.")
     for task_id, task in data["tasks"].items():
@@ -126,9 +148,8 @@ def validate_exec_plan(raw: Any) -> dict[str, Any]:
         strict_object(task, name=f"ExecPlan.tasks.{task_id}", required=("definition", "status", "progress", "commit_ref"))
         if task["status"] not in {"pending", "in_progress", "blocked", "completed"}:
             raise ContractError(ErrorCode.INVALID_VALUE, "ExecPlan task status is invalid.")
-        commit_ref = text(task["commit_ref"], f"ExecPlan.tasks.{task_id}.commit_ref", minimum=0, maximum=64)
-        if commit_ref and (len(commit_ref) < 40 or any(character not in "0123456789abcdef" for character in commit_ref)):
-            raise ContractError(ErrorCode.INVALID_VALUE, "ExecPlan task commit ref is invalid.")
+        validate_commit_ref(task["commit_ref"], f"ExecPlan.tasks.{task_id}.commit_ref")
+    validate_commit_ref(data["archive_ref"], "ExecPlan.archive_ref")
     verification = strict_object(
         data["verification"],
         name="ExecPlan.verification",
@@ -184,10 +205,11 @@ def planning_gates_current(plan: dict[str, Any]) -> bool:
 def invalidate_gates(plan: dict[str, Any]) -> None:
     plan["definition_fingerprint"] = definition_fingerprint(plan)
     for gate in plan["gates"].values():
-        gate.update({"status": "pending", "fingerprint": "", "approved_revision": 0, "decided_at": ""})
+        gate.update({"status": "pending", "fingerprint": "", "approved_revision": 0, "decided_at": "", "commit_ref": ""})
     plan["status"] = "awaiting_gate"
     plan["phase"] = "planning"
     plan["completion_requested"] = False
+    plan["archive_ref"] = ""
     plan["verification"] = {"status": "pending", "evidence_ids": [], "reports": {}, "current_report_id": ""}
     plan["review"]["round"] = 0
     plan["review"]["status"] = "pending"
@@ -195,3 +217,10 @@ def invalidate_gates(plan: dict[str, Any]) -> None:
     plan["review"]["source_fingerprint"] = ""
     plan["review"]["reviewer_thread_id"] = ""
     plan["review"]["review_turn_id"] = ""
+
+
+def validate_commit_ref(value: Any, field: str) -> str:
+    result = text(value, field, minimum=0, maximum=64)
+    if result and not GIT_OBJECT_ID.fullmatch(result) and not CHECKPOINT_REF.fullmatch(result):
+        raise ContractError(ErrorCode.INVALID_VALUE, f"{field} is invalid.")
+    return result

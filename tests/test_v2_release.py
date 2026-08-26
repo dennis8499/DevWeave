@@ -236,6 +236,7 @@ class CutoverFinalizerTests(unittest.TestCase):
                     "fingerprint": plan["definition_fingerprint"],
                     "approved_revision": 1,
                     "decided_at": "2026-08-25T00:00:00Z",
+                    "commit_ref": "a" * 40,
                 }
             )
         for task in plan["tasks"].values():
@@ -266,6 +267,7 @@ class CutoverFinalizerTests(unittest.TestCase):
                     "reviewer_thread_id": "reviewer-fixture", "review_turn_id": "turn-fixture",
                 },
                 "completion_requested": True,
+                "archive_ref": "a" * 40,
             }
         )
         completed = self.repository / TRANSITION_COMPLETION_PATH
@@ -278,6 +280,9 @@ class CutoverFinalizerTests(unittest.TestCase):
         plan["base_ref"] = self.base_ref
         for task in plan["tasks"].values():
             task["commit_ref"] = self.base_ref
+        for gate in plan["gates"].values():
+            gate["commit_ref"] = self.base_ref
+        plan["archive_ref"] = self.base_ref
         report = plan["verification"]["reports"]["transition"]
         report.update(
             {

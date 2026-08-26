@@ -131,8 +131,9 @@ def validate_completion_record(path: Path, *, transition_run_id: str) -> dict[st
         not plan["completion_requested"]
         or plan["verification"]["status"] != "passed"
         or plan["review"]["status"] != "passed"
+        or not plan["archive_ref"]
         or any(task["status"] != "completed" or not task["commit_ref"] for task in plan["tasks"].values())
-        or any(gate["status"] != "approved" for gate in plan["gates"].values())
+        or any(gate["status"] != "approved" or not gate["commit_ref"] for gate in plan["gates"].values())
     ):
         raise DevWeaveError(ErrorCode.BLOCKED, "Transition completion record lacks closed, committed proof.")
     transition_report(plan)

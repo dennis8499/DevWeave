@@ -107,6 +107,7 @@ def record_transition_completion(
             "fingerprint": plan["definition_fingerprint"],
             "approved_revision": 1,
             "decided_at": gate["approved_at"],
+            "commit_ref": expected_source_head,
         }
     for task_id, task in plan["tasks"].items():
         legacy = state["tasks"][task_id]
@@ -151,6 +152,7 @@ def record_transition_completion(
                 "review_turn_id": review_details.get("review_turn_id") or f"transition:{review['id']}",
             },
             "completion_requested": True,
+            "archive_ref": expected_source_head,
             "blockers": [],
             "applied_mutations": ["run-start", "transition-import"],
             "updated_at": accepted_at,

@@ -54,7 +54,8 @@ The Webview cannot access the filesystem, shell, network, host token, or raw app
 - Every public schema is strict, versioned, bounded, canonically serialized, and traced to requirements/acceptance.
 - Agent and host capabilities are separate facades; transport discovery never grants authority.
 - Verification uses tokenized argv, `shell=False`, dependency closure, serial writer barriers, bounded resources, and declared-effect reconciliation.
-- Git work is based on a fixed base ref and scoped local commits. No implicit remote operation, merge, reset, or branch restoration exists.
+- A writable Codex turn is representable only by an existing physical `directory/**` task declaration. Exact-file and other glob shapes stay read-only instead of being widened, and approval checks reject traversal plus symlink/junction components.
+- Git work is based on a fixed base ref and scoped local commits. Task, Gate, and completed-archive transitions write the post-transition ExecPlan before a crash-recoverable commit, then bind its deterministic `refs/devweave/checkpoints/...` ref to that commit. No implicit remote operation, merge, reset, or branch restoration exists.
 - Durable documentation is indexed under `docs/`; run/runtime artifacts do not become a second knowledge system.
 - Privacy boundaries discard reasoning and avoid storing prompts, credentials, or inferred usage.
 

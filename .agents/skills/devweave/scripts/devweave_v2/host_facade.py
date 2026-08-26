@@ -39,6 +39,8 @@ class HostFacade:
         return self._service.store.create(plan)
 
     def run_resume(self, run_id: str) -> dict[str, Any]:
+        if self._service.git_coordinator is not None:
+            self._service.git_coordinator.assert_resume_target(run_id)
         plan = self._service.inspect(run_id)
         self._service.assert_run_context(plan)
         return plan
@@ -101,10 +103,16 @@ class HostFacade:
         from .contract_utils import identifier
 
         safe_gate = identifier(gate_id, "gate_id")
+        checkpoint_ref = ""
 
         def mutation(plan: dict[str, Any]) -> None:
             if safe_gate == "acceptance":
                 self._decide_acceptance(plan, expected_revision, approve, review_result)
+                gate = plan["gates"].get("acceptance")
+                if gate is not None and checkpoint_ref:
+                    gate["commit_ref"] = checkpoint_ref
+                if plan["status"] == "completed" and checkpoint_ref:
+                    plan["archive_ref"] = checkpoint_ref
                 return
             gate = plan["gates"].get(safe_gate)
             if gate is None:
@@ -113,6 +121,8 @@ class HostFacade:
             gate["fingerprint"] = plan["definition_fingerprint"]
             gate["approved_revision"] = expected_revision + 1 if approve else 0
             gate["decided_at"] = self._service.clock()
+            if checkpoint_ref:
+                gate["commit_ref"] = checkpoint_ref
             if not approve:
                 plan["status"] = "blocked"
                 plan["blockers"].append(f"gate_rejected:{safe_gate}")
@@ -120,10 +130,32 @@ class HostFacade:
                 plan["status"] = "implementing"
                 plan["phase"] = "implementation"
 
+        coordinator = self._service.git_coordinator
         with self._service.authority_transaction():
-            updated = self._service._mutate_locked(run_id, expected_revision, mutation_id, mutation)
+            current = self._service.store.load(run_id)
+            if mutation_id in current["applied_mutations"]:
+                updated = current
+            else:
+                if current["revision"] != expected_revision:
+                    raise DevWeaveError(ErrorCode.STALE_REVISION, "Gate decision expected a stale run revision.")
+                if coordinator is not None:
+                    checkpoint_ref = coordinator.prepare_gate(
+                        current,
+                        gate_id=safe_gate,
+                        mutation_id=mutation_id,
+                        expected_revision=expected_revision,
+                    )
+                updated = self._service._mutate_locked(run_id, expected_revision, mutation_id, mutation)
             if safe_gate == "acceptance" and updated["status"] == "completed":
                 self._service.store.complete(run_id)
+            if coordinator is not None:
+                committed_ref = coordinator.checkpoint_gate(
+                    updated,
+                    gate_id=safe_gate,
+                    mutation_id=mutation_id,
+                    expected_revision=expected_revision,
+                )
+                coordinator.finalize_gate(run_id, mutation_id, committed_ref)
             return updated
 
     def _decide_acceptance(

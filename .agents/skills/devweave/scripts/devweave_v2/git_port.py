@@ -33,6 +33,7 @@ class GitPort(Protocol):
     def stage(self, paths: Sequence[str]) -> None: ...
     def staged_paths(self) -> tuple[str, ...]: ...
     def commit(self, message: str) -> str: ...
+    def update_ref(self, ref: str, target: str) -> None: ...
     def commit_message(self, ref: str = "HEAD") -> str: ...
     def parent(self, ref: str = "HEAD") -> str: ...
     def is_ancestor(self, ancestor: str, descendant: str) -> bool: ...
@@ -133,6 +134,20 @@ class GitAdapter:
     def commit(self, message: str) -> str:
         self._run(("commit", "-m", message))
         return self.head()
+
+    def update_ref(self, ref: str, target: str) -> None:
+        safe_ref = validate_git_ref(ref)
+        if not safe_ref.startswith("refs/devweave/checkpoints/"):
+            raise DevWeaveError(ErrorCode.FORBIDDEN, "Only DevWeave checkpoint refs may be updated.")
+        target_oid = self.resolve_ref(target)
+        present = self._run(("show-ref", "--verify", "--quiet", safe_ref), check=False)
+        if present.returncode == 0:
+            if self.resolve_ref(safe_ref) != target_oid:
+                raise DevWeaveError(ErrorCode.CONFLICT, "Checkpoint ref already names a different commit.")
+            return
+        if present.returncode != 1:
+            raise DevWeaveError(ErrorCode.COMMAND_FAILED, "Checkpoint ref lookup failed.")
+        self._run(("update-ref", safe_ref, target_oid, "0" * len(target_oid)))
 
     def commit_message(self, ref: str = "HEAD") -> str:
         safe = validate_git_ref(ref)

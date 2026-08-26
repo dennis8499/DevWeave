@@ -1,6 +1,9 @@
-import { resolve, relative, isAbsolute } from "node:path";
+import { isAbsolute } from "node:path";
 
 import type { ServerRequest } from "../app-server/session";
+import { currentDeclarations, isTaskPathInScope } from "./task-scope";
+
+export { currentDeclarations } from "./task-scope";
 
 export type ApprovalDecision = "accept" | "decline" | "cancel";
 
@@ -28,7 +31,7 @@ export class ApprovalBroker {
       if (phase !== "implementation" || currentDeclarations(run).length === 0) {
         return { eligible: false, reason: "File writes require exactly one in-progress implementation task.", paths, readOnly: false };
       }
-      if (!paths.length || !paths.every((path) => this.inScope(path, run))) {
+      if (!paths.length || !paths.every((path) => isTaskPathInScope(this.repository, run, path))) {
         return { eligible: false, reason: "File request is outside the current task scope.", paths, readOnly: false };
       }
       return { eligible: true, reason: "File request is within the current task scope.", paths, readOnly: false };
@@ -51,24 +54,6 @@ export class ApprovalBroker {
       throw new Error("Ineligible approval request cannot be accepted.");
     }
   }
-
-  private inScope(candidate: string, run: Record<string, unknown>): boolean {
-    if (!candidate || isAbsolute(candidate) || candidate.replaceAll("\\", "/").split("/").includes("..")) return false;
-    const absolute = resolve(this.repository, candidate);
-    const rel = relative(this.repository, absolute).replaceAll("\\", "/");
-    if (!rel || rel.startsWith("../") || isAbsolute(rel)) return false;
-    return currentDeclarations(run).some((pattern) => matches(rel, pattern));
-  }
-}
-
-export function currentDeclarations(run: Record<string, unknown>): string[] {
-  const tasks = Object.values(record(run.tasks)).filter((value) => record(value).status === "in_progress");
-  if (tasks.length !== 1) return [];
-  const definition = record(record(tasks[0]).definition);
-  const declared = Array.isArray(definition.declared_paths)
-    ? definition.declared_paths.filter((item): item is string => typeof item === "string")
-    : [];
-  return declared.length > 0 ? [...new Set(declared)] : [];
 }
 
 function extractPaths(params: unknown): string[] {
@@ -118,13 +103,6 @@ function safeReadOnlyCommand(argv: string[]): boolean {
     });
   }
   return false;
-}
-
-function matches(path: string, pattern: string): boolean {
-  const normalized = pattern.replaceAll("\\", "/");
-  if (normalized.endsWith("/**")) return path === normalized.slice(0, -3) || path.startsWith(normalized.slice(0, -2));
-  if (normalized.endsWith("/*")) return path.startsWith(normalized.slice(0, -1)) && !path.slice(normalized.length - 1).includes("/");
-  return path === normalized;
 }
 
 function record(value: unknown): Record<string, unknown> {

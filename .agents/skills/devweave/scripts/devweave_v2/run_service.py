@@ -193,7 +193,10 @@ class AgentFacade:
             plan["required_gates"] = list(policy.required_gates)
             old_gates = plan["gates"]
             plan["gates"] = {
-                gate: old_gates.get(gate, {"status": "pending", "fingerprint": "", "approved_revision": 0, "decided_at": ""})
+                gate: old_gates.get(gate, {
+                    "status": "pending", "fingerprint": "", "approved_revision": 0,
+                    "decided_at": "", "commit_ref": "",
+                })
                 for gate in policy.required_gates
             }
             plan["tasks"] = {
@@ -261,7 +264,7 @@ class AgentFacade:
         if status not in {"in_progress", "completed"}:
             raise DevWeaveError(ErrorCode.INVALID_VALUE, "Agent task status is not allowed.")
         bounded_progress = text(progress, "progress", minimum=0, maximum=2048)
-        commit_ref = ""
+        checkpoint_ref = ""
 
         def mutation(plan: dict[str, Any]) -> None:
             if not planning_gates_current(plan) or plan["phase"] != "implementation":
@@ -278,8 +281,8 @@ class AgentFacade:
                 raise DevWeaveError(ErrorCode.CONFLICT, "Completed task state is immutable.")
             task["status"] = status
             task["progress"] = bounded_progress
-            if status == "completed" and commit_ref:
-                task["commit_ref"] = commit_ref
+            if status == "completed" and checkpoint_ref:
+                task["commit_ref"] = checkpoint_ref
             plan["verification"].update({"status": "pending", "evidence_ids": [], "current_report_id": ""})
             plan["completion_requested"] = False
 
@@ -289,13 +292,30 @@ class AgentFacade:
         with self._service.authority_transaction():
             current = self._service.store.load(run_id)
             if mutation_id in current["applied_mutations"]:
+                committed_ref = coordinator.checkpoint_task(
+                    current,
+                    task_id=safe_task,
+                    mutation_id=mutation_id,
+                    expected_revision=expected_revision,
+                )
+                coordinator.finalize_task(run_id, mutation_id, committed_ref)
                 return current
             if current["revision"] != expected_revision:
                 raise DevWeaveError(ErrorCode.STALE_REVISION, "Task completion expected a stale run revision.")
-            coordinator.assert_run(current)
-            commit_ref = coordinator.complete_task(current, task_id=safe_task, mutation_id=mutation_id)
+            checkpoint_ref = coordinator.prepare_task(
+                current,
+                task_id=safe_task,
+                mutation_id=mutation_id,
+                expected_revision=expected_revision,
+            )
             updated = self._service._mutate_locked(run_id, expected_revision, mutation_id, mutation)
-            coordinator.finalize_task(run_id, mutation_id, commit_ref)
+            committed_ref = coordinator.checkpoint_task(
+                updated,
+                task_id=safe_task,
+                mutation_id=mutation_id,
+                expected_revision=expected_revision,
+            )
+            coordinator.finalize_task(run_id, mutation_id, committed_ref)
             return updated
 
     def verification_run(

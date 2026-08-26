@@ -14,6 +14,7 @@ if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
 from devweave_v2.errors import DevWeaveError, ErrorCode
+from devweave_v2.canonical import dumps
 from devweave_v2.git_port import GitAdapter
 from devweave_v2.git_transaction import GitTransaction
 from devweave_v2.plan_store import PlanStore
@@ -151,20 +152,31 @@ class ProductionGitCoordinatorTests(unittest.TestCase):
             plan["run_id"], expected_revision=3, mutation_id="complete-task", task_id="TASK-001", status="completed"
         )
         commit_ref = completed["tasks"]["TASK-001"]["commit_ref"]
-        self.assertEqual(commit_ref, self.h.adapter.head())
+        commit_sha = self.h.adapter.resolve_ref(commit_ref)
+        self.assertEqual(commit_sha, self.h.adapter.head())
         self.assertEqual(self.h.adapter.resolve_ref("main"), self.info["base_ref"])
-        self.assertEqual(self.h.adapter.diff_paths(self.info["base_ref"]), ("src/app.txt",))
+        self.assertEqual(
+            self.h.adapter.diff_paths(self.info["base_ref"]),
+            ("docs/exec-plans/active/run-fixture.json", "src/app.txt"),
+        )
+        self.assertEqual(self.coordinator.changed_paths(completed), ("src/app.txt",))
+        self.assertEqual(
+            self.h.adapter.read_tree_file(commit_ref, "docs/exec-plans/active/run-fixture.json"),
+            dumps(completed).encode("utf-8"),
+        )
         journal = json.loads(
             (self.h.repo / ".devweave/runtime/run-fixture/task-commits/complete-task.json").read_text(encoding="utf-8")
         )
         self.assertEqual(journal["status"], "finalized")
+        self.assertEqual(journal["checkpoint_ref"], commit_ref)
+        self.assertEqual(journal["commit_sha"], commit_sha)
 
-    def test_commit_then_plan_crash_retries_without_a_second_commit(self) -> None:
+    def test_post_transition_plan_crash_retries_with_exactly_one_checkpoint_commit(self) -> None:
         armed = False
 
         def fault(stage: str, path: Path) -> None:
-            if armed and stage == "before_replace":
-                raise RuntimeError("crash-after-commit")
+            if armed and stage == "after_replace":
+                raise RuntimeError("crash-after-state")
 
         store = PlanStore(self.h.repo, fault_hook=fault)
         service, plan = self.start_service(store=store)
@@ -172,18 +184,77 @@ class ProductionGitCoordinatorTests(unittest.TestCase):
             plan["run_id"], expected_revision=2, mutation_id="start-task", task_id="TASK-001", status="in_progress"
         )
         (self.h.repo / "src" / "app.txt").write_text("slice\n", encoding="utf-8")
+        head_before_checkpoint = self.h.adapter.head()
         armed = True
-        with self.assertRaisesRegex(RuntimeError, "crash-after-commit"):
+        with self.assertRaisesRegex(RuntimeError, "crash-after-state"):
             service.agent().task_update(
                 plan["run_id"], expected_revision=3, mutation_id="complete-task", task_id="TASK-001", status="completed"
             )
-        committed_head = self.h.adapter.head()
+        self.assertEqual(self.h.adapter.head(), head_before_checkpoint)
         armed = False
         recovered = service.agent().task_update(
             plan["run_id"], expected_revision=3, mutation_id="complete-task", task_id="TASK-001", status="completed"
         )
-        self.assertEqual(recovered["tasks"]["TASK-001"]["commit_ref"], committed_head)
+        checkpoint_ref = recovered["tasks"]["TASK-001"]["commit_ref"]
+        committed_head = self.h.adapter.resolve_ref(checkpoint_ref)
         self.assertEqual(self.h.adapter.head(), committed_head)
+        self.assertEqual(self.h.adapter.parent(committed_head), head_before_checkpoint)
+
+    def test_planning_gate_checkpoint_contains_the_authoritative_decision(self) -> None:
+        _, plan = self.start_service()
+        gate_ref = plan["gates"]["plan"]["commit_ref"]
+        self.assertEqual(self.h.adapter.resolve_ref(gate_ref), self.h.adapter.head())
+        recorded = json.loads(
+            self.h.adapter.read_tree_file(gate_ref, "docs/exec-plans/active/run-fixture.json").decode("utf-8")
+        )
+        self.assertEqual(recorded, plan)
+        self.assertEqual(recorded["gates"]["plan"]["status"], "approved")
+        self.assertEqual(recorded["gates"]["plan"]["commit_ref"], gate_ref)
+        self.assertEqual(self.h.adapter.status(), ())
+
+    def test_acceptance_archives_a_recoverable_plan_and_leaves_clean_next_run_preflight(self) -> None:
+        service, plan = self.start_service()
+        plan = service.agent().task_update(
+            plan["run_id"], expected_revision=2, mutation_id="start-task", task_id="TASK-001", status="in_progress"
+        )
+        (self.h.repo / "src" / "app.txt").write_text("slice\n", encoding="utf-8")
+        plan = service.agent().task_update(
+            plan["run_id"], expected_revision=3, mutation_id="complete-task", task_id="TASK-001", status="completed"
+        )
+
+        class AlwaysCurrent:
+            @staticmethod
+            def report_is_current(*args, **kwargs) -> bool:
+                return True
+
+        service.verification_engine = AlwaysCurrent()  # type: ignore[assignment]
+
+        def record_verification(candidate: dict) -> None:
+            candidate["verification"] = {
+                "status": "passed",
+                "evidence_ids": ["EVID-1"],
+                "current_report_id": "manual",
+                "reports": {"manual": {"source_digest": "b" * 64}},
+            }
+
+        plan = service.mutate(plan["run_id"], 4, "record-current-verification", record_verification)
+        plan = service.agent().completion_request(plan["run_id"], expected_revision=5, mutation_id="request-completion")
+        completed = service.host().gate_decide(
+            plan["run_id"], expected_revision=6, mutation_id="accept-run", gate_id="acceptance", approve=True
+        )
+        archive_ref = completed["archive_ref"]
+        archive_path = "docs/exec-plans/completed/run-fixture.json"
+        self.assertEqual(self.h.adapter.resolve_ref(archive_ref), self.h.adapter.head())
+        self.assertEqual(self.h.adapter.read_tree_file(archive_ref, archive_path), dumps(completed).encode("utf-8"))
+        self.assertTrue((self.h.repo / archive_path).is_file())
+        self.assertFalse((self.h.repo / "docs/exec-plans/active/run-fixture.json").exists())
+        self.assertEqual(self.h.adapter.status(), ())
+        next_run = self.h.transaction.preflight(run_id="run-next", slug="next-slice")
+        self.assertEqual(next_run["base_ref"], self.h.adapter.head())
+
+        (self.h.repo / archive_path).unlink()
+        recovered = json.loads(self.h.adapter.read_tree_file(archive_ref, archive_path).decode("utf-8"))
+        self.assertEqual(recovered, completed)
 
     def test_unrelated_dirty_path_and_wrong_checkout_block_mutation_or_resume(self) -> None:
         service, plan = self.start_service()

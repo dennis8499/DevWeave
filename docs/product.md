@@ -34,10 +34,10 @@ Allow only the authenticated host to start/resume runs, resolve decisions, decid
 Require plan; plan plus acceptance; or scope plus design plus acceptance for low, standard, and high risk respectively, with matching review depth.
 
 ### AC-006: Git lifecycle
-Reject dirty/detached/colliding starts and otherwise create a fixed-base run branch with scoped local commits and no remote/merge/reset/switch-back side effect.
+Reject dirty/detached/colliding starts and otherwise create a fixed-base run branch whose task/Gate/archive commits include the post-transition canonical plan, with no remote/merge/reset/switch-back side effect.
 
 ### AC-007: ExecPlan restart
-Replay saved plan/task/Gate events into an equivalent canonical snapshot without duplicating side effects.
+Resolve saved task/Gate/archive checkpoint refs into equivalent canonical snapshots and replay an interrupted mutation without duplicating state transitions or commits.
 
 ### AC-008: Pending decision round-trip
 Resolve only a valid option or allowed custom answer at the current revision; cancellation or malformed/stale input leaves the task pending.
@@ -64,7 +64,7 @@ Use detached reviewer identity; run one standard review or no more than three hi
 Align public versions, generate but do not track VSIX output, and remove V1 runtime/UI mutation surfaces while retaining export recovery.
 
 ### AC-016: Adversarial authorization
-Reject unknown methods, forged roles, stale revisions, traversal, symlink escape, and scope violations before repository/process mutation.
+Reject unknown methods, forged roles, stale revisions, traversal, symlink/junction escape, scope violations, and task globs that cannot map exactly to directory-subtree sandbox roots before repository/process mutation.
 
 ### AC-017: Deterministic state
 Produce identical canonical snapshots/hashes from identical ordered transcripts and recover atomically around injected write failures or duplicate delivery.
@@ -82,4 +82,4 @@ Produce bounded DOM/accessibility/log/screenshot evidence with run, commit, Code
 Mark only the executed Windows x64/VS Code matrix certified and label all other environments unverified.
 
 ### AC-022: Recovery drill
-Identify the last current phase, diff, evidence, export, and recovery commit after injected failure while leaving the base ref and remotes untouched.
+Identify the last current phase, source-only diff, evidence, export, and canonical-plan checkpoint after injected state/commit failure; recover a lost working plan from Git while leaving the base ref and remotes untouched.

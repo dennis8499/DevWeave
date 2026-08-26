@@ -71,10 +71,50 @@ class GitTransaction:
     ) -> str:
         identifier(run_id, "run_id")
         identifier(task_id, "task_id")
+        message = text(f"devweave({run_id}): complete {task_id}", "commit_message", maximum=256)
+        return self._commit_scoped(
+            run_branch=run_branch,
+            base_branch=base_branch,
+            base_ref=base_ref,
+            allowed_paths=declared_paths,
+            ignored_paths=ignored_paths,
+            message=message,
+        )
+
+    def commit_checkpoint(
+        self,
+        *,
+        run_id: str,
+        run_branch: str,
+        base_branch: str,
+        base_ref: str,
+        allowed_paths: Sequence[str],
+        message: str,
+    ) -> str:
+        identifier(run_id, "run_id")
+        return self._commit_scoped(
+            run_branch=run_branch,
+            base_branch=base_branch,
+            base_ref=base_ref,
+            allowed_paths=allowed_paths,
+            ignored_paths=(),
+            message=text(message, "commit_message", maximum=256),
+        )
+
+    def _commit_scoped(
+        self,
+        *,
+        run_branch: str,
+        base_branch: str,
+        base_ref: str,
+        allowed_paths: Sequence[str],
+        ignored_paths: Sequence[str],
+        message: str,
+    ) -> str:
         if self.git.branch() != run_branch:
             raise DevWeaveError(ErrorCode.CONFLICT, "Current branch is not owned by this run.")
         self.assert_base_ref(base_branch=base_branch, base_ref=base_ref)
-        declarations = tuple(relative_path(item, f"declared_paths[{index}]") for index, item in enumerate(declared_paths))
+        declarations = tuple(relative_path(item, f"allowed_paths[{index}]") for index, item in enumerate(allowed_paths))
         ignored = tuple(relative_path(item, f"ignored_paths[{index}]") for index, item in enumerate(ignored_paths))
         entries = tuple(
             item for item in self.git.status()
@@ -109,7 +149,6 @@ class GitTransaction:
                 "Staged paths differ from the declared slice.",
                 {"staged": list(staged), "changed": changed, "unexpected": unexpected_staged},
             )
-        message = text(f"devweave({run_id}): complete {task_id}", "commit_message", maximum=256)
         commit_ref = self.git.commit(message)
         self.assert_base_ref(base_branch=base_branch, base_ref=base_ref)
         return commit_ref

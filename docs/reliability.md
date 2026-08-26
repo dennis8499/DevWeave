@@ -3,7 +3,7 @@
 
 ## Atomic state
 
-Canonical JSON uses sorted keys and a trailing newline. Plan writes use a same-directory temporary file, flush/fsync, atomic replacement, and recovery rules that never treat a partial candidate as current. Mutations require both the expected revision and a bounded mutation ID; replaying an accepted mutation does not repeat external work.
+Canonical JSON uses sorted keys and a trailing newline. Plan writes use a same-directory temporary file, flush/fsync, atomic replacement, and recovery rules that never treat a partial candidate as current. Mutations require both the expected revision and a bounded mutation ID; replaying an accepted mutation finishes any pending Git checkpoint without repeating the transition or creating a second commit.
 
 ## Restart behavior
 
@@ -21,7 +21,7 @@ The reducer reconstructs the RunSnapshot from the ExecPlan and ordered events. I
 
 ## Git recovery
 
-Every run records its immutable base ref and run branch. Scoped phase commits are recovery checkpoints. On interruption, inspect rather than reset: compare HEAD, current plan revision, task state, verification report, and export index. DevWeave does not move the base, merge, push, or restore another branch.
+Every run records its immutable base ref and run branch. Each decided Gate, completed task slice, and completed-plan archive is committed together with the authoritative post-transition ExecPlan. The plan records a deterministic local `refs/devweave/checkpoints/...` name; a retry-safe journal binds that ref to the exact commit only after the commit contains matching canonical bytes. On interruption, inspect rather than reset: resolve the recorded checkpoint ref and compare its plan, HEAD ancestry, current revision, task state, verification report, and export index. DevWeave does not move the base, merge, push, or restore another branch.
 
 ## Release recovery
 
