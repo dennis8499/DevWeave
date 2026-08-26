@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -165,6 +166,76 @@ class McpProtocolTests(unittest.TestCase):
             oversized_out = io.BytesIO()
             run_stdio(harness.repo, io.BytesIO((b"x" * (MAX_MESSAGE_BYTES + 1)) + b"\n"), oversized_out)
             self.assertEqual(json.loads(oversized_out.getvalue())["error"]["code"], -32700)
+        finally:
+            harness.close()
+
+    def test_stdio_production_composition_runs_release_verification(self) -> None:
+        harness = McpHarness()
+        try:
+            release_command = command_payload_with_digest({
+                "command_id": "release-check", "argv": ["python", "-B", "-c", "print('release')"], "cwd": ".",
+                "affected_paths": [], "writes": "none", "outputs": [], "dependencies": [], "timeout_seconds": 5,
+                "risk_profiles": ["high"], "expected_exit_codes": [0], "release_only": True,
+            })
+            project = {
+                "schema_version": 2, "executables": {"python": {"candidates": ["python", "python3", "py"]}},
+                "verification_plan": {"schema_version": 2, "plan_id": "stdio-production", "commands": [release_command]},
+            }
+            project_path = harness.repo / ".devweave" / "project.json"
+            project_path.parent.mkdir(parents=True, exist_ok=True)
+            project_path.write_text(json.dumps(project), encoding="utf-8")
+            (harness.repo / ".gitignore").write_text(".devweave/runtime/\ndocs/exec-plans/active/\n", encoding="utf-8")
+            for arguments in (
+                ("init", "-b", "main"),
+                ("config", "user.name", "DevWeave Test"),
+                ("config", "user.email", "devweave@example.test"),
+                ("add", "--", ".gitignore", ".devweave/project.json", "docs/index.md"),
+                ("commit", "-m", "base"),
+            ):
+                subprocess.run(["git", "-C", str(harness.repo), *arguments], check=True, capture_output=True, shell=False)
+            base_ref = subprocess.run(
+                ["git", "-C", str(harness.repo), "rev-parse", "HEAD"], check=True, capture_output=True,
+                text=True, encoding="utf-8", shell=False,
+            ).stdout.strip()
+            subprocess.run(
+                ["git", "-C", str(harness.repo), "switch", "-c", "devweave/run-fixture-slice"],
+                check=True, capture_output=True, shell=False,
+            )
+            harness.service.store.path_for("run-fixture").unlink()
+            draft = json.loads((ROOT / "fixtures" / "devweave_v2" / "run-plan-draft.json").read_text(encoding="utf-8"))
+            harness.service.host().run_start(
+                draft, base_branch="main", base_ref=base_ref, run_branch="devweave/run-fixture-slice"
+            )
+            plan = harness.service.host().gate_decide(
+                "run-fixture", expected_revision=1, mutation_id="scope-production", gate_id="scope", approve=True
+            )
+            plan = harness.service.host().gate_decide(
+                "run-fixture", expected_revision=2, mutation_id="design-production", gate_id="design", approve=True
+            )
+            messages = [
+                initialize(),
+                {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+                {
+                    "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                    "params": {
+                        "name": "verification_run",
+                        "arguments": {
+                            "run_id": "run-fixture", "expected_revision": plan["revision"],
+                            "mutation_id": "stdio-release", "release": True,
+                        },
+                    },
+                },
+            ]
+            stdin = io.BytesIO(b"".join((json.dumps(item) + "\n").encode("utf-8") for item in messages))
+            stdout = io.BytesIO()
+            run_stdio(harness.repo, stdin, stdout)
+            output = [json.loads(line) for line in stdout.getvalue().splitlines()]
+            result = output[-1]["result"]
+            self.assertFalse(result["isError"])
+            report = result["structuredContent"]["report"]
+            self.assertTrue(report["release"])
+            self.assertEqual(report["selection"]["selected"], ["release-check"])
+            self.assertEqual(result["structuredContent"]["run"]["verification"]["status"], "passed")
         finally:
             harness.close()
 

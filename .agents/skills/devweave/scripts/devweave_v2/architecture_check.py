@@ -70,15 +70,17 @@ REQUIRED_NAVIGATION = (
 
 # Imports may point to the same or a lower-numbered layer, never upward.
 PYTHON_LAYERS = {
-    "errors": 0, "version": 0,
+    "errors": 0, "interprocess_lock": 0, "version": 0,
     "canonical": 1, "contract_utils": 1, "redaction": 1,
     "fingerprints": 2, "plan_contracts": 2, "project_config": 2,
     "risk": 2, "run_state": 2, "schemas": 2, "snapshot_contracts": 2,
     "verification_contracts": 2,
-    "architecture_check": 3, "cutover": 3, "cutover_hashing": 3, "git_port": 3,
-    "plan_store": 3, "reducer": 3,
+    "architecture_check": 3, "cutover": 3, "cutover_git": 3, "cutover_hashing": 3,
+    "cutover_provenance": 3, "git_port": 3,
+    "plan_store": 3, "reducer": 3, "run_start_journal": 3,
     "v1_export": 3, "verification_engine": 3, "verification_store": 3,
-    "codex_doctor": 4, "git_transaction": 4, "run_service": 4, "service_factory": 4,
+    "codex_doctor": 4, "git_transaction": 4, "host_facade": 4,
+    "run_git_coordinator": 4, "run_service": 4, "service_factory": 4,
     "transition_record": 4,
     "__init__": 5, "__main__": 5, "cli": 5, "host_bridge": 5,
     "host_operations": 5, "mcp_server": 5, "mcp_tools": 5,

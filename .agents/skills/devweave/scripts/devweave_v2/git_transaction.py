@@ -34,10 +34,20 @@ class GitTransaction:
 
     def start_branch(self, *, run_id: str, slug: str) -> dict[str, str]:
         result = self.preflight(run_id=run_id, slug=slug)
+        self.start_preflighted(result)
+        return result
+
+    def start_preflighted(self, result: dict[str, str]) -> None:
         self.git.switch_new_branch(result["run_branch"])
         if self.git.head() != result["base_ref"]:
             raise DevWeaveError(ErrorCode.CONFLICT, "Run branch did not start at the recorded base ref.")
-        return result
+
+    def assert_run(self, *, run_branch: str, base_branch: str, base_ref: str) -> None:
+        if self.git.root() != self.repository or self.git.branch() != run_branch:
+            raise DevWeaveError(ErrorCode.CONFLICT, "Current checkout is not owned by this run.")
+        self.assert_base_ref(base_branch=base_branch, base_ref=base_ref)
+        if not self.git.is_ancestor(base_ref, self.git.head()):
+            raise DevWeaveError(ErrorCode.CONFLICT, "Run HEAD is not descended from its immutable base ref.")
 
     def assert_base_ref(self, *, base_branch: str, base_ref: str) -> None:
         current = self.git.resolve_ref(base_branch)
@@ -57,6 +67,7 @@ class GitTransaction:
         base_branch: str,
         base_ref: str,
         declared_paths: Sequence[str],
+        ignored_paths: Sequence[str] = (),
     ) -> str:
         identifier(run_id, "run_id")
         identifier(task_id, "task_id")
@@ -64,7 +75,11 @@ class GitTransaction:
             raise DevWeaveError(ErrorCode.CONFLICT, "Current branch is not owned by this run.")
         self.assert_base_ref(base_branch=base_branch, base_ref=base_ref)
         declarations = tuple(relative_path(item, f"declared_paths[{index}]") for index, item in enumerate(declared_paths))
-        entries = self.git.status()
+        ignored = tuple(relative_path(item, f"ignored_paths[{index}]") for index, item in enumerate(ignored_paths))
+        entries = tuple(
+            item for item in self.git.status()
+            if not path_matches(item.path, ignored) and (not item.original_path or not path_matches(item.original_path, ignored))
+        )
         if not entries:
             raise DevWeaveError(ErrorCode.CONFLICT, "No slice changes are available to commit.")
         changed = sorted({path for item in entries for path in (item.path, item.original_path) if path})

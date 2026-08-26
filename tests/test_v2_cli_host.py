@@ -28,6 +28,7 @@ from devweave_v2.git_port import GitAdapter
 from devweave_v2.git_transaction import GitTransaction
 from devweave_v2.host_bridge import HostBridgeSession, run_host_stdio
 from devweave_v2.host_operations import HostOperationAdapter
+from devweave_v2.plan_store import PlanStore
 from devweave_v2.run_service import RunService
 from devweave_v2.verification_engine import ProcessResult
 
@@ -129,7 +130,8 @@ class GitHostHarness:
         git(self.repo, "config", "user.name", "DevWeave Test")
         git(self.repo, "config", "user.email", "devweave@example.test")
         (self.repo / "README.md").write_text("# fixture\n", encoding="utf-8")
-        git(self.repo, "add", "README.md")
+        (self.repo / ".gitignore").write_text(".devweave/runtime/\n", encoding="utf-8")
+        git(self.repo, "add", "README.md", ".gitignore")
         git(self.repo, "commit", "-m", "base")
 
     def close(self) -> None:
@@ -168,6 +170,44 @@ class HostOperationTests(unittest.TestCase):
             self.assertEqual(result["run"]["run_id"], "run-fixture")
             self.assertEqual(git(harness.repo, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip(), "devweave/run-fixture-slice")
             self.assertEqual(git(harness.repo, "rev-parse", "main").stdout.strip(), result["run"]["base_ref"])
+        finally:
+            harness.close()
+
+    def test_invalid_draft_is_rejected_before_branch_creation(self) -> None:
+        harness = GitHostHarness()
+        try:
+            adapter = HostOperationAdapter(harness.repo, doctor=ReadyDoctor())
+            with self.assertRaises(DevWeaveError):
+                adapter.call("run_start", {"draft": {"run_id": "broken"}, "slug": "slice"})
+            self.assertEqual(git(harness.repo, "branch", "--list", "devweave/*").stdout.strip(), "")
+            self.assertFalse((harness.repo / ".devweave/runtime/start-journals/broken.json").exists())
+        finally:
+            harness.close()
+
+    def test_run_start_journal_recovers_branch_before_plan_crash(self) -> None:
+        harness = GitHostHarness()
+        armed = True
+
+        def fault(stage: str, path: Path) -> None:
+            if armed and stage == "before_replace":
+                raise RuntimeError("start-plan-crash")
+
+        try:
+            store = PlanStore(harness.repo, fault_hook=fault)
+            service = RunService(harness.repo, store=store, clock=lambda: "2026-08-25T00:00:00Z")
+            transaction = GitTransaction(harness.repo, GitAdapter(harness.repo))
+            adapter = HostOperationAdapter(harness.repo, service=service, doctor=ReadyDoctor(), git=transaction)
+            draft = json.loads((ROOT / "fixtures" / "devweave_v2" / "run-plan-draft.json").read_text(encoding="utf-8"))
+            with self.assertRaisesRegex(RuntimeError, "start-plan-crash"):
+                adapter.call("run_start", {"draft": draft, "slug": "slice"})
+            self.assertEqual(git(harness.repo, "branch", "--show-current").stdout.strip(), "devweave/run-fixture-slice")
+            armed = False
+            recovered = adapter.call("run_start", {"draft": draft, "slug": "slice"})
+            self.assertEqual(recovered["run"]["run_id"], "run-fixture")
+            journal = json.loads(
+                (harness.repo / ".devweave/runtime/start-journals/run-fixture.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(journal["status"], "finalized")
         finally:
             harness.close()
 

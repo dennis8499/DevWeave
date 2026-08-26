@@ -16,8 +16,10 @@ if str(SCRIPT_ROOT) not in sys.path:
 from devweave_v2.canonical import dumps
 from devweave_v2.errors import DevWeaveError, ErrorCode
 from devweave_v2.plan_store import PlanStore
+from devweave_v2.project_config import ProjectConfig, command_payload_with_digest
 from devweave_v2.reducer import reduce_snapshot
 from devweave_v2.run_service import RunService
+from devweave_v2.verification_engine import ExecutableResolver, VerificationEngine
 
 
 BASE_REF = "a" * 40
@@ -198,14 +200,28 @@ class RunServiceTests(unittest.TestCase):
                 plan["run_id"], expected_revision=3, mutation_id="premature-completion"
             )
         self.assertEqual(unverified.exception.code, ErrorCode.BLOCKED)
-        plan = self.h.service.mutate(
-            plan["run_id"], 3, "record-verification",
-            lambda candidate: candidate["verification"].update({"status": "passed", "evidence_ids": ["VER-1"]}),
+        command = command_payload_with_digest({
+            "command_id": "unit", "argv": ["python", "-B", "-c", "print('ok')"], "cwd": ".",
+            "affected_paths": [], "writes": "none", "outputs": [], "dependencies": [], "timeout_seconds": 5,
+            "risk_profiles": ["standard"], "expected_exit_codes": [0], "release_only": False,
+        })
+        project = ProjectConfig.from_dict({
+            "schema_version": 2, "executables": {"python": {"candidates": ["python"]}},
+            "verification_plan": {"schema_version": 2, "plan_id": "run-service-fixture", "commands": [command]},
+        })
+        self.h.service.verification_engine = VerificationEngine(
+            self.h.repo, project, resolver=ExecutableResolver({"python": Path(sys.executable)})
         )
+        plan = self.h.service.agent().verification_run(
+            plan["run_id"], expected_revision=3, mutation_id="record-verification",
+        )
+        plan = plan["run"]
         plan = self.h.service.agent().completion_request(
             plan["run_id"], expected_revision=4, mutation_id="completion-request"
         )
         self.assertEqual(plan["status"], "reviewing")
+        current_report = plan["verification"]["current_report_id"]
+        source_fingerprint = plan["verification"]["reports"][current_report]["source_digest"]
         with self.assertRaises(DevWeaveError) as missing:
             self.h.service.host().gate_decide(
                 plan["run_id"], expected_revision=5, mutation_id="accept-no-review",
@@ -217,8 +233,10 @@ class RunServiceTests(unittest.TestCase):
                 plan["run_id"], expected_revision=5, mutation_id="accept-reused-review",
                 gate_id="acceptance", approve=True,
                 review_result={
-                    "detached": True, "implementation_thread_id": "thread-1", "reviewer_thread_id": "thread-1",
-                    "round": 1, "unresolved_critical": False, "finding_ids": [],
+                    "schema_version": 2, "result": "passed", "severity": "advisory",
+                    "source_fingerprint": source_fingerprint,
+                    "implementation_thread_id": "thread-1", "reviewer_thread_id": "thread-1",
+                    "review_turn_id": "review-turn-1", "round": 1, "findings": [],
                 },
             )
         self.assertEqual(reused.exception.code, ErrorCode.BLOCKED)
@@ -226,12 +244,58 @@ class RunServiceTests(unittest.TestCase):
             plan["run_id"], expected_revision=5, mutation_id="accept-detached-review",
             gate_id="acceptance", approve=True,
             review_result={
-                "detached": True, "implementation_thread_id": "thread-1", "reviewer_thread_id": "review-1",
-                "round": 1, "unresolved_critical": False, "finding_ids": ["FIND-1"],
+                "schema_version": 2, "result": "passed", "severity": "warning",
+                "source_fingerprint": source_fingerprint,
+                "implementation_thread_id": "thread-1", "reviewer_thread_id": "review-1",
+                "review_turn_id": "review-turn-1", "round": 1,
+                "findings": [{
+                    "schema_version": 2, "finding_id": "FIND-1", "severity": "warning",
+                    "summary": "Bounded warning.", "paths": [], "requirement_ids": [],
+                    "acceptance_ids": [], "task_ids": [], "status": "open", "round": 1,
+                }],
             },
         )
         self.assertEqual(completed["status"], "completed")
         self.assertEqual(completed["review"]["finding_ids"], ["FIND-1"])
+
+    def test_source_change_and_task_update_invalidate_successful_verification(self) -> None:
+        plan = self.h.start("low")
+        plan = self.h.service.host().gate_decide(
+            plan["run_id"], expected_revision=1, mutation_id="approve-plan", gate_id="plan", approve=True
+        )
+        plan = self.h.service.agent().task_update(
+            plan["run_id"], expected_revision=2, mutation_id="start-task", task_id="TASK-001", status="in_progress"
+        )
+        command = command_payload_with_digest({
+            "command_id": "unit", "argv": ["python", "-B", "-c", "print('ok')"], "cwd": ".",
+            "affected_paths": [], "writes": "none", "outputs": [], "dependencies": [], "timeout_seconds": 5,
+            "risk_profiles": ["low"], "expected_exit_codes": [0], "release_only": False,
+        })
+        project = ProjectConfig.from_dict({
+            "schema_version": 2, "executables": {"python": {"candidates": ["python"]}},
+            "verification_plan": {"schema_version": 2, "plan_id": "freshness-fixture", "commands": [command]},
+        })
+        self.h.service.verification_engine = VerificationEngine(
+            self.h.repo, project, resolver=ExecutableResolver({"python": Path(sys.executable)})
+        )
+        first_verification = self.h.service.agent().verification_run(
+            plan["run_id"], expected_revision=3, mutation_id="verify-current"
+        )["run"]
+        plan = self.h.service.agent().task_update(
+            plan["run_id"], expected_revision=first_verification["revision"], mutation_id="complete-task",
+            task_id="TASK-001", status="completed",
+        )
+        self.assertEqual(plan["verification"]["status"], "pending")
+        self.assertEqual(plan["verification"]["current_report_id"], "")
+        verified = self.h.service.agent().verification_run(
+            plan["run_id"], expected_revision=plan["revision"], mutation_id="verify-after-task"
+        )["run"]
+        (self.h.repo / "source.txt").write_text("changed", encoding="utf-8")
+        with self.assertRaises(DevWeaveError) as stale:
+            self.h.service.agent().completion_request(
+                plan["run_id"], expected_revision=verified["revision"], mutation_id="stale-completion"
+            )
+        self.assertEqual(stale.exception.code, ErrorCode.BLOCKED)
 
     def test_reducer_is_deterministic_and_duplicate_events_do_not_duplicate_effects(self) -> None:
         plan = self.h.start("low")

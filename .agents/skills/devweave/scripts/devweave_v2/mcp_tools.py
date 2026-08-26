@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from .contract_utils import integer, relative_path, sequence, strict_object, strings, text
+from .contract_utils import boolean, integer, relative_path, sequence, strict_object, strings, text
 from .errors import DevWeaveError, ErrorCode
 from .run_service import AgentFacade
 
@@ -65,7 +65,7 @@ TOOL_DEFINITIONS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "verification_run", "description": "Run the frozen verification policy for the run's current risk level.",
-        "inputSchema": object_schema({**COMMON, "paths": {"type": "array", "items": {"type": "string"}, "maxItems": 256}}, ("run_id", "expected_revision", "mutation_id")),
+        "inputSchema": object_schema({**COMMON, "paths": {"type": "array", "items": {"type": "string"}, "maxItems": 256}, "release": {"type": "boolean", "default": False}}, ("run_id", "expected_revision", "mutation_id")),
         "annotations": {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True, "openWorldHint": False},
     },
     {
@@ -140,12 +140,13 @@ class McpToolAdapter:
         )
 
     def _verification_run(self, raw: dict[str, Any]) -> Any:
-        data = strict_object(raw, name="verification_run", required=("run_id", "expected_revision", "mutation_id"), optional=("paths",))
+        data = strict_object(raw, name="verification_run", required=("run_id", "expected_revision", "mutation_id"), optional=("paths", "release"))
         paths = [relative_path(item, f"paths[{index}]") for index, item in enumerate(sequence(data.get("paths", []), "paths"))]
         return self.facade.verification_run(
             text(data["run_id"], "run_id", maximum=128),
             expected_revision=integer(data["expected_revision"], "expected_revision", minimum=1),
             mutation_id=text(data["mutation_id"], "mutation_id", maximum=128), paths=paths,
+            release=boolean(data.get("release", False), "release"),
         )
 
     def _verification_read(self, raw: dict[str, Any]) -> Any:

@@ -4,19 +4,27 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timezone
+from contextlib import contextmanager
 from pathlib import Path
+import threading
 from typing import Any, Callable
 
 from .canonical import primitive
 from .contract_utils import identifier, integer, text
 from .errors import DevWeaveError, ErrorCode
+from .interprocess_lock import InterProcessLock
 from .plan_contracts import DecisionStatus, PendingDecision, RunPlanDraft
 from .plan_store import PlanStore
 from .risk import RISK_ORDER, escalate_risk, policy_for
-from .run_state import definition_fingerprint, invalidate_gates, new_exec_plan, planning_gates_current
+from .run_state import definition_fingerprint, invalidate_gates, planning_gates_current
 from .verification_contracts import RiskLevel
 from .verification_engine import VerificationEngine
 from .verification_store import VerificationReportStore
+
+try:
+    from .run_git_coordinator import RunGitCoordinator
+except ImportError:  # pragma: no cover - only protects partial embedded installations
+    RunGitCoordinator = Any  # type: ignore[misc,assignment]
 
 Clock = Callable[[], str]
 
@@ -36,17 +44,23 @@ class RunService:
         clock: Clock = utc_now,
         verification_engine: VerificationEngine | None = None,
         verification_store: VerificationReportStore | None = None,
+        git_coordinator: RunGitCoordinator | None = None,
     ) -> None:
         self.repository = repository.resolve()
         self.store = store or PlanStore(self.repository)
         self.clock = clock
         self.verification_engine = verification_engine
         self.verification_store = verification_store or VerificationReportStore(self.repository)
+        self.git_coordinator = git_coordinator
+        self._lock = threading.RLock()
+        self._authority_lock_path = self.repository / ".devweave" / "runtime" / "locks" / "authority.lock"
 
     def agent(self) -> "AgentFacade":
         return AgentFacade(self)
 
     def host(self) -> "HostFacade":
+        from .host_facade import HostFacade
+
         return HostFacade(self)
 
     def inspect(self, run_id: str) -> dict[str, Any]:
@@ -58,7 +72,29 @@ class RunService:
         expected_revision: int,
         mutation_id: str,
         callback: Callable[[dict[str, Any]], None],
+        allowed_dirty_paths: tuple[str, ...] = (),
     ) -> dict[str, Any]:
+        with self.authority_transaction():
+            return self._mutate_locked(
+                run_id,
+                expected_revision,
+                mutation_id,
+                callback,
+                allowed_dirty_paths=allowed_dirty_paths,
+            )
+
+    def _mutate_locked(
+        self,
+        run_id: str,
+        expected_revision: int,
+        mutation_id: str,
+        callback: Callable[[dict[str, Any]], None],
+        *,
+        allowed_dirty_paths: tuple[str, ...] = (),
+    ) -> dict[str, Any]:
+        current = self.store.load(run_id)
+        if self.git_coordinator is not None:
+            self.git_coordinator.assert_run(current, extra_paths=allowed_dirty_paths)
         return self.store.mutate(
             run_id,
             expected_revision=integer(expected_revision, "expected_revision", minimum=1),
@@ -66,6 +102,37 @@ class RunService:
             now=self.clock(),
             mutation=callback,
         )
+
+    @contextmanager
+    def authority_transaction(self):
+        with self._lock, InterProcessLock(self._authority_lock_path):
+            yield
+
+    def assert_run_context(self, plan: dict[str, Any], *, require_clean: bool = False) -> None:
+        if self.git_coordinator is not None:
+            self.git_coordinator.assert_run(plan, require_clean=require_clean)
+
+    def verification_is_current(self, plan: dict[str, Any]) -> bool:
+        engine = self.verification_engine
+        current_id = plan["verification"].get("current_report_id", "")
+        report = plan["verification"].get("reports", {}).get(current_id)
+        if engine is None or not current_id or plan["verification"].get("status") != "passed" or not isinstance(report, dict):
+            return False
+        try:
+            return engine.report_is_current(
+                report,
+                profile=RiskLevel(plan["risk"]),
+                plan_digest=plan["definition_fingerprint"],
+            )
+        except (DevWeaveError, AttributeError, KeyError, TypeError, ValueError):
+            return False
+
+    def require_current_verification(self, plan: dict[str, Any]) -> None:
+        if not self.verification_is_current(plan):
+            raise DevWeaveError(
+                ErrorCode.BLOCKED,
+                "Verification evidence is stale or its source, plan, command, or executable binding changed.",
+            )
 
 
 class AgentFacade:
@@ -134,6 +201,7 @@ class AgentFacade:
                     "definition": primitive(task),
                     "status": plan["tasks"].get(task.task_id, {}).get("status", "pending"),
                     "progress": plan["tasks"].get(task.task_id, {}).get("progress", ""),
+                    "commit_ref": plan["tasks"].get(task.task_id, {}).get("commit_ref", ""),
                 }
                 for task in updated.tasks
             }
@@ -143,6 +211,9 @@ class AgentFacade:
                 "round": 0,
                 "status": "pending",
                 "finding_ids": [],
+                "source_fingerprint": "",
+                "reviewer_thread_id": "",
+                "review_turn_id": "",
             }
             plan["definition_fingerprint"] = definition_fingerprint(plan)
             invalidate_gates(plan)
@@ -190,6 +261,7 @@ class AgentFacade:
         if status not in {"in_progress", "completed"}:
             raise DevWeaveError(ErrorCode.INVALID_VALUE, "Agent task status is not allowed.")
         bounded_progress = text(progress, "progress", minimum=0, maximum=2048)
+        commit_ref = ""
 
         def mutation(plan: dict[str, Any]) -> None:
             if not planning_gates_current(plan) or plan["phase"] != "implementation":
@@ -206,8 +278,25 @@ class AgentFacade:
                 raise DevWeaveError(ErrorCode.CONFLICT, "Completed task state is immutable.")
             task["status"] = status
             task["progress"] = bounded_progress
+            if status == "completed" and commit_ref:
+                task["commit_ref"] = commit_ref
+            plan["verification"].update({"status": "pending", "evidence_ids": [], "current_report_id": ""})
+            plan["completion_requested"] = False
 
-        return self._service.mutate(run_id, expected_revision, mutation_id, mutation)
+        coordinator = self._service.git_coordinator
+        if status != "completed" or coordinator is None:
+            return self._service.mutate(run_id, expected_revision, mutation_id, mutation)
+        with self._service.authority_transaction():
+            current = self._service.store.load(run_id)
+            if mutation_id in current["applied_mutations"]:
+                return current
+            if current["revision"] != expected_revision:
+                raise DevWeaveError(ErrorCode.STALE_REVISION, "Task completion expected a stale run revision.")
+            coordinator.assert_run(current)
+            commit_ref = coordinator.complete_task(current, task_id=safe_task, mutation_id=mutation_id)
+            updated = self._service._mutate_locked(run_id, expected_revision, mutation_id, mutation)
+            coordinator.finalize_task(run_id, mutation_id, commit_ref)
+            return updated
 
     def verification_run(
         self,
@@ -216,6 +305,7 @@ class AgentFacade:
         expected_revision: int,
         mutation_id: str,
         paths: list[str] | None = None,
+        release: bool = False,
     ) -> dict[str, Any]:
         engine = self._service.verification_engine
         if engine is None:
@@ -230,26 +320,64 @@ class AgentFacade:
             raise DevWeaveError(ErrorCode.STALE_REVISION, "Verification expected a stale run revision.")
         if plan["phase"] not in {"implementation", "verification", "review"} or not planning_gates_current(plan):
             raise DevWeaveError(ErrorCode.GATE_REQUIRED, "Current planning gates do not allow verification.")
+        effective_paths = tuple(paths or ())
+        coordinator = self._service.git_coordinator
+        if coordinator is not None:
+            discovered = coordinator.changed_paths(plan)
+            if effective_paths and tuple(sorted(set(effective_paths))) != discovered:
+                raise DevWeaveError(
+                    ErrorCode.FORBIDDEN,
+                    "Verification paths must equal the Git-derived run change set.",
+                    {"expected": list(discovered)},
+                )
+            effective_paths = discovered
         report = self._service.verification_store.load(run_id, mutation_id)
         if report is None:
             report = engine.run(
                 profile=RiskLevel(plan["risk"]),
                 plan_digest=plan["definition_fingerprint"],
-                changed_paths=tuple(paths or ()),
+                changed_paths=effective_paths,
+                release=release,
             )
             report = self._service.verification_store.save_once(run_id, mutation_id, report)
 
         def mutation(candidate: dict[str, Any]) -> None:
             evidence_ids = [item["evidence_id"] for item in report["evidence"]]
-            candidate["verification"]["status"] = "passed" if report["gate_eligible"] else "failed"
-            candidate["verification"]["evidence_ids"] = evidence_ids
-            candidate["verification"]["reports"][mutation_id] = {
+            summary = {
+                "schema_version": report["schema_version"],
                 "gate_eligible": bool(report["gate_eligible"]),
                 "evidence_ids": evidence_ids,
+                "plan_id": report["plan_id"],
                 "plan_digest": report["plan_digest"],
+                "profile": report["profile"],
+                "release": report["release"],
+                "changed_paths": report["changed_paths"],
+                "source_digest": report["source_digest"],
+                "selection": report["selection"],
+                "bindings": report["bindings"],
             }
+            current = engine.report_is_current(
+                summary,
+                profile=RiskLevel(candidate["risk"]),
+                plan_digest=candidate["definition_fingerprint"],
+            )
+            candidate["verification"]["status"] = "passed" if current else "failed"
+            candidate["verification"]["evidence_ids"] = evidence_ids
+            candidate["verification"]["reports"][mutation_id] = summary
+            candidate["verification"]["current_report_id"] = mutation_id if current else ""
 
-        updated = self._service.mutate(run_id, expected_revision, mutation_id, mutation)
+        effects = tuple(
+            path
+            for evidence in report["evidence"]
+            for path in evidence.get("changed_paths", [])
+        )
+        updated = self._service.mutate(
+            run_id,
+            expected_revision,
+            mutation_id,
+            mutation,
+            allowed_dirty_paths=effects,
+        )
         return {"run": updated, "report": report}
 
     def verification_read(self, run_id: str) -> dict[str, Any]:
@@ -263,8 +391,7 @@ class AgentFacade:
             incomplete = sorted(task_id for task_id, value in plan["tasks"].items() if value["status"] != "completed")
             if incomplete:
                 raise DevWeaveError(ErrorCode.BLOCKED, "Tasks remain incomplete.", {"tasks": incomplete})
-            if plan["verification"]["status"] != "passed":
-                raise DevWeaveError(ErrorCode.BLOCKED, "Current successful verification is required before completion.")
+            self._service.require_current_verification(plan)
             plan["completion_requested"] = True
             if RiskLevel(plan["risk"]) is RiskLevel.LOW:
                 plan["phase"] = "acceptance"
@@ -274,150 +401,3 @@ class AgentFacade:
                 plan["status"] = "reviewing"
 
         return self._service.mutate(run_id, expected_revision, mutation_id, mutation)
-
-
-class HostFacade:
-    """Host-only lifecycle surface.  No generic method dispatcher is provided."""
-
-    def __init__(self, service: RunService) -> None:
-        self._service = service
-
-    def run_start(
-        self,
-        draft: dict[str, Any],
-        *,
-        base_branch: str,
-        base_ref: str,
-        run_branch: str,
-    ) -> dict[str, Any]:
-        parsed = RunPlanDraft.from_dict(draft)
-        plan = new_exec_plan(parsed, base_branch=base_branch, base_ref=base_ref, run_branch=run_branch, now=self._service.clock())
-        return self._service.store.create(plan)
-
-    def run_resume(self, run_id: str) -> dict[str, Any]:
-        return self._service.inspect(run_id)
-
-    def decision_resolve(
-        self,
-        run_id: str,
-        *,
-        expected_revision: int,
-        mutation_id: str,
-        decision_id: str,
-        option_id: str = "",
-        other: str = "",
-    ) -> dict[str, Any]:
-        safe_decision = identifier(decision_id, "decision_id")
-        if bool(option_id) == bool(other):
-            raise DevWeaveError(ErrorCode.INVALID_ARGUMENT, "Resolve with exactly one option or custom answer.")
-
-        def mutation(plan: dict[str, Any]) -> None:
-            pending = plan["pending_decision"]
-            if pending is None or pending["decision_id"] != safe_decision:
-                raise DevWeaveError(ErrorCode.NOT_FOUND, "Pending decision was not found.")
-            option_ids = {item["option_id"] for item in pending["options"]}
-            if option_id:
-                selected = identifier(option_id, "option_id")
-                if selected not in option_ids:
-                    raise DevWeaveError(ErrorCode.INVALID_VALUE, "Decision option is not valid.")
-                answer = selected
-            else:
-                if not pending["allow_other"]:
-                    raise DevWeaveError(ErrorCode.FORBIDDEN, "Custom answers are not allowed for this decision.")
-                answer = text(other, "other", maximum=2048)
-            record = {key: value for key, value in pending.items() if key not in {"previous_task_status", "previous_run_status"}}
-            record["status"] = "resolved"
-            record["answer"] = answer
-            plan["decision_history"].append(record)
-            task = plan["tasks"][pending["blocking_task_id"]]
-            task["status"] = pending["previous_task_status"]
-            plan["status"] = pending["previous_run_status"]
-            plan["pending_decision"] = None
-
-        return self._service.mutate(run_id, expected_revision, mutation_id, mutation)
-
-    def gate_decide(
-        self,
-        run_id: str,
-        *,
-        expected_revision: int,
-        mutation_id: str,
-        gate_id: str,
-        approve: bool,
-        review_result: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        safe_gate = identifier(gate_id, "gate_id")
-
-        def mutation(plan: dict[str, Any]) -> None:
-            if safe_gate == "acceptance":
-                if not approve:
-                    gate = plan["gates"].get("acceptance")
-                    if gate is not None:
-                        gate["status"] = "rejected"
-                        gate["fingerprint"] = plan["definition_fingerprint"]
-                        gate["approved_revision"] = 0
-                        gate["decided_at"] = self._service.clock()
-                    plan["status"] = "blocked"
-                    plan["blockers"].append("gate_rejected:acceptance")
-                    return
-                if not plan["completion_requested"] or plan["verification"]["status"] != "passed":
-                    raise DevWeaveError(ErrorCode.GATE_REQUIRED, "Acceptance requires completion request and current verification.")
-                risk = RiskLevel(plan["risk"])
-                if risk is not RiskLevel.LOW:
-                    validated_review = _validate_review_result(review_result, plan["review"]["max_rounds"])
-                    plan["review"].update(validated_review)
-                else:
-                    plan["review"].update({"round": 1, "status": "passed", "finding_ids": []})
-                gate = plan["gates"].get("acceptance")
-                if gate is not None:
-                    gate["status"] = "approved"
-                    gate["fingerprint"] = plan["definition_fingerprint"]
-                    gate["approved_revision"] = expected_revision + 1
-                    gate["decided_at"] = self._service.clock()
-                plan["status"] = "completed"
-                plan["phase"] = "closed"
-                return
-            gate = plan["gates"].get(safe_gate)
-            if gate is None:
-                raise DevWeaveError(ErrorCode.INVALID_VALUE, "Gate is not required by current risk policy.")
-            gate["status"] = "approved" if approve else "rejected"
-            gate["fingerprint"] = plan["definition_fingerprint"]
-            gate["approved_revision"] = expected_revision + 1 if approve else 0
-            gate["decided_at"] = self._service.clock()
-            if not approve:
-                plan["status"] = "blocked"
-                plan["blockers"].append(f"gate_rejected:{safe_gate}")
-            elif planning_gates_current(plan):
-                plan["status"] = "implementing"
-                plan["phase"] = "implementation"
-
-        return self._service.mutate(run_id, expected_revision, mutation_id, mutation)
-
-    def run_cancel(self, run_id: str, *, expected_revision: int, mutation_id: str) -> dict[str, Any]:
-        def mutation(plan: dict[str, Any]) -> None:
-            if plan["status"] == "completed":
-                raise DevWeaveError(ErrorCode.CONFLICT, "Completed runs cannot be cancelled.")
-            plan["status"] = "cancelled"
-            plan["phase"] = "closed"
-
-        return self._service.mutate(run_id, expected_revision, mutation_id, mutation)
-
-
-def _validate_review_result(raw: dict[str, Any] | None, max_rounds: int) -> dict[str, Any]:
-    from .contract_utils import boolean, sequence, strict_object, strings
-    if raw is None:
-        raise DevWeaveError(ErrorCode.GATE_REQUIRED, "Detached review evidence is required for acceptance.")
-    data = strict_object(
-        raw,
-        name="review_result",
-        required=("detached", "implementation_thread_id", "reviewer_thread_id", "round", "unresolved_critical", "finding_ids"),
-    )
-    detached = boolean(data["detached"], "review_result.detached")
-    implementation_thread = text(data["implementation_thread_id"], "review_result.implementation_thread_id", maximum=256)
-    reviewer_thread = text(data["reviewer_thread_id"], "review_result.reviewer_thread_id", maximum=256)
-    round_number = integer(data["round"], "review_result.round", minimum=1, maximum=max_rounds)
-    unresolved = boolean(data["unresolved_critical"], "review_result.unresolved_critical")
-    finding_ids = list(strings(data["finding_ids"], "review_result.finding_ids"))
-    if not detached or implementation_thread == reviewer_thread or unresolved:
-        raise DevWeaveError(ErrorCode.BLOCKED, "Acceptance review is not detached and clear of critical findings.")
-    return {"round": round_number, "status": "passed", "finding_ids": finding_ids}

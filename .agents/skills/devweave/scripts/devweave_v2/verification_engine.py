@@ -179,11 +179,25 @@ class VerificationEngine:
                 evidence[writer.command_id] = self._execute(writer, plan_digest)
         ordered = [evidence[command_id] for command_id in selection.selected]
         current = all(item["gate_eligible"] for item in ordered) and bool(ordered)
+        source_digest = snapshot_digest(snapshot_tree(self.repository))
+        bindings = [
+            {
+                "command_id": item["command_id"],
+                "definition_digest": item["definition_digest"],
+                "executable_id": item["executable"]["id"],
+                "executable_sha256": item["executable"]["sha256"],
+            }
+            for item in ordered
+            if "executable" in item
+        ]
         return {
             "schema_version": SCHEMA_VERSION,
             "plan_id": self.config.verification_plan.plan_id,
             "plan_digest": plan_digest,
             "profile": profile.value,
+            "release": release,
+            "changed_paths": list(changed_paths),
+            "source_digest": source_digest,
             "selection": {
                 "selected": list(selection.selected),
                 "skipped": list(selection.skipped),
@@ -191,9 +205,53 @@ class VerificationEngine:
                 "stages": [list(stage) for stage in selection.stages],
             },
             "evidence": ordered,
+            "bindings": bindings,
             "gate_eligible": current,
             "usage": {"available": False, "input_tokens": None, "output_tokens": None, "total_tokens": None},
         }
+
+    def report_is_current(
+        self,
+        report: Mapping[str, Any],
+        *,
+        profile: RiskLevel,
+        plan_digest: str,
+    ) -> bool:
+        """Re-resolve every authority binding and compare it with a stored report."""
+
+        changed_paths = report.get("changed_paths")
+        release = report.get("release")
+        if not isinstance(changed_paths, list) or not all(isinstance(item, str) for item in changed_paths):
+            return False
+        if not isinstance(release, bool) or report.get("profile") != profile.value:
+            return False
+        if report.get("plan_digest") != plan_digest or report.get("plan_id") != self.config.verification_plan.plan_id:
+            return False
+        if not report.get("gate_eligible"):
+            return False
+        source_digest = snapshot_digest(snapshot_tree(self.repository))
+        if report.get("source_digest") != source_digest:
+            return False
+        stored_selection = report.get("selection")
+        if not isinstance(stored_selection, Mapping) or not isinstance(report.get("bindings"), list):
+            return False
+        selection = self.plan(profile=profile, changed_paths=changed_paths, release=release)
+        if stored_selection.get("selected") != list(selection.selected):
+            return False
+        commands = {item.command_id: item for item in self.config.verification_plan.commands}
+        expected_bindings = []
+        for command_id in selection.selected:
+            command = commands[command_id]
+            executable = self.resolver.resolve(command.argv[0], self.config.candidates_for(command.argv[0]))
+            expected_bindings.append(
+                {
+                    "command_id": command_id,
+                    "definition_digest": command.definition_digest,
+                    "executable_id": executable.executable_id,
+                    "executable_sha256": executable.sha256,
+                }
+            )
+        return report.get("bindings") == expected_bindings
 
     def _execute(self, command: VerificationCommand, plan_digest: str) -> dict[str, Any]:
         executable = self.resolver.resolve(command.argv[0], self.config.candidates_for(command.argv[0]))

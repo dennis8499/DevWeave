@@ -42,6 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--run", required=True)
     verify.add_argument("--profile", choices=("low", "standard", "high"))
     verify.add_argument("--path", action="append", default=[])
+    verify.add_argument("--release", action="store_true")
     export = subparsers.add_parser("export-v1")
     export.add_argument("--source-ref", required=True)
     export.add_argument("--output", required=True)
@@ -124,12 +125,13 @@ def _dispatch(args: argparse.Namespace, repository: Path) -> Any:
         profile = RiskLevel(plan["risk"])
         if args.profile is not None and RiskLevel(args.profile) is not profile:
             raise DevWeaveError(ErrorCode.FORBIDDEN, "CLI verification profile must equal the run risk.")
-        mutation_id = f"cli-verify-{plan['revision']}-{sha256(args.path)[:12]}"
+        mutation_id = f"cli-verify-{plan['revision']}-{sha256({'paths': args.path, 'release': args.release})[:12]}"
         return service.agent().verification_run(
             args.run,
             expected_revision=plan["revision"],
             mutation_id=mutation_id,
             paths=args.path,
+            release=args.release,
         )
     if args.command == "export-v1":
         output = (repository / args.output).resolve() if not Path(args.output).is_absolute() else Path(args.output).resolve()

@@ -51,13 +51,14 @@ function fixture(): UiProjection {
       assessment: { eligible: true, reason: "Declared task scope", paths: ["src/app.ts"], readOnly: false }
     }],
     review: {
-      status: "passed", round: 1, reviewerThreadId: "review-thread",
+      status: "passed", result: "passed", severity: "warning", sourceFingerprint: "a".repeat(64),
+      round: 1, reviewerThreadId: "review-thread", reviewTurnId: "review-turn",
       findings: [{
         schema_version: 2, finding_id: "F-1", severity: "warning", summary: "Bounded",
         paths: ["src/app.ts"], requirement_ids: ["REQ-1"], acceptance_ids: ["AC-1"],
         task_ids: ["TASK-1"], status: "open", round: 1
       }],
-      unresolvedCritical: false
+      unresolvedCritical: false, protocolValid: true
     },
     diagnostics: ["healthy"]
   };

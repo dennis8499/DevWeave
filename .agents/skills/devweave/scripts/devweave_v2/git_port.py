@@ -33,6 +33,10 @@ class GitPort(Protocol):
     def stage(self, paths: Sequence[str]) -> None: ...
     def staged_paths(self) -> tuple[str, ...]: ...
     def commit(self, message: str) -> str: ...
+    def commit_message(self, ref: str = "HEAD") -> str: ...
+    def parent(self, ref: str = "HEAD") -> str: ...
+    def is_ancestor(self, ancestor: str, descendant: str) -> bool: ...
+    def diff_paths(self, base_ref: str, head_ref: str = "HEAD") -> tuple[str, ...]: ...
     def list_tree(self, ref: str, prefix: str) -> tuple[str, ...]: ...
     def read_tree_file(self, ref: str, path: str) -> bytes: ...
 
@@ -129,6 +133,31 @@ class GitAdapter:
     def commit(self, message: str) -> str:
         self._run(("commit", "-m", message))
         return self.head()
+
+    def commit_message(self, ref: str = "HEAD") -> str:
+        safe = validate_git_ref(ref)
+        return self._run(("show", "-s", "--format=%s", safe)).stdout.rstrip("\r\n")
+
+    def parent(self, ref: str = "HEAD") -> str:
+        safe = validate_git_ref(ref)
+        resolved = self._run(("rev-parse", f"{safe}^")).stdout.strip()
+        if not re.fullmatch(r"[0-9a-fA-F]{40,64}", resolved):
+            raise DevWeaveError(ErrorCode.COMMAND_FAILED, "Git returned an invalid parent object id.")
+        return resolved.lower()
+
+    def is_ancestor(self, ancestor: str, descendant: str) -> bool:
+        safe_ancestor = validate_git_ref(ancestor)
+        safe_descendant = validate_git_ref(descendant)
+        result = self._run(("merge-base", "--is-ancestor", safe_ancestor, safe_descendant), check=False)
+        if result.returncode not in {0, 1}:
+            raise DevWeaveError(ErrorCode.COMMAND_FAILED, "Git ancestry check failed.")
+        return result.returncode == 0
+
+    def diff_paths(self, base_ref: str, head_ref: str = "HEAD") -> tuple[str, ...]:
+        base = validate_git_ref(base_ref)
+        head = validate_git_ref(head_ref)
+        output = self._run(("diff", "--name-only", "-z", f"{base}...{head}")).stdout
+        return tuple(sorted(item.replace("\\", "/") for item in output.split("\0") if item))
 
     def list_tree(self, ref: str, prefix: str) -> tuple[str, ...]:
         resolved = self.resolve_ref(ref)

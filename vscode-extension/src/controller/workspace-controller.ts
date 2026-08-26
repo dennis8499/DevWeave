@@ -1,9 +1,10 @@
 import { EventEmitter } from "node:events";
+import { isAbsolute, resolve } from "node:path";
 
 import type { AppServerProjection } from "../app-server/event-reducer";
 import type { ServerRequest } from "../app-server/session";
 import type { PendingDecision, ReviewFinding, RiskLevel } from "../v2/contracts";
-import { ApprovalBroker, type ApprovalAssessment, type ApprovalDecision } from "./approval-broker";
+import { ApprovalBroker, currentDeclarations, type ApprovalAssessment, type ApprovalDecision } from "./approval-broker";
 import type { HostMethod } from "./host-bridge-client";
 import { ReviewCoordinator, type ReviewOutcome } from "./review-coordinator";
 
@@ -167,13 +168,17 @@ export class WorkspaceController {
 
   public async decideGate(gateId: string, approve: boolean, review?: ReviewOutcome): Promise<void> {
     const run = this.requireRun();
+    if (approve && review && review.status !== "passed") throw new Error("A blocked review cannot approve acceptance.");
     const reviewResult = review && review.reviewerThreadId !== "self-review" ? {
-      detached: true,
+      schema_version: 2,
+      result: review.result,
+      severity: review.severity,
+      source_fingerprint: review.sourceFingerprint,
       implementation_thread_id: this.stateValue.threadId,
       reviewer_thread_id: review.reviewerThreadId,
+      review_turn_id: review.reviewTurnId,
       round: review.round,
-      unresolved_critical: review.unresolvedCritical,
-      finding_ids: review.findings.map((item) => item.finding_id)
+      findings: review.findings
     } : undefined;
     const updated = await this.host.request("gate_decide", {
       run_id: run.run_id, expected_revision: run.revision,
@@ -185,12 +190,31 @@ export class WorkspaceController {
   }
 
   public async cancel(): Promise<void> {
-    const run = this.requireRun();
-    const updated = await this.host.request("run_cancel", {
-      run_id: run.run_id, expected_revision: run.revision, mutation_id: `cancel-${run.revision}`
-    });
-    this.setRun(record(updated));
-    this.transition("cancelled");
+    try {
+      const run = this.requireRun();
+      for (const [requestId] of this.approvals) {
+        this.appServer.respond(requestId, { decision: "decline" });
+        this.approvals.delete(requestId);
+      }
+      this.syncApprovals();
+      if (this.stateValue.turnId) {
+        if (!this.appServer.waitForTurnCompleted) throw new Error("Cancellation cannot confirm terminal turn state.");
+        await this.appServer.request("turn/interrupt", {
+          threadId: this.stateValue.threadId,
+          turnId: this.stateValue.turnId
+        });
+        const terminal = record(await this.appServer.waitForTurnCompleted(this.stateValue.turnId));
+        if (terminal.status !== "interrupted") throw new Error("Cancellation requires an authoritative interrupted turn.");
+      }
+      const updated = await this.host.request("run_cancel", {
+        run_id: run.run_id, expected_revision: run.revision, mutation_id: `cancel-${run.revision}`
+      });
+      this.setRun(record(updated));
+      this.transition("cancelled");
+    } catch (error) {
+      this.block(error);
+      throw error;
+    }
   }
 
   public async refreshRun(codexPath?: string): Promise<void> {
@@ -220,11 +244,16 @@ export class WorkspaceController {
     fixAndReverify: (round: number, findings: ReviewFinding[]) => Promise<void>
   ): Promise<ReviewOutcome> {
     const run = this.requireRun();
+    const sourceFingerprint = currentVerificationFingerprint(run);
     const outcome = await this.reviewCoordinator.run(
       run.risk as RiskLevel,
       this.stateValue.threadId,
       String(run.base_branch ?? ""),
-      fixAndReverify
+      sourceFingerprint,
+      async (round, findings) => {
+        await fixAndReverify(round, findings);
+        return currentVerificationFingerprint(this.requireRun());
+      }
     );
     this.stateValue = { ...this.stateValue, review: outcome, status: outcome.status === "passed" ? "ready" : "blocked" };
     this.publish();
@@ -262,18 +291,15 @@ export class WorkspaceController {
       cwd: this.repository,
       approvalPolicy: "untrusted",
       approvalsReviewer: "user",
-      sandbox: this.isWritable(run) ? "workspace-write" : "read-only"
+      sandbox: "read-only"
     };
   }
 
   private turnSandboxPolicy(run: Record<string, unknown>): Record<string, unknown> {
-    return this.isWritable(run)
-      ? { type: "workspaceWrite", writableRoots: [this.repository], networkAccess: false }
+    const roots = run.phase === "implementation" ? writableRoots(this.repository, run) : [];
+    return roots.length > 0
+      ? { type: "workspaceWrite", writableRoots: roots, networkAccess: false }
       : { type: "readOnly", networkAccess: false };
-  }
-
-  private isWritable(run: Record<string, unknown>): boolean {
-    return run.phase === "implementation" || run.phase === "verification" || run.phase === "review";
   }
 
   private assertReady(): void {
@@ -318,4 +344,30 @@ function record(value: unknown): Record<string, unknown> {
 function extractId(value: Record<string, unknown>, ...keys: string[]): string {
   for (const key of keys) if (typeof value[key] === "string") return value[key];
   return "";
+}
+
+function writableRoots(repository: string, run: Record<string, unknown>): string[] {
+  const roots: string[] = [];
+  for (const declaration of currentDeclarations(run)) {
+    const normalized = declaration.replaceAll("\\", "/");
+    if (!normalized || normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized) || normalized.split("/").includes("..")) return [];
+    const wildcard = normalized.search(/[?*[]/);
+    const prefix = (wildcard < 0 ? normalized : normalized.slice(0, wildcard)).replace(/\/+$/, "");
+    if (!prefix) return [];
+    const absolute = resolve(repository, prefix);
+    if (!absolute || !isAbsolute(absolute)) return [];
+    roots.push(absolute);
+  }
+  return [...new Set(roots)];
+}
+
+function currentVerificationFingerprint(run: Record<string, unknown>): string {
+  const verification = record(run.verification);
+  const reportId = typeof verification.current_report_id === "string" ? verification.current_report_id : "";
+  const report = record(record(verification.reports)[reportId]);
+  const source = typeof report.source_digest === "string" ? report.source_digest : "";
+  if (!/^[0-9a-f]{64}$/.test(source) || verification.status !== "passed") {
+    throw new Error("Current verification source fingerprint is unavailable.");
+  }
+  return source;
 }

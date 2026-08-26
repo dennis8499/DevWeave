@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .canonical import primitive, sha256
-from .contract_utils import identifier, integer, strict_object, text
+from .contract_utils import identifier, integer, strict_object, strings, text
 from .errors import ContractError, ErrorCode
 from .plan_contracts import RunPlanDraft
 from .risk import policy_for
@@ -49,6 +49,7 @@ def new_exec_plan(
             "definition": primitive(task),
             "status": "pending",
             "progress": "",
+            "commit_ref": "",
         }
         for task in draft.tasks
     }
@@ -73,8 +74,17 @@ def new_exec_plan(
         "tasks": tasks,
         "pending_decision": None,
         "decision_history": [],
-        "verification": {"status": "pending", "evidence_ids": [], "reports": {}},
-        "review": {"mode": policy.review_mode, "max_rounds": policy.max_review_rounds, "round": 0, "status": "pending", "finding_ids": []},
+        "verification": {"status": "pending", "evidence_ids": [], "reports": {}, "current_report_id": ""},
+        "review": {
+            "mode": policy.review_mode,
+            "max_rounds": policy.max_review_rounds,
+            "round": 0,
+            "status": "pending",
+            "finding_ids": [],
+            "source_fingerprint": "",
+            "reviewer_thread_id": "",
+            "review_turn_id": "",
+        },
         "completion_requested": False,
         "blockers": [],
         "applied_mutations": ["run-start"],
@@ -113,9 +123,44 @@ def validate_exec_plan(raw: Any) -> dict[str, Any]:
         raise ContractError(ErrorCode.INVALID_VALUE, "ExecPlan task state differs from immutable definitions.")
     for task_id, task in data["tasks"].items():
         identifier(task_id, "ExecPlan.tasks key")
-        strict_object(task, name=f"ExecPlan.tasks.{task_id}", required=("definition", "status", "progress"))
+        strict_object(task, name=f"ExecPlan.tasks.{task_id}", required=("definition", "status", "progress", "commit_ref"))
         if task["status"] not in {"pending", "in_progress", "blocked", "completed"}:
             raise ContractError(ErrorCode.INVALID_VALUE, "ExecPlan task status is invalid.")
+        commit_ref = text(task["commit_ref"], f"ExecPlan.tasks.{task_id}.commit_ref", minimum=0, maximum=64)
+        if commit_ref and (len(commit_ref) < 40 or any(character not in "0123456789abcdef" for character in commit_ref)):
+            raise ContractError(ErrorCode.INVALID_VALUE, "ExecPlan task commit ref is invalid.")
+    verification = strict_object(
+        data["verification"],
+        name="ExecPlan.verification",
+        required=("status", "evidence_ids", "reports", "current_report_id"),
+    )
+    if verification["status"] not in {"pending", "passed", "failed"}:
+        raise ContractError(ErrorCode.INVALID_VALUE, "ExecPlan verification status is invalid.")
+    strings(verification["evidence_ids"], "ExecPlan.verification.evidence_ids", maximum=256)
+    if not isinstance(verification["reports"], dict) or len(verification["reports"]) > 256:
+        raise ContractError(ErrorCode.BOUND_EXCEEDED, "ExecPlan verification reports are invalid.")
+    current_report_id = text(
+        verification["current_report_id"],
+        "ExecPlan.verification.current_report_id",
+        minimum=0,
+        maximum=128,
+    )
+    if current_report_id and current_report_id not in verification["reports"]:
+        raise ContractError(ErrorCode.NOT_FOUND, "ExecPlan current verification report is unavailable.")
+    review = strict_object(
+        data["review"],
+        name="ExecPlan.review",
+        required=(
+            "mode", "max_rounds", "round", "status", "finding_ids",
+            "source_fingerprint", "reviewer_thread_id", "review_turn_id",
+        ),
+    )
+    if review["status"] not in {"pending", "passed", "failed"}:
+        raise ContractError(ErrorCode.INVALID_VALUE, "ExecPlan review status is invalid.")
+    integer(review["round"], "ExecPlan.review.round", minimum=0, maximum=3)
+    strings(review["finding_ids"], "ExecPlan.review.finding_ids", maximum=128)
+    for field, maximum in (("source_fingerprint", 64), ("reviewer_thread_id", 256), ("review_turn_id", 256)):
+        text(review[field], f"ExecPlan.review.{field}", minimum=0, maximum=maximum)
     if not isinstance(data["applied_mutations"], list) or len(data["applied_mutations"]) > 512:
         raise ContractError(ErrorCode.BOUND_EXCEEDED, "ExecPlan applied mutation ledger is invalid.")
     if not isinstance(data["blockers"], list) or len(data["blockers"]) > 256:
@@ -143,7 +188,10 @@ def invalidate_gates(plan: dict[str, Any]) -> None:
     plan["status"] = "awaiting_gate"
     plan["phase"] = "planning"
     plan["completion_requested"] = False
-    plan["verification"] = {"status": "pending", "evidence_ids": [], "reports": {}}
+    plan["verification"] = {"status": "pending", "evidence_ids": [], "reports": {}, "current_report_id": ""}
     plan["review"]["round"] = 0
     plan["review"]["status"] = "pending"
     plan["review"]["finding_ids"] = []
+    plan["review"]["source_fingerprint"] = ""
+    plan["review"]["reviewer_thread_id"] = ""
+    plan["review"]["review_turn_id"] = ""

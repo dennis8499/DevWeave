@@ -488,6 +488,14 @@ class RealCodexAppServerTests(unittest.TestCase):
 
             review_start = len(client.messages)
             phase = report_phase("detached_review")
+            expected_review = {
+                "schema_version": 2,
+                "result": "passed",
+                "severity": "advisory",
+                "source_fingerprint": "e" * 64,
+                "round": 1,
+                "findings": [],
+            }
             review = client.request("review/start", {
                 "threadId": thread_id,
                 "delivery": "detached",
@@ -495,7 +503,8 @@ class RealCodexAppServerTests(unittest.TestCase):
                     "type": "custom",
                     "instructions": (
                         "This is a bounded protocol certification only. Do not use tools or modify files. "
-                        "Return exactly: ADVISORY [DEVWEAVE-E2E] DEVWEAVE_REVIEW_OK"
+                        "Return exactly this JSON object with no Markdown fence or prose: "
+                        + json.dumps(expected_review, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
                     ),
                 },
             }, timeout=operation_timeout(deadline, 60))
@@ -546,7 +555,7 @@ class RealCodexAppServerTests(unittest.TestCase):
                                 break
             self.assertIsInstance(review_text, str)
             self.assertTrue(review_text.strip())
-            self.assertIn("DEVWEAVE_REVIEW_OK", review_text)
+            self.assertEqual(json.loads(review_text.strip()), expected_review)
 
             turn_status = interrupted["params"]["turn"].get("status")
             summary = {
@@ -562,6 +571,7 @@ class RealCodexAppServerTests(unittest.TestCase):
                 "detached_review": True,
                 "review_nonempty": True,
                 "review_completion": review_completion,
+                "review_strict_envelope": True,
                 "messages_observed": len(client.messages),
                 "approval_policy": "untrusted",
                 "approvals_reviewer": "user",
