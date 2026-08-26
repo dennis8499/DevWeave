@@ -15,12 +15,11 @@ def build_run_service(repository: Path) -> RunService:
     project_path = root / ".devweave" / "project.json"
     engine = None
     if project_path.is_file():
-        try:
-            raw = json.loads(project_path.read_text(encoding="utf-8"))
-            if raw.get("schema_version") == 2:
-                engine = VerificationEngine(root, ProjectConfig.from_dict(raw))
-        except (OSError, json.JSONDecodeError, AttributeError):
-            engine = None
+        raw = json.loads(project_path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise TypeError("DevWeave project configuration must be an object.")
+        if raw.get("schema_version") == 2:
+            engine = VerificationEngine(root, ProjectConfig.from_dict(raw))
     return RunService(root, verification_engine=engine)
 
 

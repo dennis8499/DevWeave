@@ -10,7 +10,7 @@ from typing import Any, BinaryIO
 
 from .errors import DevWeaveError, ErrorCode
 from .mcp_tools import McpToolAdapter, TOOL_DEFINITIONS
-from .run_service import RunService
+from .service_factory import build_run_service
 from .version import VERSION
 
 SUPPORTED_PROTOCOLS = ("2025-06-18", "2024-11-05")
@@ -114,7 +114,7 @@ def rpc_error(request_id: Any, code: int, message: str, data: Any = None) -> dic
 def run_stdio(repository: Path, stdin: BinaryIO | None = None, stdout: BinaryIO | None = None) -> int:
     input_stream = stdin or sys.stdin.buffer
     output_stream = stdout or sys.stdout.buffer
-    session = McpSession(McpToolAdapter(RunService(repository).agent()))
+    session = McpSession(McpToolAdapter(build_run_service(repository).agent()))
     while True:
         line = input_stream.readline(MAX_MESSAGE_BYTES + 1)
         if not line:

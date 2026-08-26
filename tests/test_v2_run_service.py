@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import sys
 import tempfile
 import unittest
@@ -20,6 +21,23 @@ from devweave_v2.run_service import RunService
 
 
 BASE_REF = "a" * 40
+
+
+def concurrent_mutation_worker(repository: str, ready, start, results, mutation_id: str) -> None:
+    store = PlanStore(Path(repository))
+    ready.put(mutation_id)
+    start.wait(10)
+    try:
+        updated = store.mutate(
+            "run-fixture",
+            expected_revision=1,
+            mutation_id=mutation_id,
+            now="2026-08-25T00:01:00Z",
+            mutation=lambda plan: plan["blockers"].append(mutation_id),
+        )
+        results.put(("ok", updated["revision"], mutation_id))
+    except DevWeaveError as exc:
+        results.put(("error", exc.code.value, mutation_id))
 
 
 class RunServiceHarness:
@@ -230,6 +248,38 @@ class RunServiceTests(unittest.TestCase):
 
 
 class AtomicStoreTests(unittest.TestCase):
+    def test_separate_processes_cannot_lose_an_optimistic_update(self) -> None:
+        h = RunServiceHarness()
+        try:
+            h.start("low")
+            context = multiprocessing.get_context("spawn")
+            ready = context.Queue()
+            results = context.Queue()
+            start = context.Event()
+            workers = [
+                context.Process(
+                    target=concurrent_mutation_worker,
+                    args=(str(h.repo), ready, start, results, f"process-{index}"),
+                )
+                for index in range(2)
+            ]
+            for worker in workers:
+                worker.start()
+            self.assertEqual({ready.get(timeout=15) for _ in workers}, {"process-0", "process-1"})
+            start.set()
+            outcomes = [results.get(timeout=15) for _ in workers]
+            for worker in workers:
+                worker.join(15)
+                self.assertEqual(worker.exitcode, 0)
+            self.assertEqual(sorted(item[0] for item in outcomes), ["error", "ok"])
+            error = next(item for item in outcomes if item[0] == "error")
+            self.assertEqual(error[1], ErrorCode.STALE_REVISION.value)
+            final = h.store.load("run-fixture")
+            self.assertEqual(final["revision"], 2)
+            self.assertEqual(len(final["blockers"]), 1)
+        finally:
+            h.close()
+
     def test_crash_before_replace_preserves_old_revision(self) -> None:
         armed = False
 

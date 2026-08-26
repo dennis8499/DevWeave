@@ -13,6 +13,7 @@ from typing import Any, Callable
 from .canonical import dumps
 from .contract_utils import identifier
 from .errors import DevWeaveError, ErrorCode
+from .interprocess_lock import InterProcessLock
 from .run_state import validate_exec_plan
 
 Mutation = Callable[[dict[str, Any]], None]
@@ -28,6 +29,7 @@ class PlanStore:
         self.completed_root = self.repository / "docs" / "exec-plans" / "completed"
         self._fault_hook = fault_hook
         self._lock = threading.RLock()
+        self._process_lock_path = self.repository / ".devweave" / "runtime" / "locks" / "plan-store.lock"
 
     def path_for(self, run_id: str, *, completed: bool = False) -> Path:
         safe_id = identifier(run_id, "run_id")
@@ -35,18 +37,23 @@ class PlanStore:
         return root / f"{safe_id}.json"
 
     def exists(self, run_id: str) -> bool:
-        return self.path_for(run_id).is_file() or self.path_for(run_id, completed=True).is_file()
+        with self._lock, InterProcessLock(self._process_lock_path):
+            return self._exists_unlocked(run_id)
 
     def create(self, plan: dict[str, Any]) -> dict[str, Any]:
         validated = validate_exec_plan(copy.deepcopy(plan))
         path = self.path_for(validated["run_id"])
-        with self._lock:
-            if self.exists(validated["run_id"]):
+        with self._lock, InterProcessLock(self._process_lock_path):
+            if self._exists_unlocked(validated["run_id"]):
                 raise DevWeaveError(ErrorCode.CONFLICT, "Run already exists.", {"run_id": validated["run_id"]})
             self._atomic_replace(path, validated)
         return copy.deepcopy(validated)
 
     def load(self, run_id: str) -> dict[str, Any]:
+        with self._lock, InterProcessLock(self._process_lock_path):
+            return self._load_unlocked(run_id)
+
+    def _load_unlocked(self, run_id: str) -> dict[str, Any]:
         path = self.path_for(run_id)
         if not path.is_file():
             completed = self.path_for(run_id, completed=True)
@@ -70,8 +77,8 @@ class PlanStore:
         mutation: Mutation,
     ) -> dict[str, Any]:
         key = identifier(mutation_id, "mutation_id")
-        with self._lock:
-            current = self.load(run_id)
+        with self._lock, InterProcessLock(self._process_lock_path):
+            current = self._load_unlocked(run_id)
             if key in current["applied_mutations"]:
                 return current
             if current["revision"] != expected_revision:
@@ -92,12 +99,17 @@ class PlanStore:
             return copy.deepcopy(validated)
 
     def complete(self, run_id: str) -> Path:
-        with self._lock:
-            plan = self.load(run_id)
-            if plan["status"] != "completed":
-                raise DevWeaveError(ErrorCode.CONFLICT, "Only completed runs can be archived.")
+        with self._lock, InterProcessLock(self._process_lock_path):
             source = self.path_for(run_id)
             target = self.path_for(run_id, completed=True)
+            if not source.is_file() and target.is_file():
+                plan = self._read_plan(target, run_id)
+                if plan["status"] != "completed":
+                    raise DevWeaveError(ErrorCode.CONFLICT, "Archived run is not completed.")
+                return target
+            plan = self._load_unlocked(run_id)
+            if plan["status"] != "completed":
+                raise DevWeaveError(ErrorCode.CONFLICT, "Only completed runs can be archived.")
             target.parent.mkdir(parents=True, exist_ok=True)
             if target.exists():
                 if target.read_bytes() == source.read_bytes():
@@ -106,6 +118,17 @@ class PlanStore:
                 raise DevWeaveError(ErrorCode.CONFLICT, "Completed run archive already exists.")
             os.replace(source, target)
             return target
+
+    def _exists_unlocked(self, run_id: str) -> bool:
+        return self.path_for(run_id).is_file() or self.path_for(run_id, completed=True).is_file()
+
+    @staticmethod
+    def _read_plan(path: Path, run_id: str) -> dict[str, Any]:
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise DevWeaveError(ErrorCode.INVALID_JSON, "Canonical ExecPlan cannot be read.", {"run_id": run_id}) from exc
+        return copy.deepcopy(validate_exec_plan(raw))
 
     def _atomic_replace(self, path: Path, value: dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
