@@ -33,7 +33,11 @@ MAX_TRANSCRIPT_BYTES = 10_000_000
 MAX_STDERR_BYTES = 262_144
 LIVE_OPT_IN = "DEVWEAVE_E2E_ALLOW_LIVE"
 CODEX_PATH_SETTING = "DEVWEAVE_CODEX_PATH"
-APPROVAL_PROBE = "DEVWEAVE_APPROVAL_TRANSPORT_PROBE"
+SENTINEL_NAME = "DEVWEAVE_E2E_MUST_NOT_EXIST.txt"
+WRITE_PROBE_COMMAND = (
+    "python -c \"from pathlib import Path; "
+    f"Path('{SENTINEL_NAME}').write_text('unsafe')\""
+)
 LIVE_OPERATION_BUDGET_SECONDS = 135
 LIVE_CLEANUP_TIMEOUT_SECONDS = 20
 
@@ -306,7 +310,7 @@ class RealCodexAppServerTests(unittest.TestCase):
         codex = require_codex_path()
         before_status = git_output("status", "--porcelain=v1", "--untracked-files=all")
         source_head = git_output("rev-parse", "HEAD").strip()
-        sentinel = ROOT / "DEVWEAVE_E2E_MUST_NOT_EXIST.txt"
+        sentinel = ROOT / SENTINEL_NAME
         self.assertFalse(sentinel.exists(), "E2E sentinel already exists")
         deadline = time.monotonic() + LIVE_OPERATION_BUDGET_SECONDS
         doctor = CodexDoctor().probe(repository=ROOT, configured_path=str(codex))
@@ -366,8 +370,9 @@ class RealCodexAppServerTests(unittest.TestCase):
                     "input": [{
                         "type": "text",
                         "text": (
-                            "This is a bounded approval transport probe. Use the shell tool exactly once to run the exact "
-                            f"harmless command: python -c \"print('{APPROVAL_PROBE}')\". "
+                            "This is a bounded approval transport probe. Use the shell tool exactly once to attempt the exact "
+                            f"write command: {WRITE_PROBE_COMMAND}. The read-only sandbox must request approval, and the "
+                            "client will decline it so the command must not execute. "
                             "Do not use another tool and do not reply before making the tool call. "
                             "After the expected denial, reply exactly DEVWEAVE_APPROVAL_DECLINED."
                         ),
@@ -438,8 +443,9 @@ class RealCodexAppServerTests(unittest.TestCase):
                     "input": [{
                         "type": "text",
                         "text": (
-                            "This is a bounded interrupt transport probe. Use the shell tool exactly once to run the exact "
-                            "harmless command: python -c \"print('DEVWEAVE_INTERRUPT_TRANSPORT_PROBE')\". "
+                            "This is a bounded interrupt transport probe. Use the shell tool exactly once to attempt the exact "
+                            f"write command: {WRITE_PROBE_COMMAND}. The read-only sandbox must request approval, and the "
+                            "client will keep the approval pending so the command must not execute. "
                             "Do not use another tool and do not reply before making the tool call."
                         ),
                     }],
