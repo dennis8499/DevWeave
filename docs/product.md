@@ -37,7 +37,7 @@ Require plan; plan plus acceptance; or scope plus design plus acceptance for low
 Reject dirty/detached/colliding starts and otherwise create a fixed-base run branch whose task/Gate/archive commits include the post-transition canonical plan, with no remote/merge/reset/switch-back side effect.
 
 ### AC-007: ExecPlan restart
-Resolve saved task/Gate/archive checkpoint refs into equivalent canonical snapshots and replay an interrupted mutation without duplicating state transitions or commits.
+Resolve saved task/Gate/archive checkpoint refs into equivalent canonical snapshots and replay an interrupted mutation without duplicating state transitions or commits, including an acceptance crash after completed state is durable but before its active-to-completed archive move.
 
 ### AC-008: Pending decision round-trip
 Resolve only a valid option or allowed custom answer at the current revision; cancellation or malformed/stale input leaves the task pending.
@@ -64,7 +64,7 @@ Use detached reviewer identity; run one standard review or no more than three hi
 Align public versions, generate but do not track VSIX output, and remove V1 runtime/UI mutation surfaces while retaining export recovery.
 
 ### AC-016: Adversarial authorization
-Reject unknown methods, forged roles, stale revisions, traversal, symlink/junction escape, scope violations, and task globs that cannot map exactly to directory-subtree sandbox roots before repository/process mutation.
+Reject unknown methods, forged roles, stale revisions, traversal, symlink/junction escape, physical filesystem aliases including NTFS short names, scope violations, and task globs that cannot map exactly to directory-subtree sandbox roots before repository/process mutation.
 
 ### AC-017: Deterministic state
 Produce identical canonical snapshots/hashes from identical ordered transcripts and recover atomically around injected write failures or duplicate delivery.

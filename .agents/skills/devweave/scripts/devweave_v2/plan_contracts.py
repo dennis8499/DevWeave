@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 from .contract_utils import (
@@ -17,6 +18,7 @@ from .contract_utils import (
     strings,
     task_declared_paths,
     text,
+    validate_task_declared_paths_for_repository,
 )
 from .verification_contracts import RiskLevel, VerificationPlan
 from .version import SCHEMA_VERSION
@@ -108,6 +110,15 @@ class RunPlanDraft:
             VerificationPlan.from_dict(data["verification_plan"]),
             enum_value(data["risk"], "RunPlanDraft.risk", RiskLevel),
             text(data["risk_rationale"], "RunPlanDraft.risk_rationale"),
+        )
+
+
+def validate_run_plan_repository_paths(draft: RunPlanDraft, repository: Path) -> None:
+    for index, task in enumerate(draft.tasks):
+        validate_task_declared_paths_for_repository(
+            task.declared_paths,
+            repository,
+            field=f"RunPlanDraft.tasks[{index}].declared_paths",
         )
 
 

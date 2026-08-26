@@ -119,6 +119,16 @@ class RunGitCoordinator:
                 if journal.get("mutation_id") in plan["applied_mutations"]:
                     raise DevWeaveError(ErrorCode.CONFLICT, "An aborted checkpoint mutation is authoritative.")
                 continue
+            if (
+                journal.get("kind") == "gate"
+                and journal.get("subject_id") == "acceptance"
+                and plan["status"] == "completed"
+            ):
+                # A crash may occur after the completed state replaces the active
+                # plan but before gate_decide moves it into the completed archive.
+                # Restore lifecycle placement before proving or creating the commit.
+                store.complete(safe_run)
+                plan = store.load(safe_run)
             commit = self.proof.existing_commit(journal)
             if status == "intent" and commit is None and journal.get("mutation_id") not in plan["applied_mutations"]:
                 journal["status"] = "aborted"

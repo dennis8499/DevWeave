@@ -6,7 +6,7 @@ from typing import Any, TYPE_CHECKING
 
 from .contract_utils import integer, sequence, strict_object, text
 from .errors import DevWeaveError, ErrorCode
-from .plan_contracts import RunPlanDraft
+from .plan_contracts import RunPlanDraft, validate_run_plan_repository_paths
 from .run_state import new_exec_plan, planning_gates_current
 from .verification_contracts import FindingSeverity, FindingStatus, ReviewFinding, RiskLevel
 
@@ -29,6 +29,7 @@ class HostFacade:
         run_branch: str,
     ) -> dict[str, Any]:
         parsed = RunPlanDraft.from_dict(draft)
+        validate_run_plan_repository_paths(parsed, self._service.repository)
         plan = new_exec_plan(
             parsed,
             base_branch=base_branch,

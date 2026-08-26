@@ -86,6 +86,8 @@ function compileTaskScope(repository: string, run: Record<string, unknown>): Com
       if (!stat.isDirectory() || stat.isSymbolicLink()) return null;
       const physicalRoot = realpathSync.native(lexicalRoot);
       if (!contained(physicalRepository, physicalRoot)) return null;
+      const physicalDeclaration = normalizeRelative(relative(physicalRepository, physicalRoot));
+      if (!physicalDeclaration || intersectsProtectedAuthority(physicalDeclaration)) return null;
       compiled.push({ declaration, root: physicalRoot });
     } catch {
       return null;

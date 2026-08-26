@@ -11,7 +11,7 @@ from .contract_utils import boolean, integer, strict_object, text
 from .errors import DevWeaveError, ErrorCode
 from .git_port import GitAdapter
 from .git_transaction import GitTransaction
-from .plan_contracts import RunPlanDraft
+from .plan_contracts import RunPlanDraft, validate_run_plan_repository_paths
 from .run_service import RunService
 from .run_start_journal import RunStartJournal
 from .service_factory import build_run_service
@@ -48,6 +48,7 @@ class HostOperationAdapter:
     def _run_start(self, raw: dict[str, Any]) -> dict[str, Any]:
         data = strict_object(raw, name="run_start", required=("draft", "slug"), optional=("codex_path",))
         parsed = RunPlanDraft.from_dict(data["draft"])
+        validate_run_plan_repository_paths(parsed, self.repository)
         slug = text(data["slug"], "slug", maximum=128)
         codex_path = data.get("codex_path")
         if codex_path is not None:

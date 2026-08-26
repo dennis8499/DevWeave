@@ -121,6 +121,23 @@ class RunServiceTests(unittest.TestCase):
         self.assertEqual(updated["required_gates"], ["scope", "design", "acceptance"])
         self.assertTrue(all(item["status"] == "pending" for item in updated["gates"].values()))
 
+    @unittest.skipUnless(sys.platform == "win32", "NTFS short-name regression is Windows-specific")
+    def test_plan_save_rejects_physical_authority_alias_without_mutation(self) -> None:
+        plan = self.h.start("low")
+        alias = self.h.repo / "docs" / "EXEC-P~1"
+        if not alias.is_dir():
+            self.skipTest("8.3 short names are disabled for this test volume")
+        draft = self.h.draft("low", revision=plan["revision"])
+        draft["tasks"][0]["declared_paths"] = ["docs/EXEC-P~1/**"]
+        with self.assertRaises(DevWeaveError) as rejected:
+            self.h.service.agent().plan_save(
+                plan["run_id"], expected_revision=plan["revision"], mutation_id="alias-scope", draft=draft
+            )
+        self.assertEqual(rejected.exception.code, ErrorCode.FORBIDDEN)
+        unchanged = self.h.store.load(plan["run_id"])
+        self.assertEqual(unchanged["revision"], plan["revision"])
+        self.assertNotIn("alias-scope", unchanged["applied_mutations"])
+
     def test_stale_revision_rejected_before_mutation_and_duplicate_is_idempotent(self) -> None:
         plan = self.h.start("low")
         first = self.h.service.host().gate_decide(

@@ -203,6 +203,27 @@ class HostOperationTests(unittest.TestCase):
         finally:
             harness.close()
 
+    @unittest.skipUnless(sys.platform == "win32", "NTFS short-name regression is Windows-specific")
+    def test_ntfs_short_authority_alias_is_rejected_before_branch_creation(self) -> None:
+        harness = GitHostHarness()
+        try:
+            (harness.repo / "docs" / "exec-plans").mkdir(parents=True)
+            alias = harness.repo / "docs" / "EXEC-P~1"
+            if not alias.is_dir():
+                self.skipTest("8.3 short names are disabled for this test volume")
+            adapter = HostOperationAdapter(harness.repo, doctor=ReadyDoctor())
+            draft = json.loads((ROOT / "fixtures" / "devweave_v2" / "run-plan-draft.json").read_text(encoding="utf-8"))
+            draft["tasks"][0]["declared_paths"] = ["docs/EXEC-P~1/**"]
+            with self.assertRaises(DevWeaveError) as rejected:
+                adapter.call("run_start", {"draft": draft, "slug": "slice"})
+            self.assertEqual(rejected.exception.code, ErrorCode.FORBIDDEN)
+            self.assertEqual(rejected.exception.details["physical_path"].casefold(), "docs/exec-plans")
+            self.assertEqual(git(harness.repo, "branch", "--show-current").stdout.strip(), "main")
+            self.assertEqual(git(harness.repo, "branch", "--list", "devweave/*").stdout.strip(), "")
+            self.assertFalse((harness.repo / ".devweave/runtime/start-journals/run-fixture.json").exists())
+        finally:
+            harness.close()
+
     def test_run_start_journal_recovers_branch_before_plan_crash(self) -> None:
         harness = GitHostHarness()
         armed = True

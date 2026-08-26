@@ -13,7 +13,7 @@ from .canonical import primitive
 from .contract_utils import identifier, integer, text
 from .errors import DevWeaveError, ErrorCode
 from .interprocess_lock import InterProcessLock
-from .plan_contracts import DecisionStatus, PendingDecision, RunPlanDraft
+from .plan_contracts import DecisionStatus, PendingDecision, RunPlanDraft, validate_run_plan_repository_paths
 from .plan_store import PlanStore
 from .risk import RISK_ORDER, escalate_risk, policy_for
 from .run_state import definition_fingerprint, invalidate_gates, planning_gates_current
@@ -184,6 +184,7 @@ class AgentFacade:
         risk_signals: list[str] | None = None,
     ) -> dict[str, Any]:
         parsed = RunPlanDraft.from_dict(draft)
+        validate_run_plan_repository_paths(parsed, self._service.repository)
         if parsed.run_id != run_id or parsed.revision != expected_revision:
             raise DevWeaveError(ErrorCode.STALE_REVISION, "Plan draft identity or revision is stale.")
 

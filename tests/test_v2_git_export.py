@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -444,6 +445,88 @@ class ProductionGitCoordinatorTests(unittest.TestCase):
         )
         self.assertEqual(journal["status"], "finalized")
         self.assertEqual(restarted_coordinator.git.status(), ())
+
+    def test_completed_state_replace_fault_archives_before_recovered_checkpoint(self) -> None:
+        armed = {"value": False}
+
+        def fault(stage: str, path: Path) -> None:
+            if armed["value"] and stage == "after_replace":
+                raise RuntimeError("crash-after-completed-state")
+
+        service, plan = self.start_service(store=PlanStore(self.h.repo, fault_hook=fault))
+        plan = service.agent().task_update(
+            plan["run_id"], expected_revision=2, mutation_id="start-task", task_id="TASK-001", status="in_progress"
+        )
+        (self.h.repo / "src" / "app.txt").write_text("slice\n", encoding="utf-8")
+        plan = service.agent().task_update(
+            plan["run_id"], expected_revision=3, mutation_id="complete-task", task_id="TASK-001", status="completed"
+        )
+
+        class AlwaysCurrent:
+            @staticmethod
+            def report_is_current(*args, **kwargs) -> bool:
+                return True
+
+        service.verification_engine = AlwaysCurrent()  # type: ignore[assignment]
+
+        def record_verification(candidate: dict) -> None:
+            candidate["verification"] = {
+                "status": "passed",
+                "evidence_ids": ["EVID-1"],
+                "current_report_id": "manual",
+                "reports": {"manual": {"source_digest": "b" * 64}},
+            }
+
+        plan = service.mutate(plan["run_id"], 4, "record-current-verification", record_verification)
+        plan = service.agent().completion_request(plan["run_id"], expected_revision=5, mutation_id="request-completion")
+        before_acceptance = self.h.adapter.head()
+        armed["value"] = True
+        with self.assertRaisesRegex(RuntimeError, "crash-after-completed-state"):
+            service.host().gate_decide(
+                plan["run_id"], expected_revision=6, mutation_id="accept-run", gate_id="acceptance", approve=True
+            )
+        armed["value"] = False
+
+        active_path = self.h.repo / "docs/exec-plans/active/run-fixture.json"
+        completed_path = self.h.repo / "docs/exec-plans/completed/run-fixture.json"
+        interrupted = json.loads(active_path.read_text(encoding="utf-8"))
+        self.assertEqual(interrupted["status"], "completed")
+        self.assertFalse(completed_path.exists())
+        self.assertEqual(self.h.adapter.head(), before_acceptance)
+
+        restarted_coordinator = RunGitCoordinator(self.h.repo, GitTransaction(self.h.repo, GitAdapter(self.h.repo)))
+        restarted = RunService(
+            self.h.repo,
+            store=PlanStore(self.h.repo),
+            clock=lambda: "2026-08-25T00:00:00Z",
+            git_coordinator=restarted_coordinator,
+        )
+        completed = restarted.host().run_resume(plan["run_id"])
+        checkpoint_sha = restarted_coordinator.git.resolve_ref(completed["archive_ref"])
+        self.assertEqual(restarted_coordinator.git.parent(checkpoint_sha), before_acceptance)
+        self.assertFalse(active_path.exists())
+        self.assertEqual(completed_path.read_bytes(), dumps(completed).encode("utf-8"))
+        self.assertEqual(
+            restarted_coordinator.git.read_tree_file(completed["archive_ref"], completed_path.relative_to(self.h.repo).as_posix()),
+            dumps(completed).encode("utf-8"),
+        )
+        journal_path = self.h.repo / ".devweave/runtime/run-fixture/gate-commits/accept-run.json"
+        journal = json.loads(journal_path.read_text(encoding="utf-8"))
+        self.assertEqual(journal["status"], "finalized")
+        self.assertEqual(journal["commit_sha"], checkpoint_sha)
+        self.assertEqual(journal["control_path"], "docs/exec-plans/completed/run-fixture.json")
+        self.assertEqual(journal["plan_digest"], hashlib.sha256(dumps(completed).encode("utf-8")).hexdigest())
+        messages = git(self.h.repo, "log", "--format=%s", f"{before_acceptance}..HEAD").stdout.splitlines()
+        self.assertEqual(messages.count("devweave(run-fixture): checkpoint gate acceptance"), 1)
+        self.assertEqual(restarted_coordinator.git.status(), ())
+
+        head_after_recovery = restarted_coordinator.git.head()
+        resumed_again = restarted.host().run_resume(plan["run_id"])
+        self.assertEqual(resumed_again, completed)
+        self.assertEqual(restarted_coordinator.git.head(), head_after_recovery)
+        self.assertEqual(restarted_coordinator.git.status(), ())
+        repeated_messages = git(self.h.repo, "log", "--format=%s", f"{before_acceptance}..HEAD").stdout.splitlines()
+        self.assertEqual(repeated_messages.count("devweave(run-fixture): checkpoint gate acceptance"), 1)
 
     def test_unrelated_dirty_path_and_wrong_checkout_block_mutation_or_resume(self) -> None:
         service, plan = self.start_service()

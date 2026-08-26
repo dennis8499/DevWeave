@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
+import stat
 from enum import Enum
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, TypeVar
 
 from .errors import ContractError, ErrorCode
@@ -182,13 +183,96 @@ def task_declared_paths(value: Any, field: str, *, minimum: int = 0) -> tuple[st
     return result
 
 
+def validate_task_declared_paths_for_repository(
+    declarations: Iterable[str],
+    repository: Path,
+    *,
+    field: str,
+) -> None:
+    """Reject declarations whose physical fixed prefix reaches host authority."""
+    lexical_repository = Path(repository)
+    if not lexical_repository.is_absolute():
+        lexical_repository = lexical_repository.absolute()
+    try:
+        repository_stat = lexical_repository.lstat()
+        physical_repository = lexical_repository.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise ContractError(
+            ErrorCode.PATH_OUTSIDE_REPOSITORY,
+            "Task declarations require an accessible physical repository root.",
+            {"field": field},
+        ) from exc
+    if not stat.S_ISDIR(repository_stat.st_mode) or _is_reparse_point(repository_stat):
+        raise ContractError(
+            ErrorCode.FORBIDDEN,
+            "Task declarations cannot use a reparse-point repository root.",
+            {"field": field},
+        )
+
+    for index, declaration in enumerate(declarations):
+        static_parts = _task_declaration_static_parts(declaration)
+        if not static_parts:
+            raise ContractError(
+                ErrorCode.FORBIDDEN,
+                f"{field}[{index}] has no safe fixed repository prefix.",
+                {"field": f"{field}[{index}]", "path": declaration},
+            )
+        physical_cursor = physical_repository
+        lexical_cursor = lexical_repository
+        unresolved: tuple[str, ...] = ()
+        for offset, part in enumerate(static_parts):
+            candidate = lexical_cursor / part
+            try:
+                candidate_stat = candidate.lstat()
+            except FileNotFoundError:
+                unresolved = static_parts[offset:]
+                break
+            except OSError as exc:
+                raise ContractError(
+                    ErrorCode.FORBIDDEN,
+                    f"{field}[{index}] cannot be resolved safely.",
+                    {"field": f"{field}[{index}]", "path": declaration},
+                ) from exc
+            if _is_reparse_point(candidate_stat):
+                raise ContractError(
+                    ErrorCode.FORBIDDEN,
+                    f"{field}[{index}] traverses a symlink or junction.",
+                    {"field": f"{field}[{index}]", "path": declaration},
+                )
+            try:
+                physical_cursor = candidate.resolve(strict=True)
+                physical_cursor.relative_to(physical_repository)
+            except (OSError, RuntimeError, ValueError) as exc:
+                raise ContractError(
+                    ErrorCode.PATH_OUTSIDE_REPOSITORY,
+                    f"{field}[{index}] resolves outside the repository.",
+                    {"field": f"{field}[{index}]", "path": declaration},
+                ) from exc
+            lexical_cursor = candidate
+
+        physical_candidate = physical_cursor.joinpath(*unresolved)
+        try:
+            physical_relative = physical_candidate.relative_to(physical_repository).as_posix()
+        except ValueError as exc:
+            raise ContractError(
+                ErrorCode.PATH_OUTSIDE_REPOSITORY,
+                f"{field}[{index}] resolves outside the repository.",
+                {"field": f"{field}[{index}]", "path": declaration},
+            ) from exc
+        if not physical_relative or _intersects_task_authority(physical_relative):
+            raise ContractError(
+                ErrorCode.FORBIDDEN,
+                f"{field}[{index}] physically intersects a host-authority path.",
+                {
+                    "field": f"{field}[{index}]",
+                    "path": declaration,
+                    "physical_path": physical_relative,
+                },
+            )
+
+
 def _intersects_task_authority(declaration: str) -> bool:
-    parts = declaration.casefold().split("/")
-    static_parts: list[str] = []
-    for part in parts:
-        if any(character in part for character in "*?["):
-            break
-        static_parts.append(part)
+    static_parts = [part.casefold() for part in _task_declaration_static_parts(declaration)]
     # A pattern without a fixed directory prefix can match every protected root.
     if not static_parts:
         return True
@@ -198,3 +282,19 @@ def _intersects_task_authority(declaration: str) -> bool:
         if static == folded or static.startswith(f"{folded}/") or folded.startswith(f"{static}/"):
             return True
     return False
+
+
+def _task_declaration_static_parts(declaration: str) -> tuple[str, ...]:
+    result: list[str] = []
+    for part in declaration.split("/"):
+        if any(character in part for character in "*?["):
+            break
+        result.append(part)
+    return tuple(result)
+
+
+def _is_reparse_point(value: object) -> bool:
+    mode = int(getattr(value, "st_mode", 0))
+    attributes = int(getattr(value, "st_file_attributes", 0))
+    reparse_flag = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+    return stat.S_ISLNK(mode) or bool(attributes & reparse_flag)

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import test, { after } from "node:test";
@@ -248,6 +248,28 @@ test("task write scope fails closed for widened globs, traversal, siblings, and 
   assert.deepEqual((linkedApp.requests.at(-1)?.params as { sandboxPolicy: unknown }).sandboxPolicy, {
     type: "readOnly", networkAccess: false
   });
+});
+
+test("NTFS short-name authority aliases remain read-only and approvals are declined", {
+  skip: process.platform !== "win32"
+}, async () => {
+  const shortRoot = join(TEST_REPOSITORY, "docs", "EXEC-P~1");
+  assert.equal(existsSync(shortRoot), true, "test volume must expose the exec-plans 8.3 alias");
+  const host = new FakeHost();
+  host.currentRun = run("implementation", "high", ["docs/EXEC-P~1/**"]);
+  const app = new FakeApp();
+  const controller = new WorkspaceController(TEST_REPOSITORY, host, app);
+  await controller.startRun({ draft: { run_id: "run-1" }, slug: "slice" });
+  await controller.startTurn("inspect");
+  assert.deepEqual((app.requests.at(-1)?.params as { sandboxPolicy: unknown }).sandboxPolicy, {
+    type: "readOnly", networkAccess: false
+  });
+  app.emitApproval({
+    id: "ntfs-short-alias",
+    method: "item/fileChange/requestApproval",
+    params: { path: "docs/EXEC-P~1/active/run.json" }
+  });
+  assert.deepEqual(app.responses.at(-1)?.result, { decision: "decline" });
 });
 
 test("approval broker auto-declines pre-gate, out-of-scope and destructive requests", async () => {
