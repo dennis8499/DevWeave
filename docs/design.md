@@ -7,6 +7,10 @@ App-server is the interactive execution plane because the agent is part of the p
 
 The product owns the Control Center, canonical plan, workflow tools, approvals, and business constraints. Codex owns the reusable agent loop and configured sandboxed execution.
 
+Every thread start, resume, reconnect, and turn start reasserts `approvalPolicy: untrusted` and `approvalsReviewer: user`. A machine-level auto-review setting therefore cannot approve an app-server request before the DevWeave client has applied its phase, scope, and human-decision policy.
+
+Detached review prefers the protocol's `exitedReviewMode` item. For app-server builds that instead finish a custom detached review with an `agentMessage`, the compatibility path accepts text only from the exact `reviewThreadId` and review turn returned by `review/start`, and only after that same turn completes successfully. Ordinary agent messages and reused implementation identities are not review results.
+
 ## Authority split
 
 The agent facade contains eight task-level operations. The host facade contains five lifecycle mutations. Both converge on one RunService and one reducer, so authorization is not duplicated in transport-specific code. The private host bridge uses a per-process stdin challenge/HMAC exchange; its token never appears in argv, environment, disk, or Webview state.

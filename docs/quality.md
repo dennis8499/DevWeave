@@ -7,13 +7,15 @@ From the repository root, run the V2 Python suite and public repository check. F
 
 The Windows certification runner is explicitly opt-in. It may use the operator's existing Codex login/network and send bounded workspace-related context to the Codex service; without that authorization, the report must remain `blocked` rather than substituting mocks or treating a local protocol-only probe as certification.
 
+The current Windows x64 certification passed against Codex `0.149.0-alpha.4.3` (executable SHA-256 `21f44f04e70d41d011268863d5109f5d7fc2862c14f390083e39ca3398b5ca47`). The read-only run observed the exact eight MCP tools, a native approval request and client decline, an interrupted turn, stored-thread resume/delete, and detached review completion; no write approval was granted. Other operating systems remain unverified.
+
 The architecture checker reports stable codes including `ROOT_INSTRUCTIONS_TOO_LARGE`, `MODULE_TOO_LARGE`, `REVERSE_DEPENDENCY`, `PUBLIC_SCHEMA_DRIFT`, `BROKEN_DOC_LINK`, `UNTRACED_ACCEPTANCE`, `DUPLICATE_CANONICAL_TOPIC`, and `NAVIGATION_TOO_DEEP`. A waiver is valid only for the exact code/path recorded in [architecture exceptions](architecture-exceptions.json), with owner, rationale, and unexpired date.
 
 ## Acceptance traces
 
 | Acceptance | Primary mechanical evidence |
 | --- | --- |
-| AC-001 | `vscode-extension/test/unit/app-server-session.test.ts` |
+| AC-001 | `vscode-extension/test/unit/app-server-session.test.ts`, `tests/test_app_server_e2e.py` |
 | AC-002 | `tests/test_v2_cli_host.py` |
 | AC-003 | `tests/test_v2_mcp.py` |
 | AC-004 | `tests/test_v2_cli_host.py`, `tests/test_v2_mcp.py` |
@@ -26,7 +28,7 @@ The architecture checker reports stable codes including `ROOT_INSTRUCTIONS_TOO_L
 | AC-011 | `tests/test_v2_contracts.py` |
 | AC-012 | `vscode-extension/test/unit/webview-contract.test.ts` |
 | AC-013 | `tests/test_v2_verification.py` |
-| AC-014 | `vscode-extension/test/unit/workspace-controller.test.ts` |
+| AC-014 | `vscode-extension/test/unit/workspace-controller.test.ts`, `tests/test_app_server_e2e.py` |
 | AC-015 | `tests/test_v2_release.py` |
 | AC-016 | `tests/test_v2_mcp.py`, `vscode-extension/test/unit/security.test.ts` |
 | AC-017 | `tests/test_v2_run_service.py`, `tests/test_v2_verification.py` |

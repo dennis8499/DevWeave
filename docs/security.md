@@ -13,7 +13,7 @@
 
 ## Authorization
 
-Agent identity never grants host identity. MCP cannot discover or forward start/resume, decision resolution, Gate decisions, or cancel. App-server command/file requests are assessed against current phase, task declarations, read-only command policy, and destructive Git policy; the user explicitly accepts, declines, or cancels eligible requests.
+Agent identity never grants host identity. MCP cannot discover or forward start/resume, decision resolution, Gate decisions, or cancel. App-server command/file requests are assessed against current phase, task declarations, read-only command policy, and destructive Git policy; the user explicitly accepts, declines, or cancels eligible requests. The host reasserts `approvalPolicy: untrusted` and `approvalsReviewer: user` on thread start/resume/reconnect and every turn so a broader machine-level auto-review preference cannot bypass this client-owned decision point.
 
 ## Sandbox and process policy
 
