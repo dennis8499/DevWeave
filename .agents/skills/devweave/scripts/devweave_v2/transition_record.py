@@ -28,8 +28,14 @@ TASK_PATHS: dict[str, tuple[str, ...]] = {
     "TASK-004": (".agents/skills/devweave/scripts/devweave_v2", "tests/test_v2_verification.py"),
     "TASK-005": (".codex/config.toml", ".agents/skills/devweave/scripts/devweave_v2", "tests/test_v2_mcp.py"),
     "TASK-006": (".agents/skills/devweave/scripts/devweave.py", ".agents/skills/devweave/scripts/devweave_v2"),
-    "TASK-007": ("vscode-extension/src/app-server-session.ts", "vscode-extension/test/unit/app-server-session.test.ts"),
-    "TASK-008": ("vscode-extension/src/workspace-controller.ts", "vscode-extension/test/unit/workspace-controller.test.ts"),
+    "TASK-007": ("vscode-extension/src/app-server/session.ts", "vscode-extension/test/unit/app-server-session.test.ts"),
+    "TASK-008": (
+        "vscode-extension/src/controller/approval-broker.ts",
+        "vscode-extension/src/controller/host-bridge-client.ts",
+        "vscode-extension/src/controller/review-coordinator.ts",
+        "vscode-extension/src/controller/workspace-controller.ts",
+        "vscode-extension/test/unit/workspace-controller.test.ts",
+    ),
     "TASK-009": ("vscode-extension/src", "vscode-extension/webview", "vscode-extension/test"),
     "TASK-010": ("AGENTS.md", "ARCHITECTURE.md", "docs", ".agents/skills/devweave/assets/v2-skill"),
     "TASK-011": (".agents/skills/devweave/scripts/devweave_v2/cutover.py", "docs/generated/v2-cutover-manifest.json", "vscode-extension"),
@@ -104,9 +110,12 @@ def record_transition_completion(
         }
     for task_id, task in plan["tasks"].items():
         legacy = state["tasks"][task_id]
-        task.update({"status": "completed", "progress": legacy["note"]})
+        task.update({"status": "completed", "progress": legacy["note"], "commit_ref": expected_source_head})
 
     findings = review["review"].get("findings", [])
+    source_fingerprint = verification["source_fingerprint"]
+    repository_head = _git(root, "rev-parse", "HEAD").strip()
+    review_details = review["review"]
     plan.update(
         {
             "status": "completed",
@@ -114,13 +123,18 @@ def record_transition_completion(
             "verification": {
                 "status": "passed",
                 "evidence_ids": [verification["id"], review["id"]],
+                "current_report_id": "transition",
                 "reports": {
                     "transition": {
                         "acceptance_path": f"{WORK_ROOT}/acceptance.md",
                         "acceptance_sha256": _file_hash(root / WORK_ROOT / "acceptance.md"),
-                        "repository_head": _git(root, "rev-parse", "HEAD").strip(),
+                        "base_branch": state["base_source"]["branch"],
+                        "base_ref": state["base_source"]["head"],
+                        "repository_head": repository_head,
+                        "run_branch": branch,
                         "source_head": expected_source_head,
-                        "source_fingerprint": verification["source_fingerprint"],
+                        "source_digest": source_fingerprint,
+                        "source_fingerprint": source_fingerprint,
                         "v1_export_json_sha256": _file_hash(root / "docs/generated/v1-export.json"),
                         "v1_export_markdown_sha256": _file_hash(root / "docs/generated/v1-export.md"),
                     }
@@ -132,6 +146,9 @@ def record_transition_completion(
                 "round": 1,
                 "status": "passed",
                 "finding_ids": [item["id"] for item in findings],
+                "source_fingerprint": source_fingerprint,
+                "reviewer_thread_id": review_details["reviewer_id"],
+                "review_turn_id": review_details.get("review_turn_id") or f"transition:{review['id']}",
             },
             "completion_requested": True,
             "blockers": [],

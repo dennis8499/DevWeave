@@ -15,6 +15,7 @@ if str(SCRIPT_ROOT) not in sys.path:
 
 from devweave_v2.cutover import (  # noqa: E402
     CutoverFinalizer,
+    LEGACY_TRANSITION_STATE_PATH,
     TRANSITION_COMPLETION_PATH,
     TRANSITION_RUN_ID,
     _git_files,
@@ -43,6 +44,8 @@ class CutoverFinalizerTests(unittest.TestCase):
         self._git("add", "-A")
         self._git("commit", "-qm", "legacy fixture")
         self.base_ref = self._git("rev-parse", "HEAD").strip()
+        self._git("checkout", "-qb", "devweave/transition-fixture")
+        self._bind_completion_to_git()
         self.manifest_path = self.repository / "docs" / "generated" / "v2-cutover-manifest.json"
         write_manifest(self.manifest_path, generate_manifest(self.repository, base_ref=self.base_ref))
 
@@ -130,6 +133,8 @@ class CutoverFinalizerTests(unittest.TestCase):
 
     def test_apply_requires_hash_bound_completed_transition_record(self) -> None:
         (self.repository / TRANSITION_COMPLETION_PATH).unlink()
+        self._git("add", TRANSITION_COMPLETION_PATH)
+        self._git("commit", "-qm", "remove completion proof")
         write_manifest(self.manifest_path, generate_manifest(self.repository, base_ref=self.base_ref))
         finalizer = CutoverFinalizer(self.repository, self.manifest_path)
         self.assertFalse(finalizer.check()["completion_record_ready"])
@@ -146,6 +151,41 @@ class CutoverFinalizerTests(unittest.TestCase):
             finalizer.apply(approved_manifest_sha256=finalizer.manifest_sha256)
         self.assertEqual(ErrorCode.CONFLICT, caught.exception.code)
         self.assertEqual("old agents\n", (self.repository / "AGENTS.md").read_text(encoding="utf-8"))
+
+    def test_changed_head_fails_before_mutation(self) -> None:
+        changed = self.repository / "docs" / "head-drift.md"
+        changed.parent.mkdir(parents=True, exist_ok=True)
+        changed.write_text("new head\n", encoding="utf-8")
+        self._git("add", "docs/head-drift.md")
+        self._git("commit", "-qm", "move prepared head")
+        self._assert_preflight_conflict_without_mutation()
+
+    def test_changed_branch_fails_before_mutation(self) -> None:
+        self._git("checkout", "-qb", "devweave/wrong-cutover-branch")
+        self._assert_preflight_conflict_without_mutation()
+
+    def test_moved_base_branch_fails_before_mutation(self) -> None:
+        self._git("checkout", "-qb", "base-drift")
+        changed = self.repository / "base-drift.txt"
+        changed.write_text("moved base\n", encoding="utf-8")
+        self._git("add", "base-drift.txt")
+        self._git("commit", "-qm", "move base")
+        moved = self._git("rev-parse", "HEAD").strip()
+        self._git("checkout", "devweave/transition-fixture")
+        self._git("branch", "-f", "master", moved)
+        self._assert_preflight_conflict_without_mutation()
+
+    def test_unrelated_dirty_path_fails_before_mutation(self) -> None:
+        (self.repository / "unrelated.txt").write_text("not in manifest\n", encoding="utf-8")
+        self._assert_preflight_conflict_without_mutation()
+
+    def _assert_preflight_conflict_without_mutation(self) -> None:
+        before = (self.repository / "AGENTS.md").read_bytes()
+        finalizer = CutoverFinalizer(self.repository, self.manifest_path)
+        with self.assertRaises(DevWeaveError) as caught:
+            finalizer.apply(approved_manifest_sha256=finalizer.manifest_sha256)
+        self.assertEqual(ErrorCode.CONFLICT, caught.exception.code)
+        self.assertEqual(before, (self.repository / "AGENTS.md").read_bytes())
 
     def _write_fixture(self) -> None:
         files = {
@@ -199,15 +239,31 @@ class CutoverFinalizerTests(unittest.TestCase):
                 }
             )
         for task in plan["tasks"].values():
-            task.update({"status": "completed", "progress": "verified"})
+            task.update({"status": "completed", "progress": "verified", "commit_ref": "a" * 40})
         plan.update(
             {
                 "status": "completed",
                 "phase": "closed",
-                "verification": {"status": "passed", "evidence_ids": ["VER-1"], "reports": {}},
+                "verification": {
+                    "status": "passed",
+                    "evidence_ids": ["VER-1"],
+                    "current_report_id": "transition",
+                    "reports": {
+                        "transition": {
+                            "base_branch": "master",
+                            "base_ref": "a" * 40,
+                            "repository_head": "a" * 40,
+                            "run_branch": "devweave/transition-fixture",
+                            "source_head": "a" * 40,
+                            "source_digest": "c" * 64,
+                            "source_fingerprint": "c" * 64,
+                        }
+                    },
+                },
                 "review": {
                     "mode": "detached_fix_reverify", "max_rounds": 3, "round": 1,
-                    "status": "passed", "finding_ids": [],
+                    "status": "passed", "finding_ids": [], "source_fingerprint": "c" * 64,
+                    "reviewer_thread_id": "reviewer-fixture", "review_turn_id": "turn-fixture",
                 },
                 "completion_requested": True,
             }
@@ -215,6 +271,34 @@ class CutoverFinalizerTests(unittest.TestCase):
         completed = self.repository / TRANSITION_COMPLETION_PATH
         completed.parent.mkdir(parents=True, exist_ok=True)
         completed.write_text(dumps(validate_exec_plan(plan)), encoding="utf-8")
+
+    def _bind_completion_to_git(self) -> None:
+        completed = self.repository / TRANSITION_COMPLETION_PATH
+        plan = json.loads(completed.read_text(encoding="utf-8"))
+        plan["base_ref"] = self.base_ref
+        for task in plan["tasks"].values():
+            task["commit_ref"] = self.base_ref
+        report = plan["verification"]["reports"]["transition"]
+        report.update(
+            {
+                "base_ref": self.base_ref,
+                "repository_head": self.base_ref,
+                "source_head": self.base_ref,
+            }
+        )
+        completed.write_text(dumps(validate_exec_plan(plan)), encoding="utf-8")
+        state = self.repository / LEGACY_TRANSITION_STATE_PATH
+        state.parent.mkdir(parents=True, exist_ok=True)
+        state.write_text(
+            dumps(
+                {
+                    "id": TRANSITION_RUN_ID,
+                    "base_source": {"branch": "master", "head": self.base_ref},
+                    "last_verification": {"source_fingerprint": "c" * 64},
+                }
+            ),
+            encoding="utf-8",
+        )
 
     def _git(self, *args: str) -> str:
         result = subprocess.run(

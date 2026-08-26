@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import uuid
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
@@ -15,15 +14,22 @@ from .cutover_hashing import (
     canonical_file_sha256,
     git_file_sha256,
 )
+from .cutover_git import git as _git
+from .cutover_git import git_files as _git_files
+from .cutover_provenance import bounded_branch as _branch_value
+from .cutover_provenance import git_anchor_issues
+from .cutover_provenance import git_sha1 as _git_hash_value
+from .cutover_provenance import manifest_provenance
+from .cutover_provenance import sha256_digest as _sha256_value
+from .cutover_provenance import validate_completion_record
 from .errors import DevWeaveError, ErrorCode
-from .run_state import validate_exec_plan
 from .version import VERSION
 
-MANIFEST_SCHEMA_VERSION = 2
+MANIFEST_SCHEMA_VERSION = 3
 MAX_MANIFEST_ENTRIES = 2_000
-MAX_COMPLETION_RECORD_BYTES = 1_000_000
 TRANSITION_RUN_ID = "20260825-163914-feature-devweave-v2-app-server-harness"
 TRANSITION_COMPLETION_PATH = f"docs/exec-plans/completed/{TRANSITION_RUN_ID}.json"
+LEGACY_TRANSITION_STATE_PATH = f".devweave/work-items/{TRANSITION_RUN_ID}/state.json"
 
 REPLACEMENT_PATHS = (
     (".agents/skills/devweave/assets/v2-cutover/AGENTS.md", "AGENTS.md"),
@@ -97,7 +103,11 @@ V2_REFERENCE_PATHS = frozenset(
 
 def generate_manifest(repository: Path, *, base_ref: str) -> dict[str, Any]:
     root = repository.resolve()
-    _git(root, "rev-parse", "--verify", f"{base_ref}^{{commit}}")
+    resolved_base = _git(root, "rev-parse", "--verify", f"{base_ref}^{{commit}}").strip()
+    prepared_from_head = _git(root, "rev-parse", "HEAD").strip()
+    prepared_from_branch = _git(root, "branch", "--show-current").strip()
+    if not prepared_from_branch:
+        raise DevWeaveError(ErrorCode.CONFLICT, "Cutover manifest cannot be prepared from detached HEAD.")
     tracked = set(_git_files(root))
     replacements: list[dict[str, str]] = []
     for source, destination in REPLACEMENT_PATHS:
@@ -144,18 +154,30 @@ def generate_manifest(repository: Path, *, base_ref: str) -> dict[str, Any]:
     retained: list[dict[str, str]] = []
     completion_path = _safe_path(root, TRANSITION_COMPLETION_PATH)
     if completion_path.is_file():
-        _validate_completion_record(completion_path)
+        validate_completion_record(completion_path, transition_run_id=TRANSITION_RUN_ID)
         retained.append(
             {
                 "path": TRANSITION_COMPLETION_PATH,
                 "sha256": canonical_file_sha256(completion_path),
             }
         )
+    provenance = manifest_provenance(
+        root,
+        completion_path=completion_path,
+        transition_state_path=_safe_path(root, LEGACY_TRANSITION_STATE_PATH),
+        transition_run_id=TRANSITION_RUN_ID,
+        prepared_from_head=prepared_from_head,
+        prepared_from_branch=prepared_from_branch,
+        resolved_base=resolved_base,
+    )
     payload = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "product_version": VERSION,
-        "prepared_from_head": _git(root, "rev-parse", "HEAD").strip(),
-        "base_ref": _git(root, "rev-parse", f"{base_ref}^{{commit}}").strip(),
+        "prepared_from_branch": prepared_from_branch,
+        "prepared_from_head": prepared_from_head,
+        "base_branch": provenance["base_branch"],
+        "base_ref": resolved_base,
+        "source_fingerprint": provenance["source_fingerprint"],
         "replacements": replacements,
         "deletions": deletions,
         "retained": retained,
@@ -243,6 +265,16 @@ class CutoverFinalizer:
         pending_deletions = completed_deletions = 0
         retained_records = 0
 
+        errors.extend(
+            git_anchor_issues(
+                self.repository,
+                manifest_path=self.manifest_path,
+                manifest=self.manifest,
+                completion_path=_safe_path(self.repository, TRANSITION_COMPLETION_PATH),
+                completion_relative=TRANSITION_COMPLETION_PATH,
+                transition_run_id=TRANSITION_RUN_ID,
+            )
+        )
         tracked_legacy = {path for path in _git_files(self.repository) if _is_legacy(path)}
         declared_deletions = {item["path"] for item in self.manifest["deletions"]}
         for path in sorted(tracked_legacy - declared_deletions):
@@ -283,7 +315,7 @@ class CutoverFinalizer:
                 errors.append({"path": item["path"], "reason": "retained record hash mismatch"})
                 continue
             try:
-                _validate_completion_record(path)
+                validate_completion_record(path, transition_run_id=TRANSITION_RUN_ID)
             except DevWeaveError:
                 errors.append({"path": item["path"], "reason": "retained completion record is invalid"})
                 continue
@@ -306,15 +338,15 @@ class CutoverFinalizer:
             "completion_record_ready": retained_records == 1,
         }
 
-
 def _load_manifest(repository: Path, path: Path) -> dict[str, Any]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise DevWeaveError(ErrorCode.INVALID_JSON, "Cutover manifest is unavailable or invalid JSON.") from exc
     required = {
-        "schema_version", "product_version", "prepared_from_head", "base_ref",
-        "replacements", "deletions", "retained", "manifest_sha256",
+        "schema_version", "product_version", "prepared_from_branch", "prepared_from_head",
+        "base_branch", "base_ref", "source_fingerprint", "replacements", "deletions",
+        "retained", "manifest_sha256",
     }
     if not isinstance(raw, dict) or set(raw) != required:
         raise DevWeaveError(ErrorCode.UNKNOWN_FIELD, "Cutover manifest fields do not match the strict contract.")
@@ -323,6 +355,11 @@ def _load_manifest(repository: Path, path: Path) -> dict[str, Any]:
     payload = {key: value for key, value in raw.items() if key != "manifest_sha256"}
     if raw["manifest_sha256"] != sha256(payload):
         raise DevWeaveError(ErrorCode.CONFLICT, "Cutover manifest canonical hash mismatch.")
+    _branch_value(raw["prepared_from_branch"], "prepared_from_branch")
+    _branch_value(raw["base_branch"], "base_branch")
+    _git_hash_value(raw["prepared_from_head"], "prepared_from_head")
+    _git_hash_value(raw["base_ref"], "base_ref")
+    _sha256_value(raw["source_fingerprint"], "source_fingerprint")
     if not isinstance(raw["replacements"], list) or not isinstance(raw["deletions"], list) or not isinstance(raw["retained"], list):
         raise DevWeaveError(ErrorCode.INVALID_TYPE, "Cutover operations must be arrays.")
     if len(raw["replacements"]) + len(raw["deletions"]) + len(raw["retained"]) > MAX_MANIFEST_ENTRIES:
@@ -362,27 +399,6 @@ def _load_manifest(repository: Path, path: Path) -> dict[str, Any]:
         _hash_value(item["sha256"], "sha256")
     _safe_path(repository, path.relative_to(repository).as_posix())
     return raw
-
-
-def _validate_completion_record(path: Path) -> dict[str, Any]:
-    try:
-        if path.is_symlink() or not path.is_file():
-            raise DevWeaveError(ErrorCode.FORBIDDEN, "Transition completion record must be a regular file.")
-        if path.stat().st_size > MAX_COMPLETION_RECORD_BYTES:
-            raise DevWeaveError(ErrorCode.BOUND_EXCEEDED, "Transition completion record exceeds its size bound.")
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except DevWeaveError:
-        raise
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise DevWeaveError(ErrorCode.INVALID_JSON, "Transition completion record is invalid JSON.") from exc
-    plan = validate_exec_plan(raw)
-    if plan["run_id"] != TRANSITION_RUN_ID or plan["status"] != "completed" or plan["phase"] != "closed":
-        raise DevWeaveError(
-            ErrorCode.CONFLICT,
-            "Transition completion record is not the closed V2 cutover ExecPlan.",
-            {"path": TRANSITION_COMPLETION_PATH},
-        )
-    return plan
 
 
 def _strict_item(value: Any, fields: set[str]) -> None:
@@ -450,24 +466,6 @@ def _legacy_files_on_disk(repository: Path) -> set[str]:
                     raise DevWeaveError(ErrorCode.FORBIDDEN, "Legacy root contains a symlink.", {"path": str(path)})
                 result.add(path.relative_to(repository).as_posix())
     return result
-
-
-def _git_files(repository: Path) -> tuple[str, ...]:
-    raw = subprocess.run(
-        ["git", "ls-files", "-z"], cwd=repository, check=True, capture_output=True, shell=False,
-    ).stdout
-    return tuple(item.decode("utf-8") for item in raw.split(b"\0") if item)
-
-
-def _git(repository: Path, *args: str) -> str:
-    try:
-        result = subprocess.run(
-            ["git", *args], cwd=repository, check=True, capture_output=True, text=True,
-            encoding="utf-8", errors="strict", shell=False,
-        )
-    except subprocess.CalledProcessError as exc:
-        raise DevWeaveError(ErrorCode.COMMAND_FAILED, "Git cutover preflight failed.", {"args": list(args)}) from exc
-    return result.stdout
 
 
 def _atomic_write(path: Path, data: bytes) -> None:
