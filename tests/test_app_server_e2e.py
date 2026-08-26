@@ -272,14 +272,6 @@ class RealCodexAppServerTests(unittest.TestCase):
             self.assertIsInstance(devweave, dict)
             self.assertEqual(tuple(sorted(devweave["tools"])), tuple(sorted(AGENT_TOOLS)))
 
-            read = client.request("thread/read", {"threadId": thread_id, "includeTurns": True}, timeout=30)
-            self.assertEqual(nested_id(read, "thread"), thread_id)
-            resumed = client.request("thread/resume", {
-                "threadId": thread_id, "cwd": str(ROOT), "approvalPolicy": "on-request",
-                "sandbox": "read-only", "config": mcp_config,
-            }, timeout=60)
-            self.assertEqual(nested_id(resumed, "thread"), thread_id)
-
             approval_start = len(client.messages)
             approval_turn = client.request("turn/start", {
                 "threadId": thread_id,
@@ -302,6 +294,14 @@ class RealCodexAppServerTests(unittest.TestCase):
             self.assertIn(approval.get("method"), APPROVAL_METHODS)
             client.wait_for(turn_completed(approval_turn_id), timeout=180, after=approval_start)
             self.assertFalse(sentinel.exists(), "declined approval created the sentinel")
+
+            read = client.request("thread/read", {"threadId": thread_id, "includeTurns": True}, timeout=30)
+            self.assertEqual(nested_id(read, "thread"), thread_id)
+            resumed = client.request("thread/resume", {
+                "threadId": thread_id, "cwd": str(ROOT), "approvalPolicy": "on-request",
+                "sandbox": "read-only", "config": mcp_config,
+            }, timeout=60)
+            self.assertEqual(nested_id(resumed, "thread"), thread_id)
 
             interrupt_start = len(client.messages)
             interrupt_turn = client.request("turn/start", {
