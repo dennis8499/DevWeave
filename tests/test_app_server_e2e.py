@@ -379,8 +379,7 @@ class RealCodexAppServerTests(unittest.TestCase):
                         "text": (
                             "This is an authorized bounded approval transport probe. Immediately use the shell tool exactly "
                             f"once with this exact command: {WRITE_PROBE_COMMAND}. "
-                            "Do not use another tool and do not reply before making the tool call. "
-                            "After the expected denial, reply exactly DEVWEAVE_APPROVAL_DECLINED."
+                            "Do not use another tool and do not reply before making the tool call."
                         ),
                     }],
                     "approvalPolicy": "untrusted",
