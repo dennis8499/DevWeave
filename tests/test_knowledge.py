@@ -47,7 +47,10 @@ def add_to_index(repo: Path, stem: str, section: str, summary: str = "Fixture pa
 
 
 def prepare_sourced_feature(
-    harness: RepositoryHarness, *, stale_unrelated: bool = False
+    harness: RepositoryHarness,
+    *,
+    stale_unrelated: bool = False,
+    historical_runtime_log: bool = False,
 ) -> dict:
     harness.init()
     write_page(harness.repo, "modules/runtime.md", "module", ["src/app.txt"])
@@ -61,6 +64,14 @@ def prepare_sourced_feature(
             fingerprint="sha256:" + "0" * 64,
         )
         add_to_index(harness.repo, "unrelated", "Modules", "Unrelated stale page")
+    if historical_runtime_log:
+        log = harness.repo / "wiki" / "log.md"
+        log.write_text(
+            log.read_text(encoding="utf-8")
+            + "\n## [2098-12-31] promote | prior-work\n\n"
+            + "- Historical behavior was documented in [[runtime]].\n",
+            encoding="utf-8",
+        )
     state = core.create_work(
         harness.repo,
         kind="feature",
@@ -802,10 +813,46 @@ class KnowledgeLifecycleTests(unittest.TestCase):
 
     def test_declared_delete_and_append_only_log_rules(self) -> None:
         with RepositoryHarness() as harness:
-            state = prepare_sourced_feature(harness)
+            state = prepare_sourced_feature(harness, historical_runtime_log=True)
             promote_runtime(harness, state["id"], delete=True)
             errors, _ = knowledge_acceptance(harness, state)
             self.assertEqual([], errors)
+
+            index = harness.repo / "wiki" / "index.md"
+            index.write_text(
+                index.read_text(encoding="utf-8").replace(
+                    "## Modules\n\n", "## Modules\n\n- [[runtime]] | Undeclared stale link\n"
+                ),
+                encoding="utf-8",
+            )
+            errors, _ = knowledge_acceptance(harness, state)
+            self.assertTrue(
+                any(
+                    "broken_wikilink [wiki/index.md]" in item
+                    and "[[runtime]]" in item
+                    for item in errors
+                ),
+                errors,
+            )
+
+        with RepositoryHarness() as harness:
+            state = prepare_sourced_feature(harness, historical_runtime_log=True)
+            promote_runtime(harness, state["id"], delete=True)
+            log = harness.repo / "wiki" / "log.md"
+            log.write_text(
+                log.read_text(encoding="utf-8")
+                + "\n- Undeclared historical target: [[undeclared-missing]].\n",
+                encoding="utf-8",
+            )
+            errors, _ = knowledge_acceptance(harness, state)
+            self.assertTrue(
+                any(
+                    "broken_wikilink [wiki/log.md]" in item
+                    and "[[undeclared-missing]]" in item
+                    for item in errors
+                ),
+                errors,
+            )
 
         with RepositoryHarness() as harness:
             state = prepare_sourced_feature(harness)

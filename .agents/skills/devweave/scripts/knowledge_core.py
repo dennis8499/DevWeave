@@ -747,9 +747,15 @@ def lint_wiki(
     root: str = "wiki",
     base_snapshot: dict[str, Any] | None = None,
     snapshot: dict[str, Any] | None = None,
+    allowed_log_missing_stems: Iterable[str] = (),
 ) -> dict[str, Any]:
     knowledge_root = normalize_root(root)
     wiki = _inside_repo(repo, knowledge_root)
+    allowed_log_targets = {
+        PurePosixPath(str(stem).strip().replace("\\", "/")).stem
+        for stem in allowed_log_missing_stems
+        if str(stem).strip()
+    }
     findings: list[dict[str, Any]] = []
     if not wiki.is_dir():
         findings.append(_finding("critical", "missing_wiki", "Knowledge root does not exist.", knowledge_root))
@@ -836,6 +842,11 @@ def lint_wiki(
             if not target:
                 continue
             if target not in stems:
+                if (
+                    page == f"{knowledge_root}/log.md"
+                    and target in allowed_log_targets
+                ):
+                    continue
                 findings.append(_finding("critical", "broken_wikilink", f"Missing target [[{raw}]].", page))
             else:
                 inbound[target] += 1
@@ -983,6 +994,7 @@ def seal_pages(
     *,
     root: str = "wiki",
     today: str | None = None,
+    allowed_log_missing_stems: Iterable[str] = (),
 ) -> list[dict[str, Any]]:
     if not WORK_PATTERN.fullmatch(work_id):
         raise KnowledgeError("invalid_work", "verified_by must be a valid work ID.")
@@ -1025,7 +1037,12 @@ def seal_pages(
         prepared.append((path, rendered, frontmatter))
         results.append({"page": page, "source_fingerprint": fingerprint, "last_updated": frontmatter["last_updated"], "verified_by": work_id})
     snapshot = knowledge_snapshot(repo, root=root)
-    lint = lint_wiki(repo, root=root, snapshot=snapshot)
+    lint = lint_wiki(
+        repo,
+        root=root,
+        snapshot=snapshot,
+        allowed_log_missing_stems=allowed_log_missing_stems,
+    )
     critical = [
         finding
         for finding in lint.get("findings", [])

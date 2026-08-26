@@ -2186,10 +2186,22 @@ def _validate_knowledge_acceptance(
     project = load_project(repo)
     root = project["knowledge"]["root"]
     base = state["base_knowledge"]
+    updates = state.get("knowledge_updates", {})
+    upserts = set(updates.get("upserts", []))
+    deletes = set(updates.get("deletes", []))
+    coupled = set(updates.get("coupled", []))
+    sealed = set(updates.get("sealed", []))
+    allowed_log_missing_stems = {
+        PurePosixPath(page).stem for page in deletes
+    }
     try:
         current = knowledge.knowledge_snapshot(repo, root=root)
         lint = knowledge.lint_wiki(
-            repo, root=root, base_snapshot=base, snapshot=current
+            repo,
+            root=root,
+            base_snapshot=base,
+            snapshot=current,
+            allowed_log_missing_stems=allowed_log_missing_stems,
         )
     except knowledge.KnowledgeError as exc:
         errors.append(f"Knowledge validation failed: {exc.message}")
@@ -2202,11 +2214,6 @@ def _validate_knowledge_acceptance(
         else:
             warnings.append(message)
 
-    updates = state.get("knowledge_updates", {})
-    upserts = set(updates.get("upserts", []))
-    deletes = set(updates.get("deletes", []))
-    coupled = set(updates.get("coupled", []))
-    sealed = set(updates.get("sealed", []))
     declared = upserts | deletes | coupled
     actual = set(knowledge.changed_knowledge_paths(base, current))
     undeclared = sorted(actual - declared)
@@ -3540,7 +3547,14 @@ def seal_knowledge(
             )
         try:
             sealed_records = knowledge.seal_pages(
-                repo, normalized, work_id, root=root
+                repo,
+                normalized,
+                work_id,
+                root=root,
+                allowed_log_missing_stems={
+                    PurePosixPath(page).stem
+                    for page in updates.get("deletes", [])
+                },
             )
         except knowledge.KnowledgeError as exc:
             _raise_knowledge(exc)
