@@ -1,0 +1,161 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-001",
+    "AC-002",
+    "AC-003",
+    "AC-004",
+    "AC-005",
+    "AC-006",
+    "AC-007",
+    "AC-008",
+    "AC-009",
+    "AC-010",
+    "AC-011",
+    "AC-012",
+    "AC-013",
+    "AC-014",
+    "AC-015",
+    "AC-016",
+    "AC-017",
+    "AC-018",
+    "AC-019",
+    "AC-020",
+    "AC-021",
+    "AC-022"
+  ],
+  "created_at": "2026-08-26T02:53:01+00:00",
+  "eligibility_reason": "review_not_passed",
+  "exit_code": null,
+  "expectation": null,
+  "gate_eligible": false,
+  "git_head": "795eec5d996591d36de56b0fb7eff5d73d702da2",
+  "id": "EVID-045",
+  "kind": "review",
+  "log_truncated": false,
+  "observed_result": "failure",
+  "raw_log": ".devweave/cache/logs/20260825-163914-feature-devweave-v2-app-server-harness/EVID-045.log",
+  "review": {
+    "context_mode": "isolated_read_only",
+    "covers": [
+      "AC-001",
+      "AC-002",
+      "AC-003",
+      "AC-004",
+      "AC-005",
+      "AC-006",
+      "AC-007",
+      "AC-008",
+      "AC-009",
+      "AC-010",
+      "AC-011",
+      "AC-012",
+      "AC-013",
+      "AC-014",
+      "AC-015",
+      "AC-016",
+      "AC-017",
+      "AC-018",
+      "AC-019",
+      "AC-020",
+      "AC-021",
+      "AC-022"
+    ],
+    "findings": [
+      {
+        "evidence": "vscode-extension/src/controller/workspace-controller.ts:260-276 grants workspaceWrite over the entire repository during implementation, verification, and review. vscode-extension/src/controller/approval-broker.ts:14-44 applies declared-path scope only to file-change approval requests and classifies commands using startsWith plus a narrow deny regex; for example, `git status; git clean -fd` is classified read-only, while git clean/restore/rebase, interpreters, redirection, and many PowerShell writers remain eligible. cutover.py:59-68 removes the legacy hook without installing a V2 task-scope execution guard. workspace-controller.ts:187-194 closes a run without interrupting an already writable turn.",
+        "id": "F-001",
+        "recommendation": "Enforce realpath-safe current-task paths at the sandbox or mandatory execution-hook boundary, parse argv structurally, reject commands whose effects cannot be proven in scope, and interrupt/await the active turn before cancellation closes the run.",
+        "severity": "critical",
+        "title": "Task scope is not enforced at the execution boundary"
+      },
+      {
+        "evidence": ".agents/skills/devweave/scripts/devweave_v2/plan_store.py:25-30 and 63-92 protect load/check/replace only with threading.RLock. The MCP process constructs its own store at mcp_server.py:114-117, while the separate host process constructs another through host_bridge.py:109-113 and host_operations.py:23-35. Both processes can read revision N, pass the same expected revision, and atomically replace revision N+1; the later replace silently discards the earlier mutation.",
+        "id": "F-002",
+        "recommendation": "Use a repository-scoped interprocess lock or durable compare-and-swap transaction covering read, revision check, and replace, then test simultaneous host and MCP mutations in separate real processes.",
+        "severity": "critical",
+        "title": "Canonical ExecPlan mutations can lose cross-process updates"
+      },
+      {
+        "evidence": ".agents/skills/devweave/scripts/devweave_v2/mcp_server.py:114-117 constructs RunService(repository) directly, leaving verification_engine unset. run_service.py:212-223 therefore rejects every production verification_run call as not configured. tests/test_v2_mcp.py:139-150 injects an engine manually, while lines 154-164 explicitly exercise the real run_stdio composition only for protocol discovery.",
+        "id": "F-003",
+        "recommendation": "Construct the MCP service through build_run_service with strict schema-v2 configuration and add a process-level mcp-serve test that executes verification_run against the staged post-cutover project.",
+        "severity": "critical",
+        "title": "The production MCP verification tool is permanently blocked"
+      },
+      {
+        "evidence": "verification_engine.py:265-274 defines evidence_is_current but it has no production caller. run_service.py:242-250 stores only aggregate status, IDs, and plan digest; task_update at 179-210 does not invalidate proof; completion_request at 259-276 and acceptance at 351-379 check only the stored passed flag. Thus code can change or tasks can complete after verification and still pass acceptance. Additionally, verification_engine.py:117-149 defaults release=False, run_service.py never supplies release=True, and cli.py:36-44/118-133 exposes no release mode, so staged release_only package, smoke, and app-server commands cannot run through the promised post-cutover V2 verify surface.",
+        "id": "F-004",
+        "recommendation": "Bind every gate to a freshly recomputed source/output, plan, executable, and command-definition digest; invalidate proof after relevant mutations; recheck it at completion and acceptance; and expose an authorized release verification mode that runs the complete release-only matrix.",
+        "severity": "critical",
+        "title": "Verification gates accept stale and incomplete proof"
+      },
+      {
+        "evidence": "git_transaction.py:51-100 defines scoped commit_slice, but no production path calls it. host_operations.py:16 exposes only five methods, and run_service.py:179-210 marks tasks completed without committing. Acceptance at run_service.py:351-379 marks the plan completed without calling PlanStore.complete. host_operations.py:56-62 resumes by doctor plus plan load only, without verifying current branch, recorded base ref, dirty state, or run ownership; run_start at 44-54 switches branch before the complete draft is validated, preserving an orphan branch on later failure.",
+        "id": "F-005",
+        "recommendation": "Integrate GitTransaction and plan archival into task/gate completion, verify run branch and immutable base before every resume and mutation, validate the complete draft before switching, and preserve explicit recovery state for partial branch, staging, commit, or archive failures.",
+        "severity": "critical",
+        "title": "Required Git commit, resume, and archival lifecycle is not integrated"
+      },
+      {
+        "evidence": "vscode-extension/src/controller/review-coordinator.ts:60-77 reports passed whenever parsed findings contain no open critical; lines 98-103 silently discard every text line not beginning with CRITICAL, WARNING, or ADVISORY. Therefore malformed output, an unavailable verdict, or ordinary prose describing a critical defect yields zero findings and passes. app-server/session.ts:316-351 accepts any nonempty bound agentMessage after turn completion as the compatibility review result. run_service.py:406-423 validates only client-supplied detached/thread/round/boolean fields and does not validate a structured verdict, source binding, or review provenance.",
+        "id": "F-006",
+        "recommendation": "Require a strict versioned review envelope with explicit result, severity, findings, source/diff fingerprint, and thread/turn provenance; treat missing, malformed, unavailable, or contradictory output as blocked; verify the persisted envelope server-side.",
+        "severity": "critical",
+        "title": "Detached review parsing fails open"
+      },
+      {
+        "evidence": "cutover.py:154-163 records prepared_from_head and base_ref in the approved manifest, but _preflight at 240-307 never compares either value with current Git state and never verifies the authorized branch or cleanliness. apply at 194-231 can consequently delete hundreds of allowlisted files after unrelated non-manifest source changes or on another compatible branch. Exact manifest-hash approval authenticates the manifest contents but not the checkout to which it is applied.",
+        "id": "F-007",
+        "recommendation": "Immediately before the first mutation, require the authorized run branch, exact prepared_from_head, unchanged recorded base ref, and a clean tree except explicitly hash-bound finalizer artifacts; bind the reviewed source fingerprint and completion record into that same preflight.",
+        "severity": "critical",
+        "title": "The destructive finalizer ignores its frozen HEAD and branch"
+      },
+      {
+        "evidence": "state.json TASK-012 still references EVID-018 through EVID-027 and says 64/64, while acceptance and current proof use EVID-035 through EVID-044 and 68/68. transition_record.py:58-59 and 170-214 correctly select current last_verification and the single current review, so this does not itself authorize stale proof. However, transition_record.py:31-32 declares obsolete TASK-007/TASK-008 paths that do not match src/app-server/session.ts and src/controller/workspace-controller.ts. EVID-044.json:20 has raw_log null and retains only hashes/summaries for the current package, smoke, and UI proof.",
+        "id": "F-008",
+        "recommendation": "Append a current TASK-012 completion snapshot, correct the projected declared paths, and retain a bounded machine-readable EVID-044 report or attestation sufficient to reproduce and independently verify its artifact, UI, and smoke hashes.",
+        "severity": "advisory",
+        "title": "Transition audit records contain stale and inexact traceability"
+      }
+    ],
+    "report_sha256": "1a1b1521de85d94f7bbacf116ca22a78b9a87f4ea1a05d7c1cf87ce4d4cadcfd",
+    "result": "critical",
+    "reviewer_id": "/root/formal_g3_review",
+    "severity": "critical",
+    "tasks": [
+      "TASK-001",
+      "TASK-002",
+      "TASK-003",
+      "TASK-004",
+      "TASK-005",
+      "TASK-006",
+      "TASK-007",
+      "TASK-008",
+      "TASK-009",
+      "TASK-010",
+      "TASK-011",
+      "TASK-012"
+    ]
+  },
+  "schema_version": 1,
+  "source_fingerprint": "c1b91cff9ef096d76e524e3a640e5455de81db367c5a34849fb21bf79054736d",
+  "stale": false,
+  "status": "failed",
+  "summary": "Independent read-only inspection confirmed the frozen Git anchors, bounded VERSION waiver, exact planned wiki/log deletion exemption, and source-bound EVID-035 through EVID-044 records. G3 must remain blocked: production MCP verification is unavailable, task scope is not enforced at the execution boundary, canonical state can lose cross-process updates, verification can become stale, Git lifecycle guarantees are not integrated, detached review can fail open, and the destructive finalizer does not enforce its recorded HEAD or branch. The TASK-012 snapshot and manual EVID-044 proof also need audit-quality cleanup.",
+  "tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006",
+    "TASK-007",
+    "TASK-008",
+    "TASK-009",
+    "TASK-010",
+    "TASK-011",
+    "TASK-012"
+  ]
+}

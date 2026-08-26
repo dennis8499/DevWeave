@@ -1,0 +1,30 @@
+{
+  "binds_current_source": true,
+  "command_id": null,
+  "covers": [
+    "AC-012",
+    "AC-015",
+    "AC-020",
+    "AC-021"
+  ],
+  "created_at": "2026-08-26T04:14:35+00:00",
+  "eligibility_reason": "manual_current_source_evidence",
+  "exit_code": null,
+  "expectation": null,
+  "gate_eligible": true,
+  "git_head": "0a276e6d88197b250c01935c66212051ad5ceced",
+  "id": "EVID-046",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "observed_result": "success",
+  "raw_log": ".devweave/cache/logs/20260825-163914-feature-devweave-v2-app-server-harness/EVID-046.log",
+  "report_sha256": "a444826fbe3740588425938491056d41aadfe1d3a9baa9cb27de5e830ce16c33",
+  "schema_version": 1,
+  "source_fingerprint": "f76795fdaa34424ec5d97829c39610311c3d6ee23ac4edc37bbcee3107424f8c",
+  "stale": false,
+  "status": "passed",
+  "summary": "Current HEAD 0a276e6 clean-clone certification passed: V2 80/80; legacy 71/71 (1 skipped); extension 117/117 plus typecheck; verified 2.0.0 VSIX sha256 153698c496d8d238d85c3bd77b9b9d870daadde44a7817ca1b4d38201660a053; VS Code 1.131.0 smoke; UI 9/9; live Codex 0.149.1 read-only E2E with eight exact MCP tools, declined write probe, interrupted turn, detached strict review, preserved Git status, and deleted synthetic thread.",
+  "tasks": [
+    "TASK-012"
+  ]
+}

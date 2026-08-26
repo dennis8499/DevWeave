@@ -1,0 +1,65 @@
+{
+  "actual_changed_paths": [],
+  "argv": [
+    "C:\\Python314\\python.exe",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-p",
+    "test_app_server_e2e.py",
+    "-v"
+  ],
+  "binds_current_source": true,
+  "command_definition_digest": "sha256:055985b434d26c136c36e1eb367f185a1667c1d6348d9f1c4111f5c48894c64b",
+  "command_id": "app-server-e2e",
+  "covers": [
+    "AC-001",
+    "AC-003",
+    "AC-014",
+    "AC-021"
+  ],
+  "created_at": "2026-08-26T02:12:10+00:00",
+  "cwd": ".",
+  "duration_ms": 45849,
+  "effective_plan_digest": "sha256:84a0b3bf59cc2edc154bfb0b102c87b6772cbd0f6b9c5f70fa217ef93e77605e",
+  "effective_plan_id": "plan-bb36c8a0d4776b3e",
+  "eligibility_reason": "zero_exit_and_current_observed_effects",
+  "execution_channel": "devweave_executor",
+  "execution_error": null,
+  "exit_code": 0,
+  "expectation": "zero",
+  "finished_at": "2026-08-26T02:12:10+00:00",
+  "gate_eligible": true,
+  "git_head": "795eec5d996591d36de56b0fb7eff5d73d702da2",
+  "id": "EVID-036",
+  "input_fingerprint": "022d6357a8b6bb862a72c0653edaea81a39a9004353cc715cd23fbea3cc1bd5c",
+  "kind": "acceptance",
+  "log_truncated": false,
+  "metrics": {
+    "duration_ms": 45849,
+    "verification": {
+      "cache_hit": false,
+      "dependency_closure_added": 0,
+      "selected": 1,
+      "skipped": 0
+    }
+  },
+  "observed_result": "success",
+  "output_fingerprint": "022d6357a8b6bb862a72c0653edaea81a39a9004353cc715cd23fbea3cc1bd5c",
+  "project_policy_digest": "sha256:377a1734d16f37f443d5bfbf3d4aa616bad545b1a0e0f806f98f3592502cee1c",
+  "raw_log": ".devweave/cache/logs/20260825-163914-feature-devweave-v2-app-server-harness/EVID-036.log",
+  "schema_version": 1,
+  "source_fingerprint": "c1b91cff9ef096d76e524e3a640e5455de81db367c5a34849fb21bf79054736d",
+  "stale": false,
+  "started_at": "2026-08-26T02:11:24+00:00",
+  "status": "passed",
+  "summary": "{\"approval_attempts\":1,\"approval_method\":\"item/commandExecution/requestApproval\",\"approval_policy\":\"untrusted\",\"approvals_reviewer\":\"user\",\"codex_sha256\":\"21f44f04e70d41d011268863d5109f5d7fc2862c14f390083e39ca3398b5ca47\",\"codex_version\":\"codex-cli 0.149.0-alpha.4.3\",\"detached_review\":true,\"interrupt_attempts\":1,\"interrupt_status\":\"interrupted\",\"mcp_tools\":[\"completion_request\",\"context_read\",\"decision_request\",\"plan_save\",\"run_inspect\",\"task_update\",\"verification_read\",\"verification_run\"],\"messages_observed\":116,\"ok\":true,\"review_completion\":\"authoritative_agent_message\",\"review_nonempty\":true,\"schema_files\":291,\"schema_version\":2,\"source_git_head\":\"795eec5d996591d36de56b0fb7eff5d73d702da2\",\"synthetic_thread_deleted\":true}\r\n\ntest_real_stdio_mcp_lifecycle_approval_and_detached_review (test_app_server_e2e.RealCodexAppServerTests.test_real_stdio_mcp_lifecycle_approval_and_detached_review) ... {\"live_e2e_phase\":\"initialize\"}\r\n{\"live_e2e_phase\":\"thread_start\"}\r\n{\"live_e2e_phase\":\"mcp_status\"}\r\n{\"live_e2e_phase\":\"approval_turn_start_1\"}\r\n{\"live_e2e_phase\":\"approval_wait_1\"}\r\n{\"live_e2e_phase\":\"approval_completion\"}\r\n{\"live_e2e_phase\":\"thread_read\"}\r\n{\"live_e2e_phase\":\"thread_resume\"}\r\n{\"live_e2e_phase\":\"interrupt_turn_start_1\"}\r\n{\"live_e2e_phase\":\"interrupt_approval_wait_1\"}\r\n{\"live_e2e_phase\":\"steer_interrupt\"}\r\n{\"live_e2e_phase\":\"detached_review\"}\r\nok\r\n\r\n----------------------------------------------------------------------\r\nRan 1 test in 45.707s\r\n\r\nOK",
+  "tasks": [
+    "TASK-012"
+  ],
+  "timed_out": false,
+  "undeclared_paths": []
+}

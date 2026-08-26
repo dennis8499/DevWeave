@@ -64,11 +64,14 @@ Independent Review provenance: `20260804-122803-feature-g3-review-agent`（待 G
 ## DevWeave V2 app-server architecture candidate（等待 G3）
 
 - V2 採 `Extension/Webview -> authenticated host bridge -> devweave_v2 application/core -> storage/git/verification adapters` 的單向邊界；agent 僅經 project-scoped MCP 進入受限 facade，host-only mutation 不會出現在 MCP discovery。
-- 實際相容性探測以 Codex CLI `0.149.0-alpha.4.3` 完成；其 generated app-server schema 含 291 個 JSON files。實作已依真實 protocol 對齊 thread-scoped MCP inventory、object-shaped tool map、`thread/start` sandbox enum、`turn/start` sandbox policy、`turn/steer.expectedTurnId`、`reviewThreadId`、nested thread/turn events、`item.review` 與 `tokenUsage.total`。
+- 實際相容性探測以 Codex CLI `0.149.1` 完成；其 generated app-server schema 含 291 個 JSON files。實作已依真實 protocol 對齊 thread-scoped MCP inventory、object-shaped tool map、`thread/start` sandbox enum、`turn/start` sandbox policy、`turn/steer.expectedTurnId`、`reviewThreadId`、nested thread/turn events、`item.review` 與 `tokenUsage.total`。
 - MCP `tools/list` 僅接受缺省/null cursor 與合法 `_meta`，未知欄位、非 null cursor 或 malformed metadata 均 fail closed；實際 app-server thread probe 已看到且只看到八個 DevWeave tools。
-- `ExecPlan` 是唯一 canonical run authority；event/process/cache/thread state 位於 ignored runtime storage，可由 ordered events 重建。Canonical serialization、atomic replace/append、revision/mutation idempotency 與 scoped local phase commits共同提供 restart/recovery boundary。
+- Thread start/resume/reconnect 與每個 turn 都強制 `approvalPolicy=untrusted`、`approvalsReviewer=user`，避免 machine-level `auto_review` 先於 client policy 核准。Detached review 優先使用 `exitedReviewMode`；目前 alpha CLI 未送出該 item 時，只接受 `review/start` 回傳之 exact reviewer thread/turn 的 authoritative `agentMessage`，並要求同一 turn `completed`。
+- Task scope 同時檢查 lexical 與 canonical repository-relative path；host 在 branch/start journal 前做 repository-aware validation，Extension 在 sandbox root 與每次 file approval 重新解析實體路徑，因此 NTFS 8.3 short name、symlink/junction、protected authority ancestor 與 repository escape 都 fail closed。
+- `ExecPlan` 是唯一 canonical run authority；event/process/cache/thread state 位於 ignored runtime storage，可由 ordered events 重建。Canonical serialization、atomic replace/append、revision/mutation idempotency 與 scoped local phase commits共同提供 restart/recovery boundary。Acceptance 若在 completed state replace 後、archive move 前崩潰，authority-locked recovery 會先冪等完成 active-to-completed placement，再建立或驗證唯一 checkpoint commit/ref/digest/final journal。
 - Controlled verification 使用 `shell=False`、固定 argv/cwd、runtime executable provenance、DAG/stage、declared effect reconciliation 與 per-command `env_allowlist`；只有 baseline OS variables 與明確允許名稱可傳入 child process。
-- Breaking finalizer 只接受 current manifest hash，並在任何 path/hash drift 時停止。主工作樹在 G3 前刻意維持 V1 transition authority；disposable clone 已證明 final tree 可通過 V2 checker且不依賴被刪除的 V1 truth。
+- Live certification 將 runner 到 OpenAI Codex 服務的 outbound transport 與 Codex tool sandbox 分開治理：前者只在使用者明確 opt-in 且提供 verified executable 時開啟；後者固定 read-only、network disabled、`approvalPolicy=untrusted`、`approvalsReviewer=user` 並拒絕所有寫入。Harness 使用 global operation budget、較短 cleanup timeout 與 bounded/redacted phase diagnostics，讓 transport denial 能在 executor timeout 前 fail closed。
+- Breaking finalizer 只接受 current manifest hash，並在任何 path/hash drift 時停止。主工作樹在 G3 前刻意維持 V1 transition authority；current suite 已證明 public-check fixture、architecture與 finalizer contract，exact finalized main tree仍須在 G3 後通過 public `check`且不得依賴被刪除的 V1 truth。
 
 V2 candidate provenance: `20260825-163914-feature-devweave-v2-app-server-harness`（等待 G3 核准與 finalizer cutover）。
 

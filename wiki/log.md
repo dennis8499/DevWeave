@@ -2,11 +2,11 @@
 title: Wiki Activity Log
 type: log
 sources: []
-last_updated: 2026-08-16
+last_updated: 2026-08-26
 tags: [log]
 status: active
 source_fingerprint: none
-verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
+verified_by: 20260825-163914-feature-devweave-v2-app-server-harness
 ---
 
 # Activity Log
@@ -111,3 +111,8 @@ verified_by: 20260814-233520-bug-guard-policy-engine-v2-side-effect-comma
 - Refresh [[overview]]、[[devweave-knowledge-workflow]] 與 [[knowledge-engine]]，同步 Verification Policy v2 的 shared evaluator、G2 frozen Effective Verification Plan、digest-bound evidence eligibility、controlled executor 與 G3 plan parity。
 - 新增 [[command-policy-engine]]，記錄 typed read-only grammar、trusted executable/cwd、writer barrier、temporary candidate、undeclared-write failure 與 policy mutation stale boundary。
 - 本批 Wiki 內容由四個 planned upsert 與 coupled index/log 更新組成；既有 log body 保持 append-only，完成後由 Router seal current source fingerprints。
+
+## [2026-08-26] promote | 20260825-163914-feature-devweave-v2-app-server-harness
+
+- 刪除 [[overview]]、[[devweave-knowledge-workflow]]、[[command-policy-engine]]、[[knowledge-engine]] 與 [[vscode-extension]] 五個 legacy 內容頁；它們描述的 clipboard、Wiki runtime、legacy verifier 與 0.2.3 Extension authority 已由 V2 clean cutover取代。
+- V2 durable knowledge 只保留在 root `ARCHITECTURE.md` 與 indexed `docs/` tree；本 index/log 只記錄本次 legacy G3 的受治理刪除，hash-bound finalizer 會移除剩餘 Wiki starter tree。
