@@ -246,6 +246,7 @@ def protocol_diagnostic(messages: list[dict[str, Any]]) -> str:
     item_types: dict[str, int] = {}
     turn_statuses: list[str] = []
     errors: list[dict[str, Any]] = []
+    agent_messages: list[str] = []
     for message in messages:
         method = message.get("method")
         if isinstance(method, str):
@@ -257,6 +258,11 @@ def protocol_diagnostic(messages: list[dict[str, Any]]) -> str:
         if isinstance(item, dict) and isinstance(item.get("type"), str):
             item_type = item["type"]
             item_types[item_type] = item_types.get(item_type, 0) + 1
+            if method == "item/completed" and item_type == "agentMessage" and len(agent_messages) < 4:
+                for key in ("text", "content", "output", "message"):
+                    if isinstance(item.get(key), str):
+                        agent_messages.append(bounded_text(item[key], max_bytes=512)[0])
+                        break
         if method == "turn/completed" and isinstance(params.get("turn"), dict):
             status = params["turn"].get("status")
             if isinstance(status, str):
@@ -280,6 +286,7 @@ def protocol_diagnostic(messages: list[dict[str, Any]]) -> str:
             "item_types": item_types,
             "turn_statuses": turn_statuses[-8:],
             "errors": errors,
+            "agent_messages": agent_messages,
         },
         ensure_ascii=True, sort_keys=True, separators=(",", ":"),
     )[:4_096]
@@ -370,9 +377,8 @@ class RealCodexAppServerTests(unittest.TestCase):
                     "input": [{
                         "type": "text",
                         "text": (
-                            "This is a bounded approval transport probe. Use the shell tool exactly once to attempt the exact "
-                            f"write command: {WRITE_PROBE_COMMAND}. The read-only sandbox must request approval, and the "
-                            "client will decline it so the command must not execute. "
+                            "This is an authorized bounded approval transport probe. Immediately use the shell tool exactly "
+                            f"once with this exact command: {WRITE_PROBE_COMMAND}. "
                             "Do not use another tool and do not reply before making the tool call. "
                             "After the expected denial, reply exactly DEVWEAVE_APPROVAL_DECLINED."
                         ),
@@ -443,9 +449,8 @@ class RealCodexAppServerTests(unittest.TestCase):
                     "input": [{
                         "type": "text",
                         "text": (
-                            "This is a bounded interrupt transport probe. Use the shell tool exactly once to attempt the exact "
-                            f"write command: {WRITE_PROBE_COMMAND}. The read-only sandbox must request approval, and the "
-                            "client will keep the approval pending so the command must not execute. "
+                            "This is an authorized bounded interrupt transport probe. Immediately use the shell tool exactly "
+                            f"once with this exact command: {WRITE_PROBE_COMMAND}. "
                             "Do not use another tool and do not reply before making the tool call."
                         ),
                     }],
