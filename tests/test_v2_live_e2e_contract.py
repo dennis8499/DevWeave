@@ -19,7 +19,11 @@ ROOT = Path(__file__).resolve().parents[1]
 class LiveE2EContractTests(unittest.TestCase):
     def test_global_budget_leaves_executor_cleanup_headroom(self) -> None:
         project = json.loads((ROOT / ".devweave/project.json").read_text(encoding="utf-8"))
-        command = next(item for item in project["commands"] if item["id"] == "app-server-e2e")
+        command = next(
+            item
+            for item in project["verification_plan"]["commands"]
+            if item["command_id"] == "app-server-e2e"
+        )
         self.assertLess(
             LIVE_OPERATION_BUDGET_SECONDS + LIVE_CLEANUP_TIMEOUT_SECONDS,
             command["timeout_seconds"],

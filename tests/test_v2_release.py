@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -29,7 +28,11 @@ from devweave_v2.errors import DevWeaveError, ErrorCode  # noqa: E402
 from devweave_v2.plan_contracts import RunPlanDraft  # noqa: E402
 from devweave_v2.project_config import ProjectConfig  # noqa: E402
 from devweave_v2.run_state import new_exec_plan, validate_exec_plan  # noqa: E402
-from devweave_v2.transition_record import WORK_ROOT, record_transition_completion  # noqa: E402
+from devweave_v2.transition_record import (  # noqa: E402
+    TASK_PATHS,
+    WORK_ROOT,
+    record_transition_completion,
+)
 
 
 class CutoverFinalizerTests(unittest.TestCase):
@@ -327,48 +330,122 @@ class TransitionCompletionRecordTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory(prefix="devweave-transition-record-")
         self.addCleanup(self.temporary.cleanup)
         self.repository = Path(self.temporary.name)
-        source_work = REPOSITORY_ROOT / WORK_ROOT
         target_work = self.repository / WORK_ROOT
         target_work.mkdir(parents=True)
-        for name in ("requirements.md", "design.md", "plan.md", "acceptance.md"):
-            shutil.copy2(source_work / name, target_work / name)
+
+        requirement_ids = [f"REQ-{index:03d}" for index in range(1, 16)] + [
+            f"NFR-{index:03d}" for index in range(1, 8)
+        ]
+        acceptance_ids = [f"AC-{index:03d}" for index in range(1, 23)]
+        requirements = ["# Transition requirements", ""]
+        requirements.extend(
+            f"## {requirement_id}: Fixture requirement"
+            for requirement_id in requirement_ids
+        )
+        requirements.extend(
+            f"## {acceptance_id}: Fixture acceptance"
+            for acceptance_id in acceptance_ids
+        )
+        (target_work / "requirements.md").write_text(
+            "\n\n".join(requirements) + "\n",
+            encoding="utf-8",
+        )
+        (target_work / "design.md").write_text(
+            "# Transition design\n\n## DEC-001: Use the V2-only release contract\n",
+            encoding="utf-8",
+        )
+        task_sections: list[str] = ["# Transition plan"]
+        for index, task_id in enumerate(sorted(TASK_PATHS), start=1):
+            traces = [
+                requirement_ids[(index - 1) % len(requirement_ids)],
+                acceptance_ids[(index - 1) % len(acceptance_ids)],
+            ]
+            if task_id == "TASK-012":
+                traces = [*requirement_ids, *acceptance_ids]
+            task_sections.append(
+                "\n".join(
+                    (
+                        f"## {task_id}: Transition fixture task {index}",
+                        f"- Traces: {', '.join(traces)}",
+                        "- Dependencies: none",
+                    )
+                )
+            )
+        (target_work / "plan.md").write_text(
+            "\n\n".join(task_sections) + "\n",
+            encoding="utf-8",
+        )
+        (target_work / "acceptance.md").write_text(
+            "# Transition acceptance\n\nAccepted fixture.\n",
+            encoding="utf-8",
+        )
+
         staged = self.repository / ".agents/skills/devweave/assets/v2-cutover/project.json"
         staged.parent.mkdir(parents=True)
-        shutil.copy2(REPOSITORY_ROOT / ".agents/skills/devweave/assets/v2-cutover/project.json", staged)
+        staged.write_bytes((REPOSITORY_ROOT / ".devweave/project.json").read_bytes())
         generated = self.repository / "docs/generated"
         generated.mkdir(parents=True)
-        shutil.copy2(REPOSITORY_ROOT / "docs/generated/v1-export.json", generated / "v1-export.json")
-        shutil.copy2(REPOSITORY_ROOT / "docs/generated/v1-export.md", generated / "v1-export.md")
+        (generated / "v1-export.json").write_text("{}\n", encoding="utf-8")
+        (generated / "v1-export.md").write_text("# V1 export fixture\n", encoding="utf-8")
 
-        state = json.loads((source_work / "state.json").read_text(encoding="utf-8"))
-        state["status"] = "closed"
-        state["base_source"].update({"branch": "master", "head": "a" * 40})
-        state["knowledge_review"].update({"disposition": "no-update", "rationale": "V2 docs are canonical."})
-        for gate in state["gates"].values():
-            gate.update({"status": "approved", "approved_at": "2026-08-25T00:00:00Z", "approved_by": "user"})
-        for task in state["tasks"].values():
-            task.update({"status": "completed", "completed_at": "2026-08-25T00:00:00Z", "note": "verified"})
         source_head = "b" * 40
-        acceptance_ids = [f"AC-{index:03d}" for index in range(1, 23)]
-        state["evidence"] = {
-            "EVID-VERIFY": {
-                "id": "EVID-VERIFY", "kind": "verification", "status": "passed", "stale": False,
-                "binds_current_source": True, "git_head": source_head, "source_fingerprint": "c" * 64,
-                "observed_result": "success", "covers": acceptance_ids,
+        state = {
+            "id": TRANSITION_RUN_ID,
+            "status": "closed",
+            "created_at": "2026-08-25T00:00:00Z",
+            "base_source": {"branch": "master", "head": "a" * 40},
+            "scope": {
+                "paths": sorted(
+                    {
+                        path
+                        for declared_paths in TASK_PATHS.values()
+                        for path in declared_paths
+                    }
+                )
             },
-            "EVID-REVIEW": {
-                "id": "EVID-REVIEW", "kind": "review", "status": "passed", "stale": False,
-                "binds_current_source": True, "git_head": source_head, "source_fingerprint": "c" * 64,
-                "review": {
-                    "context_mode": "isolated_read_only", "result": "passed", "reviewer_id": "reviewer-1",
-                    "report_sha256": "d" * 64, "covers": acceptance_ids, "findings": [
-                        {"id": "FIND-1", "severity": "advisory", "title": "Bounded residual", "evidence": "fixture"}
-                    ],
+            "risk": {"level": "high", "rationale": "Release transition fixture."},
+            "knowledge_review": {
+                "disposition": "no-update",
+                "rationale": "V2 docs are canonical.",
+            },
+            "gates": {
+                gate_id: {
+                    "status": "approved",
+                    "approved_at": "2026-08-25T00:00:00Z",
+                    "approved_by": "user",
+                }
+                for gate_id in ("scope", "build", "acceptance")
+            },
+            "tasks": {
+                task_id: {
+                    "status": "completed",
+                    "completed_at": "2026-08-25T00:00:00Z",
+                    "note": "verified",
+                }
+                for task_id in TASK_PATHS
+            },
+            "evidence": {
+                "EVID-VERIFY": {
+                    "id": "EVID-VERIFY", "kind": "verification", "status": "passed", "stale": False,
+                    "binds_current_source": True, "git_head": source_head, "source_fingerprint": "c" * 64,
+                    "observed_result": "success", "covers": acceptance_ids,
+                },
+                "EVID-REVIEW": {
+                    "id": "EVID-REVIEW", "kind": "review", "status": "passed", "stale": False,
+                    "binds_current_source": True, "git_head": source_head, "source_fingerprint": "c" * 64,
+                    "review": {
+                        "context_mode": "isolated_read_only", "result": "passed", "reviewer_id": "reviewer-1",
+                        "report_sha256": "d" * 64, "covers": acceptance_ids, "findings": [
+                            {"id": "FIND-1", "severity": "advisory", "title": "Bounded residual", "evidence": "fixture"}
+                        ],
+                    },
                 },
             },
-        }
-        state["last_verification"] = {
-            "at": "2026-08-25T00:00:00Z", "evidence_id": "EVID-VERIFY", "source_fingerprint": "c" * 64,
+            "last_verification": {
+                "at": "2026-08-25T00:00:00Z",
+                "evidence_id": "EVID-VERIFY",
+                "source_fingerprint": "c" * 64,
+            },
         }
         (target_work / "state.json").write_text(dumps(state), encoding="utf-8")
         self._git("init", "-q")
@@ -436,41 +513,27 @@ class RepositoryReleaseContractTests(unittest.TestCase):
         self.assertTrue(next(item for item in config.verification_plan.commands if item.command_id == "extension-package").release_only)
         self.assertTrue(next(item for item in config.verification_plan.commands if item.command_id == "app-server-e2e").release_only)
 
-    def test_repository_can_generate_a_hash_bound_ready_manifest(self) -> None:
-        tracked_manifest = json.loads(
-            (REPOSITORY_ROOT / "docs/generated/v2-cutover-manifest.json").read_text(encoding="utf-8")
-        )
-        cache_root = REPOSITORY_ROOT / ".devweave" / "cache"
-        cache_root.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="release-contract-", dir=cache_root) as temporary:
-            manifest_path = Path(temporary) / "v2-cutover-manifest.json"
-            write_manifest(
-                manifest_path,
-                generate_manifest(REPOSITORY_ROOT, base_ref=tracked_manifest["base_ref"]),
-            )
-            try:
-                report = CutoverFinalizer(REPOSITORY_ROOT, manifest_path).check()
-            except DevWeaveError as exc:
-                self.assertEqual(ErrorCode.CONFLICT, exc.code)
-                self.assertEqual(
-                    [
-                        {
-                            "path": "docs/generated/v2-cutover-manifest.json",
-                            "reason": "dirty path is not hash-bound by the finalizer manifest",
-                        }
-                    ],
-                    exc.details.get("issues"),
-                )
-                return
-        self.assertIn(report["status"], {"ready", "already_applied"})
-        if report["status"] == "ready":
-            self.assertEqual(6, report["pending_replacements"])
-            self.assertGreater(report["pending_deletions"], 600)
-            self.assertFalse(report["completion_record_ready"])
-        else:
-            self.assertEqual(6, report["completed_replacements"])
-            self.assertGreater(report["completed_deletions"], 600)
-            self.assertTrue(report["completion_record_ready"])
+    def test_repository_matches_the_applied_hash_bound_manifest(self) -> None:
+        manifest_path = REPOSITORY_ROOT / "docs/generated/v2-cutover-manifest.json"
+        finalizer = CutoverFinalizer(REPOSITORY_ROOT, manifest_path)
+        manifest = finalizer.manifest
+        self.assertEqual(6, len(manifest["replacements"]))
+        self.assertGreater(len(manifest["deletions"]), 600)
+        self.assertEqual(1, len(manifest["retained"]))
+
+        for item in manifest["replacements"]:
+            destination = REPOSITORY_ROOT / item["destination"]
+            self.assertTrue(destination.is_file(), item["destination"])
+            self.assertEqual(item["after_sha256"], canonical_file_sha256(destination))
+        for item in manifest["deletions"]:
+            path = REPOSITORY_ROOT / item["path"]
+            self.assertFalse(path.exists() or path.is_symlink(), item["path"])
+        for item in manifest["retained"]:
+            retained = REPOSITORY_ROOT / item["path"]
+            self.assertTrue(retained.is_file(), item["path"])
+            self.assertEqual(item["sha256"], canonical_file_sha256(retained))
+            plan = validate_exec_plan(json.loads(retained.read_text(encoding="utf-8")))
+            self.assertEqual(("completed", "closed"), (plan["status"], plan["phase"]))
 
 
 if __name__ == "__main__":
