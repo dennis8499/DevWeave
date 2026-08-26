@@ -236,6 +236,10 @@ class RealCodexAppServerTests(unittest.TestCase):
         self.assertFalse(sentinel.exists(), "E2E sentinel already exists")
         doctor = CodexDoctor().probe(repository=ROOT, configured_path=str(codex))
         client = JsonlAppServer(codex)
+        thread_id = ""
+        summary: dict[str, Any] | None = None
+        failure: Exception | None = None
+        cleanup_error: Exception | None = None
         try:
             initialized = client.initialize()
             self.assertIsInstance(initialized.get("userAgent"), str)
@@ -253,7 +257,7 @@ class RealCodexAppServerTests(unittest.TestCase):
             }
             thread_result = client.request("thread/start", {
                 "cwd": str(ROOT), "approvalPolicy": "on-request", "sandbox": "read-only",
-                "ephemeral": True,
+                "ephemeral": False,
                 "baseInstructions": "Run only bounded DevWeave protocol certification steps; never retain reasoning or secrets.",
                 "config": mcp_config,
             }, timeout=60)
@@ -268,7 +272,7 @@ class RealCodexAppServerTests(unittest.TestCase):
             self.assertIsInstance(devweave, dict)
             self.assertEqual(tuple(sorted(devweave["tools"])), tuple(sorted(AGENT_TOOLS)))
 
-            read = client.request("thread/read", {"threadId": thread_id, "includeTurns": False}, timeout=30)
+            read = client.request("thread/read", {"threadId": thread_id, "includeTurns": True}, timeout=30)
             self.assertEqual(nested_id(read, "thread"), thread_id)
             resumed = client.request("thread/resume", {
                 "threadId": thread_id, "cwd": str(ROOT), "approvalPolicy": "on-request",
@@ -363,13 +367,26 @@ class RealCodexAppServerTests(unittest.TestCase):
                 "review_nonempty": True,
                 "messages_observed": len(client.messages),
             }
-            print(json.dumps(summary, ensure_ascii=True, sort_keys=True, separators=(",", ":")))
         except Exception as exc:
-            self.fail(f"BLOCKED_LIVE_CODEX: {exc}")
+            failure = exc
         finally:
+            if thread_id:
+                try:
+                    client.request("thread/delete", {"threadId": thread_id}, timeout=30)
+                except Exception as exc:
+                    cleanup_error = exc
             client.close()
+        if failure is not None:
+            cleanup = f"; synthetic thread cleanup failed: {cleanup_error}" if cleanup_error is not None else ""
+            self.fail(f"BLOCKED_LIVE_CODEX: {failure}{cleanup}")
+        if cleanup_error is not None:
+            self.fail(f"BLOCKED_LIVE_CODEX: synthetic thread cleanup failed: {cleanup_error}")
+        if summary is None:
+            self.fail("BLOCKED_LIVE_CODEX: live run completed without a bounded summary")
         self.assertEqual(git_output("status", "--porcelain=v1", "--untracked-files=all"), before_status)
         self.assertFalse(sentinel.exists())
+        summary["synthetic_thread_deleted"] = True
+        print(json.dumps(summary, ensure_ascii=True, sort_keys=True, separators=(",", ":")))
 
 
 if __name__ == "__main__":
