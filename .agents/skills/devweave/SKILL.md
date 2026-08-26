@@ -1,60 +1,35 @@
 ---
 name: devweave
-description: Govern repository changes with typed plans, risk-adaptive Gates, scoped tasks, controlled verification, and Codex app-server. Trigger on `$devweave`, DevWeave run/status/check/verify requests, or managed product changes.
+description: Govern repository changes with typed ExecPlans, risk-adaptive human Gates, scoped tasks, controlled verification, and Codex app-server. Trigger on `$devweave`, DevWeave run/status/check/verify requests, or managed product changes.
 ---
 
 # DevWeave
 
-DevWeave is the only project workflow skill. Read the repository [knowledge map](../../../docs/index.md) and [architecture](../../../ARCHITECTURE.md); do not load all references by default.
+DevWeave is this repository's only workflow skill. Begin at the [knowledge map](../../../docs/index.md) and [architecture](../../../ARCHITECTURE.md), then load one phase reference.
 
-## Route first
+## Route
 
-1. Inspect `.devweave/project.json` without mutating it.
-2. For schema version 2, use the V2 public CLI for diagnostics and the project MCP tools for agent work. Host-only lifecycle operations remain in the VS Code controller.
-3. Read the current ExecPlan and load only the reference for its phase.
-4. If a fact is discoverable in docs, source, schemas, or tests, inspect it. Ask the user only for a material product decision.
-5. Stop at every required human Gate. Agent output never counts as approval.
+1. Run the public `doctor`/`check` diagnostics before starting work. Missing Codex or required MCP readiness blocks a run; never download or substitute another harness.
+2. The authenticated VS Code host starts/resumes runs and handles decisions, Gates, and cancellation. Agents cannot call those operations.
+3. Use `run_inspect` to read the current snapshot. Load only context allowed by `context_read` and the current task.
+4. Follow [planning](references/planning.md), [implementation](references/implementation.md), or [verification](references/verification.md) according to the authoritative phase.
+5. Stop for each required human Gate. Agent/reviewer output is evidence, never approval.
 
-## Capability split
+## Exact agent surface
 
-Agent MCP tools are exactly:
+The project MCP server exposes only `run_inspect`, `context_read`, `plan_save`, `decision_request`, `task_update`, `verification_run`, `verification_read`, and `completion_request`. Reject any passthrough or unknown tool.
 
-- `run_inspect`
-- `context_read`
-- `plan_save`
-- `decision_request`
-- `task_update`
-- `verification_run`
-- `verification_read`
-- `completion_request`
+## Universal invariants
 
-Only the authenticated host may start or resume a run, resolve a pending decision, decide a Gate, or cancel. Do not discover or invoke an alternate mutation path.
+- Validate strict schema version 2 and unknown fields at every privileged boundary.
+- Use expected revision plus mutation ID for state changes; never edit plans/events/evidence directly.
+- Work only in the current immutable task's declared paths and dependencies.
+- Use tokenized argv, `shell=False`, bounded resources, declared effects, and the frozen verification plan.
+- Reject traversal, symlink escape, stale revisions, out-of-scope writes, and destructive/remote Git operations.
+- Never persist raw reasoning, complete prompts, credentials, or estimated usage/cost.
+- Do not push, open a PR, merge, reset, or switch branches without separate user authorization.
+- A material change to approved intent returns to planning and invalidates downstream approvals/evidence.
 
-## Lifecycle
+## Completion
 
-- Planning produces a strict `RunPlanDraft`, immutable task definitions, scoped paths, acceptance IDs, a frozen verification plan, and risk rationale. Start implementation only after every planning Gate is current.
-- Implementation takes ready tasks in dependency order, changes only declared paths, and records progress through `task_update`. A material requirement/design/scope change returns to planning.
-- Verification executes only the frozen plan. A successful process is evidence only when source, plan, command definition, outputs, and declared effects reconcile.
-- Completion requires risk-selected review: low self-review, standard one detached review, high no more than three detached fix/reverify rounds. Unresolved critical findings block acceptance.
-
-## Safety invariants
-
-- Use structured argv with `shell=False`; never turn a configured command into shell permission.
-- Reject stale revisions, unknown fields/methods, traversal, symlink escape, undeclared writes, and destructive Git commands before mutation.
-- Keep the network denied unless an approved verification command explicitly declares otherwise.
-- Do not persist raw reasoning, full prompts, secrets, or invented usage/cost. Bound and redact diagnostics.
-- Do not push, open a PR, merge, reset, or switch back without separate user authorization.
-- Never hand-edit canonical plan/runtime/evidence state.
-
-## Phase references
-
-The V2-only release skill is prepared under `assets/v2-skill/` and installed by the hash-bound finalizer. During the one authorized transition run, use these existing engine-returned references:
-
-- [Requirements](references/requirements-phase.md)
-- [Design](references/design-phase.md)
-- [Implementation](references/implementation-phase.md)
-- [Verification and legacy G3](references/verification-phase.md)
-
-## Transition exception
-
-Only run `20260825-163914-feature-devweave-v2-app-server-harness` may use the legacy CLI to finish its already-approved TASK-010 through TASK-012 and high-risk G3. Do not start, revise, or mutate any other V1 work item. Its state/event files remain engine-owned. After G3, use only the reviewed hash-bound finalizer; then run the V2 `check` and complete verification again before release.
+Low risk uses self-review; standard uses one detached review; high risk permits at most three detached fix/reverify rounds. Unresolved critical findings, failed/currentness checks, or missing required evidence block acceptance. Human acceptance remains mandatory whenever the plan requires it.

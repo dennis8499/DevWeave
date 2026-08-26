@@ -1,527 +1,302 @@
 {
-  "command_policy_version": 2,
-  "commands": [
-    {
-      "affected_paths": [
-        "tests",
-        "vscode-extension/src",
-        ".codex",
-        ".agents/skills/devweave"
-      ],
-      "argv": [
-        "C:\\Python314\\python.exe",
-        "-B",
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
-        "tests",
-        "-p",
-        "test_app_server_e2e.py",
-        "-v"
-      ],
-      "cwd": ".",
-      "depends_on": [
-        "unit-tests-v2"
-      ],
-      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
-      "id": "app-server-e2e",
-      "required_for": [
-        "high"
-      ],
-      "resolved_executable": "C:\\Python314\\python.exe",
-      "timeout_seconds": 180,
-      "writes": "none"
+  "executables": {
+    "npm": {
+      "candidates": [
+        "npm",
+        "npm.cmd"
+      ]
     },
-    {
-      "affected_paths": [
-        "vscode-extension/src",
-        "vscode-extension/webview",
-        "vscode-extension/esbuild.mjs",
-        "vscode-extension/scripts"
-      ],
-      "allowed_risk": [
-        "low",
-        "standard",
-        "high"
-      ],
-      "argv": [
-        "C:/Program Files/nodejs/npm.cmd",
-        "run",
-        "package"
-      ],
-      "cwd": "vscode-extension",
-      "depends_on": [],
-      "env_allowlist": [],
-      "exclusive_group": null,
-      "executable_sha256": "21b46c69ad6e2f231f02a9e120f4ba6c8e75fef5a45637103002eab99f888ab8",
-      "expected_success_exit_codes": [
-        0
-      ],
-      "id": "extension-package",
-      "min_phase": "requirements",
-      "network": "deny",
-      "outputs": [
-        "vscode-extension/dist",
-        "vscode-extension/devweave-control-center-0.2.3.vsix"
-      ],
-      "release_only": true,
-      "required_for": [
-        "high",
-        "low",
-        "standard"
-      ],
-      "resolved_executable": "C:/Program Files/nodejs/npm.cmd",
-      "timeout_seconds": 120,
-      "writes": "tracked-artifact"
-    },
-    {
-      "affected_paths": [
-        "vscode-extension/src",
-        "vscode-extension/webview",
-        "vscode-extension/test"
-      ],
-      "allowed_risk": [
-        "low",
-        "standard",
-        "high"
-      ],
-      "argv": [
-        "C:/Program Files/nodejs/npm.cmd",
-        "run",
-        "test:smoke:current"
-      ],
-      "cwd": "vscode-extension",
-      "depends_on": [
-        "extension-package"
-      ],
-      "env_allowlist": [],
-      "exclusive_group": null,
-      "executable_sha256": "21b46c69ad6e2f231f02a9e120f4ba6c8e75fef5a45637103002eab99f888ab8",
-      "expected_success_exit_codes": [
-        0
-      ],
-      "id": "extension-smoke",
-      "min_phase": "requirements",
-      "network": "deny",
-      "outputs": [],
-      "release_only": false,
-      "required_for": [
-        "high",
-        "standard"
-      ],
-      "resolved_executable": "C:/Program Files/nodejs/npm.cmd",
-      "timeout_seconds": 120,
-      "writes": "none"
-    },
-    {
-      "affected_paths": [
-        "vscode-extension/src",
-        "vscode-extension/webview",
-        "vscode-extension/test"
-      ],
-      "allowed_risk": [
-        "low",
-        "standard",
-        "high"
-      ],
-      "argv": [
-        "C:/Program Files/nodejs/npm.cmd",
-        "run",
-        "test"
-      ],
-      "cwd": "vscode-extension",
-      "depends_on": [],
-      "env_allowlist": [],
-      "exclusive_group": null,
-      "executable_sha256": "21b46c69ad6e2f231f02a9e120f4ba6c8e75fef5a45637103002eab99f888ab8",
-      "expected_success_exit_codes": [
-        0
-      ],
-      "id": "extension-tests",
-      "min_phase": "requirements",
-      "network": "deny",
-      "outputs": [],
-      "release_only": false,
-      "required_for": [
-        "high",
-        "low",
-        "standard"
-      ],
-      "resolved_executable": "C:/Program Files/nodejs/npm.cmd",
-      "timeout_seconds": 120,
-      "writes": "none"
-    },
-    {
-      "affected_paths": [
-        "vscode-extension/src",
-        "vscode-extension/webview",
-        "vscode-extension/test"
-      ],
-      "allowed_risk": [
-        "low",
-        "standard",
-        "high"
-      ],
-      "argv": [
-        "C:/Program Files/nodejs/npm.cmd",
-        "run",
-        "typecheck"
-      ],
-      "cwd": "vscode-extension",
-      "depends_on": [],
-      "env_allowlist": [],
-      "exclusive_group": null,
-      "executable_sha256": "21b46c69ad6e2f231f02a9e120f4ba6c8e75fef5a45637103002eab99f888ab8",
-      "expected_success_exit_codes": [
-        0
-      ],
-      "id": "extension-typecheck",
-      "min_phase": "requirements",
-      "network": "deny",
-      "outputs": [],
-      "release_only": false,
-      "required_for": [
-        "high",
-        "low",
-        "standard"
-      ],
-      "resolved_executable": "C:/Program Files/nodejs/npm.cmd",
-      "timeout_seconds": 120,
-      "writes": "none"
-    },
-    {
-      "affected_paths": [
-        "tests",
-        ".agents/skills/devweave/scripts"
-      ],
-      "allowed_risk": [
-        "low",
-        "standard",
-        "high"
-      ],
-      "argv": [
-        "C:/Python314/python.exe",
-        "-B",
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
-        "tests",
-        "-p",
-        "test_cli.py",
-        "-v"
-      ],
-      "cwd": ".",
-      "depends_on": [],
-      "env_allowlist": [],
-      "exclusive_group": null,
-      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
-      "expected_success_exit_codes": [
-        0
-      ],
-      "id": "unit-tests-cli",
-      "min_phase": "requirements",
-      "network": "deny",
-      "outputs": [],
-      "release_only": false,
-      "required_for": [
-        "high",
-        "low",
-        "standard"
-      ],
-      "resolved_executable": "C:/Python314/python.exe",
-      "timeout_seconds": 180,
-      "writes": "none"
-    },
-    {
-      "affected_paths": [
-        "tests",
-        ".agents/skills/devweave/scripts"
-      ],
-      "allowed_risk": [
-        "low",
-        "standard",
-        "high"
-      ],
-      "argv": [
-        "C:/Python314/python.exe",
-        "-B",
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
-        "tests",
-        "-p",
-        "test_repository_contract.py",
-        "-v"
-      ],
-      "cwd": ".",
-      "depends_on": [],
-      "env_allowlist": [],
-      "exclusive_group": null,
-      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
-      "expected_success_exit_codes": [
-        0
-      ],
-      "id": "unit-tests-contract",
-      "min_phase": "requirements",
-      "network": "deny",
-      "outputs": [],
-      "release_only": false,
-      "required_for": [
-        "high",
-        "low",
-        "standard"
-      ],
-      "resolved_executable": "C:/Python314/python.exe",
-      "timeout_seconds": 180,
-      "writes": "none"
-    },
-    {
-      "affected_paths": [
-        "tests",
-        ".agents/skills/devweave/scripts"
-      ],
-      "allowed_risk": [
-        "low",
-        "standard",
-        "high"
-      ],
-      "argv": [
-        "C:/Python314/python.exe",
-        "-B",
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
-        "tests",
-        "-p",
-        "test_devweave_core.py",
-        "-v"
-      ],
-      "cwd": ".",
-      "depends_on": [],
-      "env_allowlist": [],
-      "exclusive_group": null,
-      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
-      "expected_success_exit_codes": [
-        0
-      ],
-      "id": "unit-tests-core",
-      "min_phase": "requirements",
-      "network": "deny",
-      "outputs": [],
-      "release_only": false,
-      "required_for": [
-        "high",
-        "low",
-        "standard"
-      ],
-      "resolved_executable": "C:/Python314/python.exe",
-      "timeout_seconds": 360,
-      "writes": "none"
-    },
-    {
-      "affected_paths": [
-        "tests",
-        ".agents/skills/devweave/scripts"
-      ],
-      "allowed_risk": [
-        "low",
-        "standard",
-        "high"
-      ],
-      "argv": [
-        "C:/Python314/python.exe",
-        "-B",
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
-        "tests",
-        "-p",
-        "test_guard.py",
-        "-v"
-      ],
-      "cwd": ".",
-      "depends_on": [],
-      "env_allowlist": [],
-      "exclusive_group": null,
-      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
-      "expected_success_exit_codes": [
-        0
-      ],
-      "id": "unit-tests-guard",
-      "min_phase": "requirements",
-      "network": "deny",
-      "outputs": [],
-      "release_only": false,
-      "required_for": [
-        "high",
-        "low",
-        "standard"
-      ],
-      "resolved_executable": "C:/Python314/python.exe",
-      "timeout_seconds": 180,
-      "writes": "none"
-    },
-    {
-      "affected_paths": [
-        "tests",
-        ".agents/skills/devweave/scripts"
-      ],
-      "allowed_risk": [
-        "low",
-        "standard",
-        "high"
-      ],
-      "argv": [
-        "C:/Python314/python.exe",
-        "-B",
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
-        "tests",
-        "-p",
-        "test_knowledge.py",
-        "-v"
-      ],
-      "cwd": ".",
-      "depends_on": [],
-      "env_allowlist": [],
-      "exclusive_group": null,
-      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
-      "expected_success_exit_codes": [
-        0
-      ],
-      "id": "unit-tests-knowledge",
-      "min_phase": "requirements",
-      "network": "deny",
-      "outputs": [],
-      "release_only": false,
-      "required_for": [
-        "high",
-        "low",
-        "standard"
-      ],
-      "resolved_executable": "C:/Python314/python.exe",
-      "timeout_seconds": 360,
-      "writes": "none"
-    },
-    {
-      "affected_paths": [
-        "tests",
-        ".agents/skills/devweave",
-        ".codex",
-        "docs"
-      ],
-      "allowed_risk": [
-        "low",
-        "standard",
-        "high"
-      ],
-      "argv": [
-        "C:\\Python314\\python.exe",
-        "-B",
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
-        "tests",
-        "-p",
-        "test_v2_*.py",
-        "-v"
-      ],
-      "cwd": ".",
-      "depends_on": [],
-      "env_allowlist": [],
-      "exclusive_group": null,
-      "executable_sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38",
-      "expected_success_exit_codes": [
-        0
-      ],
-      "id": "unit-tests-v2",
-      "min_phase": "requirements",
-      "network": "deny",
-      "outputs": [],
-      "release_only": false,
-      "required_for": [
-        "high"
-      ],
-      "resolved_executable": "C:\\Python314\\python.exe",
-      "timeout_seconds": 360,
-      "writes": "none"
+    "python": {
+      "candidates": [
+        "python",
+        "python3",
+        "py"
+      ]
     }
-  ],
-  "evidence": {
-    "raw_log_limit_bytes": 5000000,
-    "version_summaries": true
   },
-  "knowledge": {
-    "enabled": true,
-    "root": "wiki"
-  },
-  "locale": "zh-TW",
-  "managed": true,
-  "protected_mutations": [
-    "product-code",
-    "tests",
-    "schema",
-    "dependencies",
-    "build",
-    "ci"
-  ],
-  "schema_version": 1,
-  "trusted_executables": [
-    {
-      "id": "npm-cmd",
-      "kind": "registered-wrapper",
-      "path": "C:\\Program Files\\nodejs\\npm.cmd",
-      "sha256": "21b46c69ad6e2f231f02a9e120f4ba6c8e75fef5a45637103002eab99f888ab8"
-    },
-    {
-      "id": "python.exe",
-      "kind": "direct",
-      "path": "C:\\Python314\\python.exe",
-      "sha256": "03168c01b7b7491423350e82c26fee71f35b43694d1319d3c668bda6903a0c38"
-    }
-  ],
-  "verification_profiles": {
-    "high": [
-      "app-server-e2e",
-      "extension-package",
-      "extension-smoke",
-      "extension-tests",
-      "extension-typecheck",
-      "unit-tests-cli",
-      "unit-tests-contract",
-      "unit-tests-core",
-      "unit-tests-guard",
-      "unit-tests-knowledge",
-      "unit-tests-v2"
+  "schema_version": 2,
+  "verification_plan": {
+    "commands": [
+      {
+        "affected_paths": [
+          ".agents/skills/devweave",
+          ".codex/config.toml",
+          "AGENTS.md",
+          "ARCHITECTURE.md",
+          "docs",
+          "tests"
+        ],
+        "argv": [
+          "python",
+          "-B",
+          ".agents/skills/devweave/scripts/devweave_v2_cli.py",
+          "--repo",
+          ".",
+          "check"
+        ],
+        "command_id": "repository-check",
+        "cwd": ".",
+        "definition_digest": "b509ff6d32adc2d4c4eb4bc7ed9b6693301b472871d85402007081847825e057",
+        "dependencies": [],
+        "expected_exit_codes": [
+          0
+        ],
+        "outputs": [],
+        "release_only": false,
+        "risk_profiles": [
+          "low",
+          "standard",
+          "high"
+        ],
+        "timeout_seconds": 120,
+        "writes": "none"
+      },
+      {
+        "affected_paths": [
+          ".agents/skills/devweave",
+          ".codex/config.toml",
+          "docs",
+          "fixtures/devweave_v2",
+          "tests"
+        ],
+        "argv": [
+          "python",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tests",
+          "-p",
+          "test_v2_*.py",
+          "-v"
+        ],
+        "command_id": "python-v2",
+        "cwd": ".",
+        "definition_digest": "7a32018d51cec6664cc7b3f58df05758a30c44eb1484d0ee55c67d14a6cdcaef",
+        "dependencies": [
+          "repository-check"
+        ],
+        "expected_exit_codes": [
+          0
+        ],
+        "outputs": [],
+        "release_only": false,
+        "risk_profiles": [
+          "low",
+          "standard",
+          "high"
+        ],
+        "timeout_seconds": 600,
+        "writes": "none"
+      },
+      {
+        "affected_paths": [
+          "vscode-extension/package.json",
+          "vscode-extension/src",
+          "vscode-extension/tsconfig.json",
+          "vscode-extension/webview"
+        ],
+        "argv": [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        "command_id": "extension-typecheck",
+        "cwd": "vscode-extension",
+        "definition_digest": "fa5e56457507f4206863078ec64ccb7cb84ed12688f32dc716a1edfbbb5c941e",
+        "dependencies": [],
+        "expected_exit_codes": [
+          0
+        ],
+        "outputs": [],
+        "release_only": false,
+        "risk_profiles": [
+          "low",
+          "standard",
+          "high"
+        ],
+        "timeout_seconds": 180,
+        "writes": "none"
+      },
+      {
+        "affected_paths": [
+          "vscode-extension/package.json",
+          "vscode-extension/src",
+          "vscode-extension/test",
+          "vscode-extension/webview"
+        ],
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "command_id": "extension-tests",
+        "cwd": "vscode-extension",
+        "definition_digest": "56ed1ba15e1f296fe4b2d01c43779ad30d38c98b5b16a846afe8d88ed6abaf8d",
+        "dependencies": [],
+        "expected_exit_codes": [
+          0
+        ],
+        "outputs": [],
+        "release_only": false,
+        "risk_profiles": [
+          "low",
+          "standard",
+          "high"
+        ],
+        "timeout_seconds": 240,
+        "writes": "none"
+      },
+      {
+        "affected_paths": [
+          "vscode-extension/esbuild.mjs",
+          "vscode-extension/package.json",
+          "vscode-extension/src",
+          "vscode-extension/webview"
+        ],
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "command_id": "extension-build",
+        "cwd": "vscode-extension",
+        "definition_digest": "038224f0137c29ef036650b24b074f6e94ba7cf1035a678dee616795441559b4",
+        "dependencies": [
+          "extension-tests",
+          "extension-typecheck"
+        ],
+        "expected_exit_codes": [
+          0
+        ],
+        "outputs": [
+          "vscode-extension/dist"
+        ],
+        "release_only": false,
+        "risk_profiles": [
+          "low",
+          "standard",
+          "high"
+        ],
+        "timeout_seconds": 180,
+        "writes": "declared"
+      },
+      {
+        "affected_paths": [
+          "README.md",
+          "docs",
+          "vscode-extension/esbuild.mjs",
+          "vscode-extension/media",
+          "vscode-extension/package-lock.json",
+          "vscode-extension/package.json",
+          "vscode-extension/scripts",
+          "vscode-extension/src",
+          "vscode-extension/webview"
+        ],
+        "argv": [
+          "npm",
+          "run",
+          "package"
+        ],
+        "command_id": "extension-package",
+        "cwd": "vscode-extension",
+        "definition_digest": "23a47ff781bbd60dba366cbfd9b33f474ecab7c1a2332da4c06f37112696ee2a",
+        "dependencies": [
+          "extension-build",
+          "python-v2"
+        ],
+        "expected_exit_codes": [
+          0
+        ],
+        "outputs": [
+          "vscode-extension/.release",
+          "vscode-extension/dist"
+        ],
+        "release_only": true,
+        "risk_profiles": [
+          "high"
+        ],
+        "timeout_seconds": 300,
+        "writes": "declared"
+      },
+      {
+        "affected_paths": [
+          "vscode-extension/package.json",
+          "vscode-extension/src",
+          "vscode-extension/test/smoke.test.ts",
+          "vscode-extension/test/suite/index.js",
+          "vscode-extension/webview"
+        ],
+        "argv": [
+          "npm",
+          "run",
+          "test:smoke:current"
+        ],
+        "command_id": "extension-smoke",
+        "cwd": "vscode-extension",
+        "definition_digest": "4c660252a5e7ebe3af8fab456c984e276c93944fd492d7de8c352ef717129c22",
+        "dependencies": [
+          "extension-package"
+        ],
+        "expected_exit_codes": [
+          0
+        ],
+        "outputs": [
+          "vscode-extension/.test-results",
+          "vscode-extension/.vscode-test"
+        ],
+        "release_only": true,
+        "risk_profiles": [
+          "high"
+        ],
+        "timeout_seconds": 300,
+        "writes": "declared"
+      },
+      {
+        "affected_paths": [
+          ".agents/skills/devweave",
+          ".codex/config.toml",
+          "tests/test_app_server_e2e.py",
+          "vscode-extension/src"
+        ],
+        "argv": [
+          "python",
+          "-B",
+          "-m",
+          "unittest",
+          "tests.test_app_server_e2e",
+          "-v"
+        ],
+        "command_id": "app-server-e2e",
+        "cwd": ".",
+        "definition_digest": "f6129adcd54a13972997a40412fd76f6907578500780fdb69c4924abd53fa06e",
+        "dependencies": [
+          "extension-tests",
+          "python-v2"
+        ],
+        "env_allowlist": [
+          "DEVWEAVE_E2E_ALLOW_LIVE",
+          "DEVWEAVE_CODEX_PATH",
+          "USERPROFILE",
+          "HOME",
+          "APPDATA",
+          "LOCALAPPDATA",
+          "CODEX_HOME",
+          "PATH"
+        ],
+        "expected_exit_codes": [
+          0
+        ],
+        "outputs": [],
+        "release_only": true,
+        "risk_profiles": [
+          "high"
+        ],
+        "timeout_seconds": 300,
+        "writes": "none"
+      }
     ],
-    "low": [
-      "extension-package",
-      "extension-tests",
-      "extension-typecheck",
-      "unit-tests-cli",
-      "unit-tests-contract",
-      "unit-tests-core",
-      "unit-tests-guard",
-      "unit-tests-knowledge"
-    ],
-    "standard": [
-      "extension-package",
-      "extension-smoke",
-      "extension-tests",
-      "extension-typecheck",
-      "unit-tests-cli",
-      "unit-tests-contract",
-      "unit-tests-core",
-      "unit-tests-guard",
-      "unit-tests-knowledge"
-    ]
+    "plan_id": "devweave-v2-release",
+    "schema_version": 2
   }
 }

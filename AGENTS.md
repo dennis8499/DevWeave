@@ -39,8 +39,4 @@ python -B .agents/skills/devweave/scripts/devweave_v2_cli.py --repo . check
 python -B -m unittest discover -s tests -p "test_v2_*.py" -v
 ```
 
-For the extension, run `npm run typecheck`, `npm test`, and `npm run build` in `vscode-extension/`. Architecture exceptions require an exact code/path plus owner, reason, and unexpired date in [the exception ledger](docs/architecture-exceptions.json).
-
-## One-time cutover note
-
-The only authorized legacy transition run is `20260825-163914-feature-devweave-v2-app-server-harness`. Until its high-risk G3 is approved, update its task state only through the legacy CLI and retain its phase references. Do not create another legacy work item. The hash-bound 2.0.0 finalizer removes this note and installs the prepared V2-only skill after that Gate.
+For the Extension, run `npm run typecheck`, `npm test`, and `npm run build` in `vscode-extension/`. Architecture exceptions require an exact code/path plus owner, reason, and unexpired date in [the exception ledger](docs/architecture-exceptions.json).

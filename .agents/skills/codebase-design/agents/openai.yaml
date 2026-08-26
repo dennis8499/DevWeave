@@ -1,3 +1,0 @@
-interface:
-  display_name: "Codebase Design"
-  short_description: "Design deep modules, interfaces, seams, and test surfaces"
