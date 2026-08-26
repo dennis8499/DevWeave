@@ -205,8 +205,12 @@ test("standard review rejects reused identity and parses exitedReviewMode text",
   const reused = new ReviewCoordinator({ async request() { return { reviewThreadId: "implement-thread", findings: [] }; } });
   assert.equal((await reused.run("standard", "implement-thread", "main", async () => undefined)).status, "blocked");
   const detached = new ReviewCoordinator({
-    async request() { return { reviewThreadId: "review-thread" }; },
-    async waitForReviewResult() { return { text: "WARNING [F-1] bounded advisory" }; }
+    async request() { return { reviewThreadId: "review-thread", turn: { id: "review-turn" } }; },
+    async waitForReviewResult(threadId, turnId) {
+      assert.equal(threadId, "review-thread");
+      assert.equal(turnId, "review-turn");
+      return { text: "WARNING [F-1] bounded advisory" };
+    }
   });
   const outcome = await detached.run("standard", "implement-thread", "main", async () => undefined);
   assert.equal(outcome.status, "passed");

@@ -148,6 +148,36 @@ test("detached review completion reads the stable exitedReviewMode review field"
   await session.close();
 });
 
+test("detached review compatibility fallback requires the exact reviewer thread and completed review turn", async () => {
+  const { session, transport, connect } = connectedHarness();
+  await connect;
+  const pending = session.waitForReviewResult("review-thread", "review-turn");
+  transport.receive({
+    method: "item/completed",
+    params: {
+      threadId: "other-thread", turnId: "review-turn",
+      item: { id: "wrong", type: "agentMessage", text: "CRITICAL [WRONG] wrong thread" }
+    }
+  });
+  transport.receive({
+    method: "item/completed",
+    params: {
+      threadId: "review-thread", turnId: "review-turn",
+      item: { id: "review-message", type: "agentMessage", text: "WARNING [F-2] compatibility finding" }
+    }
+  });
+  transport.receive({
+    method: "turn/completed",
+    params: { threadId: "review-thread", turn: { id: "review-turn", status: "completed" } }
+  });
+  assert.deepEqual(await pending, {
+    text: "WARNING [F-2] compatibility finding",
+    findings: undefined,
+    compatibility: "authoritative_agent_message"
+  });
+  await session.close();
+});
+
 test("process exit rejects calls and reconnect resumes the recorded thread", async () => {
   const transports: TranscriptTransport[] = [];
   const session = new CodexAppServerSession({

@@ -3,7 +3,7 @@ import type { ReviewFinding, RiskLevel } from "../v2/contracts";
 
 export interface ReviewRequestPort {
   request(method: "review/start", params: unknown): Promise<unknown>;
-  waitForReviewResult?(reviewerThreadId: string): Promise<unknown>;
+  waitForReviewResult?(reviewerThreadId: string, reviewTurnId?: string): Promise<unknown>;
 }
 
 export interface ReviewOutcome {
@@ -38,8 +38,10 @@ export class ReviewCoordinator {
       const reviewerId = typeof initial.reviewThreadId === "string"
         ? initial.reviewThreadId
         : typeof initial.threadId === "string" ? initial.threadId : typeof initial.thread_id === "string" ? initial.thread_id : "";
+      const reviewTurn = record(initial.turn);
+      const reviewTurnId = typeof reviewTurn.id === "string" ? reviewTurn.id : "";
       if (!Array.isArray(initial.findings) && typeof initial.text !== "string" && reviewerId && this.appServer.waitForReviewResult) {
-        const completed = await this.appServer.waitForReviewResult(reviewerId);
+        const completed = await this.appServer.waitForReviewResult(reviewerId, reviewTurnId);
         response = { ...record(completed), threadId: reviewerId };
       }
       const parsed = parseReviewResponse(response, round);

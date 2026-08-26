@@ -21,9 +21,15 @@ interface PendingRequest {
 }
 
 interface ReviewWaiter {
+  turnId: string;
   resolve(value: unknown): void;
   reject(error: Error): void;
   timeout: NodeJS.Timeout;
+}
+
+interface ReviewFallback {
+  turnId: string;
+  text: string;
 }
 
 interface TurnWaiter {
@@ -54,6 +60,8 @@ export class CodexAppServerSession {
   private cwd = "";
   private readonly emitter = new EventEmitter();
   private readonly reviewResults = new Map<string, unknown>();
+  private readonly reviewBindings = new Map<string, string>();
+  private readonly reviewFallbacks = new Map<string, ReviewFallback>();
   private readonly reviewWaiters = new Map<string, ReviewWaiter>();
   private readonly turnResults = new Map<string, unknown>();
   private readonly turnWaiters = new Map<string, TurnWaiter>();
@@ -82,18 +90,23 @@ export class CodexAppServerSession {
     return () => this.emitter.off("serverRequest", listener);
   }
 
-  public waitForReviewResult(reviewerThreadId: string): Promise<unknown> {
+  public waitForReviewResult(reviewerThreadId: string, reviewTurnId = ""): Promise<unknown> {
+    if (reviewTurnId) this.reviewBindings.set(reviewerThreadId, reviewTurnId);
     const completed = this.reviewResults.get(reviewerThreadId);
     if (completed !== undefined) {
       this.reviewResults.delete(reviewerThreadId);
       return Promise.resolve(completed);
     }
+    const fallback = this.compatibleReviewResult(reviewerThreadId, reviewTurnId);
+    if (fallback !== undefined) return Promise.resolve(fallback);
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.reviewWaiters.delete(reviewerThreadId);
+        this.reviewBindings.delete(reviewerThreadId);
+        this.reviewFallbacks.delete(reviewerThreadId);
         reject(new AppServerError("REVIEW_TIMEOUT", "Detached review result timed out."));
       }, this.timeoutMs);
-      this.reviewWaiters.set(reviewerThreadId, { resolve, reject, timeout });
+      this.reviewWaiters.set(reviewerThreadId, { turnId: reviewTurnId, resolve, reject, timeout });
     });
   }
 
@@ -181,6 +194,8 @@ export class CodexAppServerSession {
     this.rejectReviewWaiters(new AppServerError("SESSION_CLOSED", "App-server session closed."));
     this.rejectTurnWaiters(new AppServerError("SESSION_CLOSED", "App-server session closed."));
     this.reviewResults.clear();
+    this.reviewBindings.clear();
+    this.reviewFallbacks.clear();
     this.turnResults.clear();
     await transport?.close();
     this.projectionValue = { ...this.projectionValue, connection: "disconnected" };
@@ -254,6 +269,7 @@ export class CodexAppServerSession {
       if (isRecord(value.error)) {
         pending.reject(new AppServerError("REMOTE_ERROR", bounded(value.error.message ?? value.error, 2_048)));
       } else {
+        if (pending.method === "review/start") this.bindReviewResponse(value.result);
         pending.resolve(value.result);
       }
       return;
@@ -280,6 +296,10 @@ export class CodexAppServerSession {
     this.rejectPending(error);
     this.rejectReviewWaiters(error);
     this.rejectTurnWaiters(error);
+    this.reviewResults.clear();
+    this.reviewBindings.clear();
+    this.reviewFallbacks.clear();
+    this.turnResults.clear();
     this.initialized = false;
     this.projectionValue = addDiagnostic({ ...this.projectionValue, connection: "failed" }, "app_server_failure", error.message);
     this.publish();
@@ -296,26 +316,63 @@ export class CodexAppServerSession {
   private captureReviewResult(method: string, params: unknown): void {
     if (method !== "item/completed" || !isRecord(params)) return;
     const item = isRecord(params.item) ? params.item : params;
-    if (item.type !== "exitedReviewMode") return;
     const threadId = typeof params.threadId === "string"
       ? params.threadId
       : typeof params.thread_id === "string" ? params.thread_id : "";
     if (!threadId) return;
+    if (item.type === "agentMessage") {
+      const turnId = typeof params.turnId === "string"
+        ? params.turnId
+        : typeof params.turn_id === "string" ? params.turn_id : "";
+      const text = reviewText(item);
+      if (turnId && text && this.reviewBindings.get(threadId) === turnId) {
+        this.reviewFallbacks.set(threadId, { turnId, text });
+        if (this.reviewFallbacks.size > 16) this.reviewFallbacks.delete(this.reviewFallbacks.keys().next().value!);
+      }
+      return;
+    }
+    if (item.type !== "exitedReviewMode") return;
     const result = {
       text: typeof item.review === "string"
         ? bounded(item.review, 262_144)
         : typeof item.text === "string" ? bounded(item.text, 262_144) : "",
       findings: Array.isArray(item.findings) ? structuredClone(item.findings).slice(0, 128) : undefined
     };
+    this.deliverReviewResult(threadId, result);
+  }
+
+  private compatibleReviewResult(threadId: string, turnId: string): unknown | undefined {
+    if (!turnId || this.reviewBindings.get(threadId) !== turnId) return undefined;
+    const fallback = this.reviewFallbacks.get(threadId);
+    const completed = this.turnResults.get(turnId);
+    if (!fallback || fallback.turnId !== turnId || !isRecord(completed) || completed.status !== "completed") return undefined;
+    this.reviewFallbacks.delete(threadId);
+    this.reviewBindings.delete(threadId);
+    return { text: fallback.text, findings: undefined, compatibility: "authoritative_agent_message" };
+  }
+
+  private deliverReviewResult(threadId: string, result: unknown): void {
+    this.reviewBindings.delete(threadId);
+    this.reviewFallbacks.delete(threadId);
     const waiter = this.reviewWaiters.get(threadId);
     if (waiter) {
       clearTimeout(waiter.timeout);
       this.reviewWaiters.delete(threadId);
       waiter.resolve(result);
-    } else {
-      this.reviewResults.set(threadId, result);
-      if (this.reviewResults.size > 16) this.reviewResults.delete(this.reviewResults.keys().next().value!);
+      return;
     }
+    this.reviewResults.set(threadId, result);
+    if (this.reviewResults.size > 16) this.reviewResults.delete(this.reviewResults.keys().next().value!);
+  }
+
+  private bindReviewResponse(value: unknown): void {
+    if (!isRecord(value)) return;
+    const threadId = typeof value.reviewThreadId === "string" ? value.reviewThreadId : "";
+    const turn = isRecord(value.turn) ? value.turn : {};
+    const turnId = typeof turn.id === "string" ? turn.id : "";
+    if (!threadId || !turnId) return;
+    this.reviewBindings.set(threadId, turnId);
+    if (this.reviewBindings.size > 16) this.reviewBindings.delete(this.reviewBindings.keys().next().value!);
   }
 
   private rejectReviewWaiters(error: Error): void {
@@ -343,6 +400,19 @@ export class CodexAppServerSession {
       this.turnResults.set(turnId, result);
       if (this.turnResults.size > 16) this.turnResults.delete(this.turnResults.keys().next().value!);
     }
+    if (result.status === "completed") {
+      for (const [threadId, reviewWaiter] of this.reviewWaiters.entries()) {
+        if (reviewWaiter.turnId !== turnId) continue;
+        const fallback = this.reviewFallbacks.get(threadId);
+        if (!fallback || fallback.turnId !== turnId) continue;
+        this.reviewFallbacks.delete(threadId);
+        this.deliverReviewResult(threadId, {
+          text: fallback.text,
+          findings: undefined,
+          compatibility: "authoritative_agent_message"
+        });
+      }
+    }
   }
 
   private rejectTurnWaiters(error: Error): void {
@@ -356,4 +426,11 @@ export class CodexAppServerSession {
   private publish(): void {
     this.emitter.emit("projection", this.projection);
   }
+}
+
+function reviewText(item: Record<string, unknown>): string {
+  for (const key of ["review", "text", "content", "output", "message"]) {
+    if (typeof item[key] === "string") return bounded(item[key], 262_144);
+  }
+  return "";
 }

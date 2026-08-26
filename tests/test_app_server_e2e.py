@@ -443,22 +443,47 @@ class RealCodexAppServerTests(unittest.TestCase):
             reviewer_thread_id = review.get("reviewThreadId")
             self.assertIsInstance(reviewer_thread_id, str)
             self.assertNotEqual(reviewer_thread_id, thread_id)
-            review_item = client.wait_for(
+            review_turn_id = nested_id(review, "turn")
+            self.assertTrue(review_turn_id)
+            review_event = client.wait_for(
                 lambda item: (
-                    item.get("method") == "item/completed"
-                    and isinstance(item.get("params"), dict)
-                    and item["params"].get("threadId") == reviewer_thread_id
-                    and isinstance(item["params"].get("item"), dict)
-                    and item["params"]["item"].get("type") == "exitedReviewMode"
+                    (
+                        item.get("method") == "item/completed"
+                        and isinstance(item.get("params"), dict)
+                        and item["params"].get("threadId") == reviewer_thread_id
+                        and isinstance(item["params"].get("item"), dict)
+                        and item["params"]["item"].get("type") == "exitedReviewMode"
+                    )
+                    or turn_completed(review_turn_id)(item)
                 ),
                 timeout=240, after=review_start,
             )
-            review_text = review_item["params"]["item"].get("review")
+            review_completion = "exitedReviewMode"
+            if review_event.get("method") == "item/completed":
+                review_text = review_event["params"]["item"].get("review")
+                client.wait_for(turn_completed(review_turn_id), timeout=60, after=review_start)
+            else:
+                self.assertEqual(review_event["params"]["turn"].get("status"), "completed")
+                review_completion = "authoritative_agent_message"
+                review_text = ""
+                for message in client.messages[review_start:]:
+                    params = message.get("params")
+                    item = params.get("item") if isinstance(params, dict) else None
+                    if (
+                        message.get("method") == "item/completed"
+                        and isinstance(params, dict)
+                        and params.get("threadId") == reviewer_thread_id
+                        and params.get("turnId") == review_turn_id
+                        and isinstance(item, dict)
+                        and item.get("type") == "agentMessage"
+                    ):
+                        for key in ("text", "content", "output", "message"):
+                            if isinstance(item.get(key), str):
+                                review_text = item[key]
+                                break
             self.assertIsInstance(review_text, str)
             self.assertTrue(review_text.strip())
-            review_turn_id = nested_id(review, "turn")
-            if review_turn_id:
-                client.wait_for(turn_completed(review_turn_id), timeout=60, after=review_start)
+            self.assertIn("DEVWEAVE_REVIEW_OK", review_text)
 
             turn_status = interrupted["params"]["turn"].get("status")
             summary = {
@@ -473,6 +498,7 @@ class RealCodexAppServerTests(unittest.TestCase):
                 "interrupt_status": turn_status,
                 "detached_review": True,
                 "review_nonempty": True,
+                "review_completion": review_completion,
                 "messages_observed": len(client.messages),
                 "approval_policy": "untrusted",
                 "approvals_reviewer": "user",
